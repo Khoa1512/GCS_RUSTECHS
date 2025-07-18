@@ -1,0 +1,7 @@
+// ignore: file_names
+class AppRoute {
+  static const String home = '/';
+  static const String map = '/map';
+  static const String allDrone = '/all-drone';
+  static const String route = '/route';
+}

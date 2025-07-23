@@ -11,7 +11,7 @@ class CameraCompass extends StatefulWidget {
 }
 
 class _CameraCompassState extends State<CameraCompass> {
-  final double _fakeDirection = 45.0; // Fake compass direction in degrees
+  // Fake compass direction in degrees
 
   @override
   Widget build(BuildContext context) {

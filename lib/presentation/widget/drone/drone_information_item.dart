@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:skylink/data/model/drone_information_mode.dart';
+import 'package:skylink/data/models/drone_information_mode.dart';
 import 'package:skylink/presentation/widget/custom/custom_dotted_corner_border.dart';
 
 class DroneInformationItem extends StatefulWidget {

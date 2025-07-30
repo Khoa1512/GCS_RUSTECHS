@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:skylink/core/constant/app_color.dart';
-import 'package:skylink/data/model/flight_information_model.dart';
+import 'package:skylink/data/models/flight_information_model.dart';
 import 'package:skylink/presentation/widget/custom/custom_corner_border.dart';
 
 class BatteryStatus extends StatefulWidget {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:skylink/data/model/flight_log_model.dart';
+import 'package:skylink/data/models/flight_log_model.dart';
 
 class FlightLogItem extends StatelessWidget {
   final FlightLog flightLog;

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:skylink/core/constant/map_type.dart';
-import 'package:skylink/data/model/route_point_model.dart';
+import 'package:skylink/data/models/route_point_model.dart';
 import 'package:skylink/presentation/widget/map/main_map.dart';
 import 'package:skylink/presentation/widget/map/section/flight_log_section.dart';
 import 'package:skylink/presentation/widget/map/section/map_type_section.dart';

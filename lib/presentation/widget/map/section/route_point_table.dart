@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:skylink/data/model/route_point_model.dart';
+import 'package:skylink/data/models/route_point_model.dart';
 
 class RoutePointTable extends StatefulWidget {
   final List<RoutePoint> routePoints;

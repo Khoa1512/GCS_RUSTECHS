@@ -13,24 +13,46 @@ class _CameraMainViewState extends State<CameraMainView> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: BoxConstraints(minHeight: 700, minWidth: 300),
+      width: double.infinity,
+      height: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: Colors.white,
+        color: Colors.black,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 15,
+            offset: Offset(0, 8),
+          ),
+        ],
       ),
       child: Stack(
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.asset(
-              AppImage.camImage,
-              fit: BoxFit.fill,
-              height: 700,
-              width: 2000,
+            child: SizedBox.expand(
+              child: Image.asset(
+                AppImage.camImage,
+                fit: BoxFit
+                    .cover, // Changed from fill to cover for better aspect ratio
+              ),
             ),
           ),
+          // Camera overlay elements
           Positioned(top: 0, left: 0, bottom: 0, child: CameraStatus()),
-          // Positioned(top: 550, right: 0, bottom: 0, child: CameraCompass()),
+          // Optional: Add fullscreen button for camera
+          Positioned(
+            top: 16,
+            right: 16,
+            child: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.fullscreen, color: Colors.white, size: 20),
+            ),
+          ),
         ],
       ),
     );

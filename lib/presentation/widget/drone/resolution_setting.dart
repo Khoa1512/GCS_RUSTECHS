@@ -90,9 +90,10 @@ class _ResolutionSettingState extends State<ResolutionSetting> {
   Widget _buildResolutionSelector() {
     return Column(
       children: [
-        // Resolution options
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        // Resolution options - Using Wrap for better responsiveness
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: _resolutions.map((resolution) {
             final isSelected = _selectedResolution == resolution;
             return GestureDetector(

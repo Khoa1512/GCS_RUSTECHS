@@ -37,8 +37,8 @@ class _ControlPanelWidgetState extends State<ControlPanelWidget>
 
   Widget _buildControlPanel() {
     return Container(
-      height: 400,
-      width: 350,
+      height: double.infinity,
+      width: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         color: Colors.grey.shade800,
@@ -56,21 +56,20 @@ class _ControlPanelWidgetState extends State<ControlPanelWidget>
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(16.0), // Reduced from 20
         child: Column(
           children: [
-            // Header với title
+            // Header với title - more compact
             Text(
               'Gimbal Control',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 18,
+                fontSize: 16, // Reduced from 18
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.5,
               ),
             ),
-            SizedBox(height: 16),
-
+            SizedBox(height: 12), // Reduced from 16
             // AWB and DISP buttons - Modern design
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -92,14 +91,13 @@ class _ControlPanelWidgetState extends State<ControlPanelWidget>
                 ),
               ],
             ),
-            SizedBox(height: 24),
-
-            // Modern Circular directional control
+            SizedBox(height: 16), // Reduced from 24
+            // Modern Circular directional control - more compact
             Expanded(
               child: Center(
                 child: Container(
-                  width: 250,
-                  height: 250,
+                  width: 200, // Reduced from 250
+                  height: 200, // Reduced from 250
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
@@ -129,8 +127,8 @@ class _ControlPanelWidgetState extends State<ControlPanelWidget>
                       // Inner circle với glassmorphism
                       Center(
                         child: Container(
-                          width: 150,
-                          height: 150,
+                          width: 120, // Reduced from 150
+                          height: 120, // Reduced from 150
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: LinearGradient(
@@ -159,7 +157,7 @@ class _ControlPanelWidgetState extends State<ControlPanelWidget>
                               color: AppColors.primaryColor.withValues(
                                 alpha: 0.6,
                               ),
-                              size: 32,
+                              size: 24, // Reduced from 32
                             ),
                           ),
                         ),
@@ -207,9 +205,12 @@ class _ControlPanelWidgetState extends State<ControlPanelWidget>
       onTap: onTap,
       child: AnimatedContainer(
         duration: Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        padding: EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 10,
+        ), // Reduced padding
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12), // Slightly smaller radius
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -231,13 +232,13 @@ class _ControlPanelWidgetState extends State<ControlPanelWidget>
               color: isSelected
                   ? AppColors.primaryColor.withValues(alpha: 0.3)
                   : Colors.black.withValues(alpha: 0.2),
-              blurRadius: isSelected ? 10 : 8,
-              offset: Offset(0, 4),
+              blurRadius: isSelected ? 8 : 6, // Reduced blur
+              offset: Offset(0, 3), // Reduced offset
             ),
             if (isSelected)
               BoxShadow(
                 color: AppColors.primaryColor.withValues(alpha: 0.2),
-                blurRadius: 16,
+                blurRadius: 12, // Reduced blur
                 offset: Offset(0, 0),
               ),
           ],
@@ -248,15 +249,15 @@ class _ControlPanelWidgetState extends State<ControlPanelWidget>
             Icon(
               icon,
               color: isSelected ? Colors.white : AppColors.primaryColor,
-              size: 18,
+              size: 16, // Reduced from 18
             ),
-            SizedBox(width: 8),
+            SizedBox(width: 6), // Reduced from 8
             Text(
               text,
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                fontSize: 14,
+                fontSize: 12, // Reduced from 14
               ),
             ),
           ],
@@ -286,9 +287,9 @@ class _ControlPanelWidgetState extends State<ControlPanelWidget>
         },
         child: AnimatedContainer(
           duration: Duration(milliseconds: 200),
-          width: 64,
-          height: 64,
-          margin: EdgeInsets.all(8),
+          width: 48, // Reduced from 64
+          height: 48, // Reduced from 64
+          margin: EdgeInsets.all(6), // Reduced from 8
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: isSelected
@@ -316,13 +317,13 @@ class _ControlPanelWidgetState extends State<ControlPanelWidget>
                 color: isSelected
                     ? AppColors.primaryColor.withValues(alpha: 0.3)
                     : Colors.black.withValues(alpha: 0.3),
-                blurRadius: isSelected ? 12 : 6,
-                offset: Offset(0, isSelected ? 6 : 3),
+                blurRadius: isSelected ? 10 : 5, // Reduced blur
+                offset: Offset(0, isSelected ? 4 : 2), // Reduced offset
               ),
               if (isSelected)
                 BoxShadow(
                   color: AppColors.primaryColor.withValues(alpha: 0.2),
-                  blurRadius: 20,
+                  blurRadius: 16,
                   offset: Offset(0, 0),
                 ),
             ],
@@ -332,7 +333,7 @@ class _ControlPanelWidgetState extends State<ControlPanelWidget>
             color: isSelected
                 ? Colors.white
                 : Colors.white.withValues(alpha: 0.8),
-            size: 28,
+            size: 20, // Reduced from 28
           ),
         ),
       ),

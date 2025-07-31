@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 class ResponsiveDimensions {
-  // Breakpoints
-  static const double mobileBreakpoint = 600;
-  static const double tabletBreakpoint = 1200;
-  static const double desktopBreakpoint = 1200;
+
+  static const double mobileBreakpoint = 768;
+  static const double tabletBreakpoint = 1024;
+  static const double desktopBreakpoint = 1024;
 
   // Spacing
   static const double spacingXS = 4.0;
@@ -14,12 +14,16 @@ class ResponsiveDimensions {
   static const double spacingXL = 32.0;
   static const double spacingXXL = 48.0;
 
-  // Get device type
+  // Get device type - Improved logic
   static DeviceType getDeviceType(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    if (width < mobileBreakpoint) return DeviceType.mobile;
-    if (width < tabletBreakpoint) return DeviceType.tablet;
-    return DeviceType.desktop;
+    final height = MediaQuery.of(context).size.height;
+
+    // Check for desktop based on both width and context
+    if (width >= desktopBreakpoint) return DeviceType.desktop;
+    if (width >= tabletBreakpoint && width < desktopBreakpoint)
+      return DeviceType.tablet;
+    return DeviceType.mobile;
   }
 
   // Responsive spacing

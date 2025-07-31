@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:skylink/data/model/flight_log_model.dart';
+import 'package:skylink/data/models/flight_log_model.dart';
 import 'package:skylink/presentation/widget/map/log_item.dart';
 
 class FlightLogSection extends StatefulWidget {

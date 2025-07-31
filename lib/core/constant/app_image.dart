@@ -18,4 +18,6 @@ class AppImage {
   static const String oceanBaseMap = 'assets/images/oceanBaseMap.jpeg';
 
   static const String topoMap = 'assets/images/topoMap.jpeg';
+
+  static const String camImage = 'assets/images/bg.jpeg';
 }

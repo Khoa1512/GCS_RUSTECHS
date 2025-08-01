@@ -9,7 +9,6 @@ import 'package:skylink/presentation/widget/flight/drone_map_widget.dart';
 import 'package:skylink/responsive/responsive_layout.dart';
 import 'package:skylink/responsive/mobile_body.dart';
 import 'package:skylink/responsive/tablet_body.dart';
-import 'package:skylink/core/constant/app_color.dart';
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
@@ -29,6 +28,8 @@ class _HomepageState extends State<Homepage> {
   double? droneHeading;
 
   void _onConnectionStateChanged(connection.ConnectionState newState) {
+    // print('Connection state changing from $_connectionState to $newState');
+
     setState(() {
       _connectionState = newState;
 
@@ -51,6 +52,7 @@ class _HomepageState extends State<Homepage> {
         droneHeading = null;
       }
     });
+
   }
 
   void _simulateConnection() {
@@ -65,7 +67,9 @@ class _HomepageState extends State<Homepage> {
   }
 
   void _disconnect() {
-    _onConnectionStateChanged(connection.ConnectionState.disconnected);
+    if (_connectionState != connection.ConnectionState.disconnected) {
+      _onConnectionStateChanged(connection.ConnectionState.disconnected);
+    }
   }
 
   @override

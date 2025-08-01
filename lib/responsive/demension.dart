@@ -21,8 +21,9 @@ class ResponsiveDimensions {
 
     // Check for desktop based on both width and context
     if (width >= desktopBreakpoint) return DeviceType.desktop;
-    if (width >= tabletBreakpoint && width < desktopBreakpoint)
+    if (width >= tabletBreakpoint && width < desktopBreakpoint) {
       return DeviceType.tablet;
+    }
     return DeviceType.mobile;
   }
 

@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:skylink/responsive/demension.dart';
-import 'package:skylink/presentation/widget/connection/connection_widget.dart'
-    as connection;
-import 'dart:async';
 
 class AppStatusBar extends StatefulWidget {
   const AppStatusBar({super.key});
@@ -13,24 +10,6 @@ class AppStatusBar extends StatefulWidget {
 
 class _AppStatusBarState extends State<AppStatusBar> {
   bool _isHovered = false;
-  Timer? _refreshTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    // Refresh every 500ms to update connection status
-    _refreshTimer = Timer.periodic(Duration(milliseconds: 500), (timer) {
-      if (mounted) {
-        setState(() {});
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -107,7 +86,12 @@ class _AppStatusBarState extends State<AppStatusBar> {
                       textColor: Colors.white,
                     ),
                     SizedBox(width: ResponsiveDimensions.spacingM),
-                    _buildConnectionStatus(),
+                    _buildInfoItem(
+                      icon: Icons.online_prediction,
+                      text: 'Connected',
+                      iconColor: Colors.green.shade400,
+                      textColor: Colors.white,
+                    ),
                     SizedBox(width: ResponsiveDimensions.spacingM),
                     _buildTimeItem(text: '11:43 AM'),
                     SizedBox(width: ResponsiveDimensions.spacingS),
@@ -119,64 +103,6 @@ class _AppStatusBarState extends State<AppStatusBar> {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildConnectionStatus() {
-    final connectionState = connection.ConnectionManager.currentState;
-
-    String statusText;
-    Color statusColor;
-    IconData statusIcon;
-
-    switch (connectionState) {
-      case connection.ConnectionState.disconnected:
-        statusText = 'Disconnected';
-        statusColor = Colors.red.shade600;
-        statusIcon = Icons.wifi_off;
-        break;
-      case connection.ConnectionState.gpsConnected:
-        statusText = 'GPS Only';
-        statusColor = Colors.orange.shade600;
-        statusIcon = Icons.gps_fixed;
-        break;
-      case connection.ConnectionState.fullyConnected:
-        statusText = 'Connected';
-        statusColor = const Color(0xFF00C896);
-        statusIcon = Icons.wifi;
-        break;
-    }
-
-    return GestureDetector(
-      onTap: connectionState != connection.ConnectionState.disconnected
-          ? connection.ConnectionManager.onDisconnect
-          : null,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: statusColor,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(statusIcon, size: 12, color: Colors.white),
-            SizedBox(width: 4),
-            Text(
-              statusText,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            if (connectionState != connection.ConnectionState.disconnected) ...[
-              SizedBox(width: 4),
-              Icon(Icons.close, size: 10, color: Colors.white70),
-            ],
-          ],
-        ),
-      ),
     );
   }
 

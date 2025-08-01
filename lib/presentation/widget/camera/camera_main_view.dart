@@ -40,19 +40,6 @@ class _CameraMainViewState extends State<CameraMainView> {
           ),
           // Camera overlay elements
           Positioned(top: 0, left: 0, bottom: 0, child: CameraStatus()),
-          // Optional: Add fullscreen button for camera
-          Positioned(
-            top: 16,
-            right: 16,
-            child: Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.fullscreen, color: Colors.white, size: 20),
-            ),
-          ),
         ],
       ),
     );

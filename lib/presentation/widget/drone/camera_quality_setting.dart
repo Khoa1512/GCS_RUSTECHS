@@ -26,15 +26,21 @@ class _CameraQualitySettingState extends State<CameraQualitySetting> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 1200;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           "Camera Quality Setting",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: isSmallScreen ? 14 : 16,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
@@ -51,27 +57,32 @@ class _CameraQualitySettingState extends State<CameraQualitySetting> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
+                textStyle: TextStyle(fontSize: isSmallScreen ? 10 : 12),
               ),
-              segments: const [
+              segments: [
                 ButtonSegment<String>(
                   value: 'low',
                   label: Text('Low'),
-                  icon: Icon(Icons.camera),
+                  icon: isSmallScreen ? null : Icon(Icons.camera, size: 16),
                 ),
                 ButtonSegment<String>(
                   value: 'medium',
-                  label: Text('Medium'),
-                  icon: Icon(Icons.camera_alt),
+                  label: Text(isSmallScreen ? 'Med' : 'Medium'),
+                  icon: isSmallScreen ? null : Icon(Icons.camera_alt, size: 16),
                 ),
                 ButtonSegment<String>(
                   value: 'high',
                   label: Text('High'),
-                  icon: Icon(Icons.high_quality),
+                  icon: isSmallScreen
+                      ? null
+                      : Icon(Icons.high_quality, size: 16),
                 ),
                 ButtonSegment<String>(
                   value: 'ultra',
                   label: Text('Ultra'),
-                  icon: Icon(Icons.photo_size_select_small),
+                  icon: isSmallScreen
+                      ? null
+                      : Icon(Icons.photo_size_select_small, size: 16),
                 ),
               ],
               selected: {_selectedQuality},

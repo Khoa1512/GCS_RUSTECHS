@@ -54,22 +54,37 @@ class _DroneInformationItemState extends State<DroneInformationItem>
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final imageWidth = screenWidth < 1200 ? 80.0 : 100.0;
+    final imageHeight = screenWidth < 1200 ? 60.0 : 80.0;
+
     return Container(
       padding: EdgeInsets.all(16),
       child: Row(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.droneInformation.name,
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-              ),
-              SizedBox(height: 10),
-              Text(widget.droneInformation.description),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.droneInformation.name,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: screenWidth < 1200 ? 16 : 20,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: 10),
+                Text(
+                  widget.droneInformation.description,
+                  style: TextStyle(fontSize: screenWidth < 1200 ? 12 : 14),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+              ],
+            ),
           ),
-          const Spacer(),
+          SizedBox(width: 8),
           MouseRegion(
             onEnter: (_) {
               setState(() => _isHovered = true);
@@ -80,7 +95,7 @@ class _DroneInformationItemState extends State<DroneInformationItem>
               _stopTakeoff();
             },
             child: Container(
-              padding: EdgeInsets.all(20),
+              padding: EdgeInsets.all(12),
               child: AnimatedBuilder(
                 animation: _takeoffController,
                 builder: (context, child) {
@@ -93,8 +108,8 @@ class _DroneInformationItemState extends State<DroneInformationItem>
                         child: CustomPaint(
                           painter: DottedBorderPainter(),
                           child: Container(
-                            height: 100,
-                            width: 150,
+                            height: imageHeight,
+                            width: imageWidth,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(4),
                               boxShadow: _isHovered
@@ -111,8 +126,8 @@ class _DroneInformationItemState extends State<DroneInformationItem>
                               borderRadius: BorderRadius.circular(2),
                               child: Image.asset(
                                 widget.droneInformation.image,
-                                height: 100,
-                                width: 150,
+                                height: imageHeight,
+                                width: imageWidth,
                                 fit: BoxFit.cover,
                               ),
                             ),

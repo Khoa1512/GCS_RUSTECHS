@@ -18,35 +18,54 @@ class _DroneInformationSectionState extends State<DroneInformationSection> {
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: double.infinity,
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         color: Colors.grey.shade800,
-      ),
-      child: Column(
-        children: [
-          DroneInformationItem(droneInformation: FakeData.droneInformation[0]),
-          BatteryStatus(flightInformation: FakeData.fightInformation[0]),
-          AltitudeLimitation(
-            currentAltitude: double.parse(FakeData.fightInformation[0].height),
-            maxAltitude: 300.0,
-            onAltitudeChanged: (value) {
-              // Handle altitude change
-            },
-          ),
-          ResolutionSetting(
-            currentResolution: FakeData.fightInformation[0].resolution,
-            onResolutionChanged: (value) {
-              // Handle resolution change
-            },
-          ),
-          CameraQualitySetting(
-            currentQuality: "hdr",
-            onQualityChanged: (value) {
-              // Handle quality change
-            },
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 10,
+            offset: Offset(0, 4),
           ),
         ],
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DroneInformationItem(
+              droneInformation: FakeData.droneInformation[0],
+            ),
+            SizedBox(height: 12),
+            BatteryStatus(flightInformation: FakeData.fightInformation[0]),
+            SizedBox(height: 12),
+            AltitudeLimitation(
+              currentAltitude: double.parse(
+                FakeData.fightInformation[0].height,
+              ),
+              maxAltitude: 300.0,
+              onAltitudeChanged: (value) {
+                // Handle altitude change
+              },
+            ),
+            SizedBox(height: 12),
+            ResolutionSetting(
+              currentResolution: FakeData.fightInformation[0].resolution,
+              onResolutionChanged: (value) {
+                // Handle resolution change
+              },
+            ),
+            SizedBox(height: 12),
+            CameraQualitySetting(
+              currentQuality: "hdr",
+              onQualityChanged: (value) {
+                // Handle quality change
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

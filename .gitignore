@@ -134,4 +134,5 @@ lcov.info
 # Other
 *.log
 *.tmp
-*.temp 
+*.temp
+.metadata

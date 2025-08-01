@@ -48,7 +48,6 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 400,
       width: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
@@ -66,10 +65,14 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(16.0), // Reduced from 24
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [_buildHeader(), SizedBox(height: 24), _buildMainContent()],
+          children: [
+            _buildHeader(),
+            SizedBox(height: 12), // Reduced from 20
+            Expanded(child: _buildMainContent()),
+          ],
         ),
       ),
     );
@@ -114,14 +117,12 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   Widget _buildMainContent() {
-    return Expanded(
-      child: Row(
-        children: [
-          _buildMapSection(),
-          SizedBox(width: 20),
-          _buildTelemetrySection(),
-        ],
-      ),
+    return Row(
+      children: [
+        _buildMapSection(),
+        SizedBox(width: 20),
+        _buildTelemetrySection(),
+      ],
     );
   }
 
@@ -141,7 +142,7 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
     return Expanded(
       flex: 4,
       child: Container(
-        padding: EdgeInsets.all(20),
+        padding: EdgeInsets.all(12), // Reduced from 20
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           gradient: LinearGradient(
@@ -158,8 +159,8 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildTelemetryHeader(),
-            SizedBox(height: 16),
-            _buildTelemetryGrid(),
+            SizedBox(height: 8), // Reduced from 16
+            Expanded(child: _buildTelemetryGrid()),
           ],
         ),
       ),
@@ -184,32 +185,30 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   Widget _buildTelemetryGrid() {
-    return Expanded(
-      child: Column(
-        children: [
-          _buildTelemetryRow([0, 1, 2]),
-          SizedBox(height: 12),
-          _buildTelemetryRow([3, 4, 5]),
-          SizedBox(height: 12),
-          _buildTelemetryRow([6, 7, 8]),
-        ],
-      ),
+    return Column(
+      children: [
+        Expanded(child: _buildTelemetryRow([0, 1, 2])),
+        SizedBox(height: 6), // Reduced from 12
+        Expanded(child: _buildTelemetryRow([3, 4, 5])),
+        SizedBox(height: 6), // Reduced from 12
+        Expanded(child: _buildTelemetryRow([6, 7, 8])),
+      ],
     );
   }
 
   Widget _buildTelemetryRow(List<int> indices) {
-    return Expanded(
-      child: Row(
-        children: [
-          for (int i = 0; i < indices.length; i++) ...[
-            TelemetryItemWidget(
+    return Row(
+      children: [
+        for (int i = 0; i < indices.length; i++) ...[
+          Expanded(
+            child: TelemetryItemWidget(
               telemetry: displayedTelemetry[indices[i]],
               onTap: () => _showTelemetrySelector(indices[i]),
             ),
-            if (i < indices.length - 1) SizedBox(width: 8),
-          ],
+          ),
+          if (i < indices.length - 1) SizedBox(width: 6), // Reduced from 8
         ],
-      ),
+      ],
     );
   }
 }

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:skylink/responsive/demension.dart';
+import 'package:skylink/services/telemetry_service.dart';
+import 'package:skylink/presentation/widget/connection/connection_dialog.dart';
+import 'dart:async';
 
 class AppStatusBar extends StatefulWidget {
   const AppStatusBar({super.key});
@@ -10,6 +13,36 @@ class AppStatusBar extends StatefulWidget {
 
 class _AppStatusBarState extends State<AppStatusBar> {
   bool _isHovered = false;
+  final TelemetryService _telemetryService = TelemetryService();
+  StreamSubscription? _connectionSubscription;
+  bool _isConnected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isConnected = _telemetryService.isConnected;
+
+    // Listen to connection status changes
+    _connectionSubscription = _telemetryService.connectionStream.listen((
+      connected,
+    ) {
+      if (mounted) {
+        setState(() {
+          _isConnected = connected;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectionSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _showConnectionDialog() {
+    ConnectionDialog.show(context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -86,11 +119,7 @@ class _AppStatusBarState extends State<AppStatusBar> {
                       textColor: Colors.white,
                     ),
                     SizedBox(width: ResponsiveDimensions.spacingM),
-                    _buildConnectStatus(
-                      isConnected: true,
-                      text: 'Ongoing',
-                      subText: '12 >',
-                    ),
+                    _buildDroneConnection(),
                     SizedBox(width: ResponsiveDimensions.spacingM),
                     _buildTimeItem(text: '11:43 AM'),
                     SizedBox(width: ResponsiveDimensions.spacingS),
@@ -105,38 +134,49 @@ class _AppStatusBarState extends State<AppStatusBar> {
     );
   }
 
-  Widget _buildConnectStatus({
-    required bool isConnected,
-    required String text,
-    required String subText,
-  }) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF00C896),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            text,
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+  Widget _buildDroneConnection() {
+    return GestureDetector(
+      onTap: _showConnectionDialog,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: _isConnected
+              ? const Color(0xFF00C896)
+              : const Color(0xFFFF6B6B),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _isConnected ? Icons.link : Icons.link_off,
+              color: Colors.white,
+              size: 14,
             ),
-          ),
-          SizedBox(width: 4),
-          Text(
-            subText,
-            style: TextStyle(
-              color: Colors.black54,
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
+            SizedBox(width: 4),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _isConnected ? 'Connected' : 'Disconnected',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  _isConnected ? 'MAVLink' : 'Tap to connect',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 9,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

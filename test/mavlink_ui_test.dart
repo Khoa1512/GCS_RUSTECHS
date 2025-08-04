@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import '../lib/api/telemetry/mavlink_api.dart';
+import 'package:skylink/api/telemetry/mavlink_api.dart';
 
 void main() {
   runApp(MAVLinkTestApp());
 }
 
 class MAVLinkTestApp extends StatelessWidget {
+  const MAVLinkTestApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -21,6 +23,8 @@ class MAVLinkTestApp extends StatelessWidget {
 }
 
 class MAVLinkDashboard extends StatefulWidget {
+  const MAVLinkDashboard({super.key});
+
   @override
   _MAVLinkDashboardState createState() => _MAVLinkDashboardState();
 }
@@ -28,12 +32,12 @@ class MAVLinkDashboard extends StatefulWidget {
 class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
   late DroneMAVLinkAPI _api;
   late StreamSubscription _eventSubscription;
-  
+
   // Connection state
   bool _isConnected = false;
   String _selectedPort = '';
   List<String> _availablePorts = [];
-  
+
   // Vehicle state
   String _flightMode = 'Unknown';
   bool _isArmed = false;
@@ -41,45 +45,45 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
   int _satellites = 0;
   int _batteryPercent = 0;
   double _batteryVoltage = 0.0;
-  
+
   // Attitude data
   double _roll = 0.0;
   double _pitch = 0.0;
   double _yaw = 0.0;
-  
+
   // Position data
   double _latitude = 0.0;
   double _longitude = 0.0;
   double _altitudeMSL = 0.0;
   double _altitudeRelative = 0.0;
-  
+
   // Speed data
   double _airspeed = 0.0;
   double _groundspeed = 0.0;
-  
+
   // Status messages
-  List<String> _statusMessages = [];
-  
+  final List<String> _statusMessages = [];
+
   // Parameters
   Map<String, double> _parameters = {};
   bool _parametersLoaded = false;
-  
+
   @override
   void initState() {
     super.initState();
     _initializeAPI();
   }
-  
+
   void _initializeAPI() {
     _api = DroneMAVLinkAPI();
-    
+
     // Listen to all MAVLink events
     _eventSubscription = _api.eventStream.listen(_handleMAVLinkEvent);
-    
+
     // Get available ports
     _refreshPorts();
   }
-  
+
   void _refreshPorts() {
     setState(() {
       _availablePorts = _api.getAvailablePorts();
@@ -88,61 +92,61 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
       }
     });
   }
-  
+
   void _handleMAVLinkEvent(MAVLinkEvent event) {
     if (!mounted) return;
-    
+
     setState(() {
       switch (event.type) {
         case MAVLinkEventType.connectionStateChanged:
           _isConnected = event.data == MAVLinkConnectionState.connected;
           break;
-          
+
         case MAVLinkEventType.heartbeat:
           _flightMode = event.data['mode'] ?? 'Unknown';
           _isArmed = event.data['armed'] ?? false;
           break;
-          
+
         case MAVLinkEventType.attitude:
           _roll = event.data['roll'] ?? 0.0;
           _pitch = event.data['pitch'] ?? 0.0;
           _yaw = event.data['yaw'] ?? 0.0;
           break;
-          
+
         case MAVLinkEventType.position:
           _latitude = event.data['lat'] ?? 0.0;
           _longitude = event.data['lon'] ?? 0.0;
           _altitudeMSL = event.data['altMSL'] ?? 0.0;
           _altitudeRelative = event.data['altRelative'] ?? 0.0;
           break;
-          
+
         case MAVLinkEventType.gpsInfo:
           _gpsFixType = event.data['fixType'] ?? 'No GPS';
           _satellites = event.data['satellites'] ?? 0;
           break;
-          
+
         case MAVLinkEventType.batteryStatus:
           _batteryPercent = event.data['batteryPercent'] ?? 0;
           _batteryVoltage = event.data['voltageBattery'] ?? 0.0;
           break;
-          
+
         case MAVLinkEventType.vfrHud:
           _airspeed = event.data['airspeed'] ?? 0.0;
           _groundspeed = event.data['groundspeed'] ?? 0.0;
           break;
-          
+
         case MAVLinkEventType.statusText:
           String severity = event.data['severity'] ?? 'Info';
           String text = event.data['text'] ?? '';
           _addStatusMessage('[$severity] $text');
           break;
-          
+
         case MAVLinkEventType.allParametersReceived:
           _parameters = Map<String, double>.from(event.data);
           _parametersLoaded = true;
           _addStatusMessage('Received ${_parameters.length} parameters');
           break;
-          
+
         case MAVLinkEventType.parameterReceived:
           String paramName = event.data['id'] ?? '';
           double paramValue = event.data['value'] ?? 0.0;
@@ -151,23 +155,23 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
       }
     });
   }
-  
+
   void _addStatusMessage(String message) {
     _statusMessages.insert(0, '${DateTime.now().toLocal().toString().substring(11, 19)}: $message');
     if (_statusMessages.length > 50) {
       _statusMessages.removeLast();
     }
   }
-  
+
   Future<void> _connect() async {
     if (_selectedPort.isEmpty) {
       _showSnackBar('Please select a port');
       return;
     }
-    
+
     _addStatusMessage('Connecting to $_selectedPort...');
     bool success = await _api.connect(_selectedPort, baudRate: 115200);
-    
+
     if (success) {
       _addStatusMessage('Connected successfully');
       // Request parameters after connection
@@ -178,48 +182,48 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
       _addStatusMessage('Connection failed');
     }
   }
-  
+
   void _disconnect() {
     _api.disconnect();
     _addStatusMessage('Disconnected');
   }
-  
+
   void _armDrone() {
     if (!_isConnected) {
       _showSnackBar('Not connected to drone');
       return;
     }
-    
+
     _api.sendArmCommand(true);
     _addStatusMessage('Arming command sent');
   }
-  
+
   void _disarmDrone() {
     if (!_isConnected) {
       _showSnackBar('Not connected to drone');
       return;
     }
-    
+
     _api.sendArmCommand(false);
     _addStatusMessage('Disarming command sent');
   }
-  
+
   void _setFlightMode(int mode, String modeName) {
     if (!_isConnected) {
       _showSnackBar('Not connected to drone');
       return;
     }
-    
+
     _api.setFlightMode(mode);
     _addStatusMessage('Set flight mode to $modeName');
   }
-  
+
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -240,9 +244,9 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
           children: [
             // Connection Panel
             _buildConnectionPanel(),
-            
+
             SizedBox(height: 16),
-            
+
             // Main content
             Expanded(
               child: Row(
@@ -260,9 +264,9 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
                       ],
                     ),
                   ),
-                  
+
                   SizedBox(width: 16),
-                  
+
                   // Right column - Controls and Messages
                   Expanded(
                     flex: 1,
@@ -284,7 +288,7 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
       ),
     );
   }
-  
+
   Widget _buildConnectionPanel() {
     return Card(
       child: Padding(
@@ -319,10 +323,10 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
                 SizedBox(width: 16),
                 ElevatedButton(
                   onPressed: _isConnected ? _disconnect : _connect,
-                  child: Text(_isConnected ? 'Disconnect' : 'Connect'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _isConnected ? Colors.red : Colors.green,
                   ),
+                  child: Text(_isConnected ? 'Disconnect' : 'Connect'),
                 ),
               ],
             ),
@@ -348,7 +352,7 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
       ),
     );
   }
-  
+
   Widget _buildVehicleStatusPanel() {
     return Card(
       child: Padding(
@@ -372,7 +376,7 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
       ),
     );
   }
-  
+
   Widget _buildStatusRow(String label, String value, Color color) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4),
@@ -391,7 +395,7 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
       ),
     );
   }
-  
+
   Widget _buildBatteryRow() {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4),
@@ -420,7 +424,7 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
       ),
     );
   }
-  
+
   Widget _buildSpeedRow() {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4),
@@ -436,7 +440,7 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
       ),
     );
   }
-  
+
   Widget _buildAttitudePanel() {
     return Card(
       child: Padding(
@@ -462,7 +466,7 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
       ),
     );
   }
-  
+
   Widget _buildAttitudeIndicator(String label, double angle, Color color) {
     return Column(
       children: [
@@ -489,7 +493,7 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
       ],
     );
   }
-  
+
   Widget _buildPositionPanel() {
     return Card(
       child: Padding(
@@ -511,7 +515,7 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
       ),
     );
   }
-  
+
   Widget _buildControlPanel() {
     return Card(
       child: Padding(
@@ -524,40 +528,40 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 16),
-            
+
             // Arm/Disarm buttons
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton(
                     onPressed: _isConnected && !_isArmed ? _armDrone : null,
-                    child: Text('ARM'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
                     ),
+                    child: Text('ARM'),
                   ),
                 ),
                 SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: _isConnected && _isArmed ? _disarmDrone : null,
-                    child: Text('DISARM'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
                     ),
+                    child: Text('DISARM'),
                   ),
                 ),
               ],
             ),
-            
+
             SizedBox(height: 16),
-            
+
             // Flight mode buttons
             Text('Flight Modes:', style: TextStyle(fontWeight: FontWeight.w500)),
             SizedBox(height: 8),
-            
+
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -569,37 +573,37 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
                 _buildModeButton('GUIDED', 14),
               ],
             ),
-            
+
             SizedBox(height: 16),
-            
+
             // Parameter request button
             ElevatedButton(
               onPressed: _isConnected ? () => _api.requestAllParameters() : null,
-              child: Text('Request Parameters'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
               ),
+              child: Text('Request Parameters'),
             ),
           ],
         ),
       ),
     );
   }
-  
+
   Widget _buildModeButton(String modeName, int modeNumber) {
     bool isCurrentMode = _flightMode == modeName;
-    
+
     return ElevatedButton(
       onPressed: _isConnected ? () => _setFlightMode(modeNumber, modeName) : null,
-      child: Text(modeName),
       style: ElevatedButton.styleFrom(
         backgroundColor: isCurrentMode ? Colors.orange : Colors.grey,
         foregroundColor: Colors.white,
       ),
+      child: Text(modeName),
     );
   }
-  
+
   Widget _buildParametersPanel() {
     return Card(
       child: Padding(
@@ -624,16 +628,16 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
               ],
             ),
             SizedBox(height: 8),
-            
+
             if (_parameters.isNotEmpty) ...[
-              Container(
+              SizedBox(
                 height: 150,
                 child: ListView.builder(
                   itemCount: _parameters.length,
                   itemBuilder: (context, index) {
                     String key = _parameters.keys.elementAt(index);
                     double value = _parameters[key]!;
-                    
+
                     return ListTile(
                       dense: true,
                       title: Text(key, style: TextStyle(fontSize: 12)),
@@ -658,7 +662,7 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
       ),
     );
   }
-  
+
   Widget _buildStatusMessagesPanel() {
     return Card(
       child: Padding(
@@ -671,7 +675,7 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 8),
-            Container(
+            SizedBox(
               height: 200,
               child: ListView.builder(
                 itemCount: _statusMessages.length,
@@ -691,7 +695,7 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
       ),
     );
   }
-  
+
   Color _getFlightModeColor() {
     switch (_flightMode) {
       case 'STABILIZE':
@@ -708,7 +712,7 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
         return Colors.grey;
     }
   }
-  
+
   Color _getGPSColor() {
     if (_gpsFixType.contains('3D') || _gpsFixType.contains('RTK')) {
       return Colors.green;
@@ -718,19 +722,19 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
       return Colors.red;
     }
   }
-  
+
   Color _getSatelliteColor() {
     if (_satellites >= 8) return Colors.green;
     if (_satellites >= 6) return Colors.orange;
     return Colors.red;
   }
-  
+
   Color _getBatteryColor() {
     if (_batteryPercent > 50) return Colors.green;
     if (_batteryPercent > 25) return Colors.orange;
     return Colors.red;
   }
-  
+
   @override
   void dispose() {
     _eventSubscription.cancel();

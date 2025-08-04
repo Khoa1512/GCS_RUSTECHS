@@ -19,5 +19,5 @@ class AppImage {
 
   static const String topoMap = 'assets/images/topoMap.jpeg';
 
-  static const String camImage = 'assets/images/bg.jpeg';
+  static const String camImage = 'assets/images/backgroundcam.png';
 }

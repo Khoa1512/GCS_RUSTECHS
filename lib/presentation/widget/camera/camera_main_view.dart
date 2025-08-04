@@ -12,8 +12,15 @@ class CameraMainView extends StatefulWidget {
 class _CameraMainViewState extends State<CameraMainView> {
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return Container(
-      constraints: BoxConstraints(minHeight: 700, minWidth: 300),
+      constraints: BoxConstraints(
+        minHeight:
+            screenHeight * 0.4, // 40% of screen height instead of fixed 700
+        minWidth: screenWidth > 600 ? 300 : 200, // Responsive min width
+      ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         color: Colors.white,
@@ -24,9 +31,10 @@ class _CameraMainViewState extends State<CameraMainView> {
             borderRadius: BorderRadius.circular(12),
             child: Image.asset(
               AppImage.camImage,
-              fit: BoxFit.fill,
-              height: 700,
-              width: 2000,
+              fit: BoxFit
+                  .cover, // Changed from fill to cover for better aspect ratio
+              width: double.infinity,
+              height: double.infinity,
             ),
           ),
           Positioned(top: 0, left: 0, bottom: 0, child: CameraStatus()),

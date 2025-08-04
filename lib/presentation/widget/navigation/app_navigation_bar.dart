@@ -30,7 +30,6 @@ class _AppNavigationBarState extends State<AppNavigationBar>
     super.initState();
   }
 
-
   void _updateIndicatorPosition(String currentRoute) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final routes = [
@@ -135,6 +134,9 @@ class _AppNavigationBarState extends State<AppNavigationBar>
                 // Animated selection indicator (render first so buttons appear on top)
                 if (_isInitialized)
                   AnimatedPositioned(
+                    key: ValueKey(
+                      'nav_indicator_$_selectedIndex',
+                    ), // Add key to prevent conflicts
                     duration: const Duration(milliseconds: 400),
                     curve: Curves.easeInOutCubic,
                     left: _indicatorLeft,

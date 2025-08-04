@@ -45,23 +45,23 @@ class DroneMAVLinkAPI {
   bool _isConnected = false;
   String _selectedPort = "";
   int _baudRate = 115200;
-  
+
   // MAVLink parser
   late MavlinkDialectCommon _dialect;
   late MavlinkParser _parser;
   StreamSubscription? _parserSubscription;
-  
+
   // Sequence number for MAVLink messages
   int _sequence = 0;
-  
+
   // Target system and component IDs
   int _systemId = 1;
-  int _componentId = 0;
-  
+  final int _componentId = 0;
+
   // Parameters storage
-  Map<String, double> _parameters = {};
+  final Map<String, double> _parameters = {};
   bool _requestingParameters = false;
-  
+
   // MAVLink stream IDs
   static const int MAV_DATA_STREAM_ALL = 0;
   static const int MAV_DATA_STREAM_RAW_SENSORS = 1;
@@ -72,7 +72,7 @@ class DroneMAVLinkAPI {
   static const int MAV_DATA_STREAM_EXTRA1 = 10;  // Attitude data
   static const int MAV_DATA_STREAM_EXTRA2 = 11;  // VFR HUD data
   static const int MAV_DATA_STREAM_EXTRA3 = 12;
-  
+
   // Vehicle state storage
   String _currentMode = 'Unknown';
   bool _isArmed = false;
@@ -80,30 +80,30 @@ class DroneMAVLinkAPI {
   int _totalWaypoints = -1;
   Map<String, double> _homePosition = {};
   String _ekfStatus = 'Unknown';
-  
+
   // Attitude data
   double _roll = 0.0;
   double _pitch = 0.0;
   double _yaw = 0.0;
-  
+
   // Speed data
   double _airSpeed = 0.0;
   double _groundSpeed = 0.0;
-  
+
   // Altitude data
   double _altMSL = 0.0;
   double _altRelative = 0.0;
-  
+
   // GPS data
   String _gpsFixType = 'No GPS';
   int _satellites = 0;
-  
+
   // Battery data
   int _batteryPercent = 0;
-  
+
   // Event controller for subscribers
   final _eventController = StreamController<MAVLinkEvent>.broadcast();
-  
+
   // Public accessors
   Stream<MAVLinkEvent> get eventStream => _eventController.stream;
   bool get isConnected => _isConnected;
@@ -144,40 +144,40 @@ class DroneMAVLinkAPI {
   }
 
   /// Connect to the specified serial port
-  /// 
+  ///
   /// Returns true if connection was successful, false otherwise
   Future<bool> connect(String port, {int? baudRate}) async {
     if (_isConnected) {
       disconnect();
     }
-    
+
     _selectedPort = port;
     if (baudRate != null) {
       _baudRate = baudRate;
     }
-    
+
     try {
       _serialPort = SerialPort(_selectedPort);
-      
+
       if (_serialPort!.openReadWrite()) {
         _serialPort!.config.baudRate = _baudRate;
         _serialPort!.config.bits = 8;
         _serialPort!.config.stopBits = 1;
         _serialPort!.config.parity = SerialPortParity.none;
         _serialPort!.config.setFlowControl(SerialPortFlowControl.none);
-        
+
         _isConnected = true;
         _eventController.add(MAVLinkEvent(MAVLinkEventType.connectionStateChanged, MAVLinkConnectionState.connected));
-        
+
         // Read data at high frequency to catch all packets
         _timer = Timer.periodic(const Duration(milliseconds: 10), (_) {
           _readData();
         });
-        
+
         // Add small delay to ensure stable connection before requesting data
         await Future.delayed(const Duration(milliseconds: 500));
         requestAllDataStreams();
-        
+
         return true;
       } else {
         _eventController.add(MAVLinkEvent(MAVLinkEventType.connectionStateChanged, MAVLinkConnectionState.error));
@@ -194,7 +194,7 @@ class DroneMAVLinkAPI {
     _timer?.cancel();
     _subscription?.cancel();
     _serialPort?.close();
-    
+
     _isConnected = false;
     _eventController.add(MAVLinkEvent(MAVLinkEventType.connectionStateChanged, MAVLinkConnectionState.disconnected));
   }
@@ -202,12 +202,12 @@ class DroneMAVLinkAPI {
   /// Read data from the serial port
   void _readData() {
     if (_serialPort == null || !_isConnected) return;
-    
+
     try {
       // Try to read available bytes from the serial port
       if (_serialPort!.isOpen) {
         final Uint8List data = _serialPort!.read(4096);
-        
+
         if (data.isNotEmpty) {
           // Feed data to the MAVLink parser
           _parser.parse(data);
@@ -232,7 +232,7 @@ class DroneMAVLinkAPI {
     if (frm.systemId > 0 && frm.systemId < 255) {
       _systemId = frm.systemId;
     }
-    
+
     // Process different message types
     if (frm.message is Heartbeat) {
       _processHeartbeat(frm.message as Heartbeat);
@@ -278,10 +278,10 @@ class DroneMAVLinkAPI {
     _currentMode = _decodeFlightMode(heartbeat.baseMode, heartbeat.customMode);
     // Update armed status
     _isArmed = (heartbeat.baseMode & 0x80) != 0;
-    
+
     // Send event
     _eventController.add(MAVLinkEvent(
-      MAVLinkEventType.heartbeat, 
+      MAVLinkEventType.heartbeat,
       {
         'mode': _currentMode,
         'armed': _isArmed,
@@ -298,9 +298,9 @@ class DroneMAVLinkAPI {
   /// Process system status message
   void _processSysStatus(SysStatus status) {
     _batteryPercent = status.batteryRemaining;
-    
+
     _eventController.add(MAVLinkEvent(
-      MAVLinkEventType.batteryStatus, 
+      MAVLinkEventType.batteryStatus,
       {
         'batteryPercent': status.batteryRemaining,
         'voltageBattery': status.voltageBattery / 1000, // Convert to volts
@@ -318,9 +318,9 @@ class DroneMAVLinkAPI {
     _roll = attitude.roll * 180 / pi;   // Convert to degrees
     _pitch = attitude.pitch * 180 / pi; // Convert to degrees
     _yaw = attitude.yaw * 180 / pi;     // Convert to degrees
-    
+
     _eventController.add(MAVLinkEvent(
-      MAVLinkEventType.attitude, 
+      MAVLinkEventType.attitude,
       {
         'roll': _roll,
         'pitch': _pitch,
@@ -336,14 +336,14 @@ class DroneMAVLinkAPI {
   void _processGlobalPosition(GlobalPositionInt pos) {
     _altMSL = pos.alt / 1000;           // Convert to meters
     _altRelative = pos.relativeAlt / 1000; // Convert to meters
-    
+
     // Calculate ground speed from North and East velocities
     double vx = pos.vx / 100; // m/s
     double vy = pos.vy / 100; // m/s
     _groundSpeed = sqrt(vx * vx + vy * vy);
-    
+
     _eventController.add(MAVLinkEvent(
-      MAVLinkEventType.position, 
+      MAVLinkEventType.position,
       {
         'lat': pos.lat / 1e7,  // Convert to degrees
         'lon': pos.lon / 1e7,  // Convert to degrees
@@ -362,9 +362,9 @@ class DroneMAVLinkAPI {
   void _processVfrHud(VfrHud hud) {
     _airSpeed = hud.airspeed;
     _groundSpeed = hud.groundspeed; // More accurate ground speed
-    
+
     _eventController.add(MAVLinkEvent(
-      MAVLinkEventType.vfrHud, 
+      MAVLinkEventType.vfrHud,
       {
         'airspeed': _airSpeed,
         'groundspeed': _groundSpeed,
@@ -380,9 +380,9 @@ class DroneMAVLinkAPI {
   void _processGpsRawInt(GpsRawInt gps) {
     _gpsFixType = _getGpsFix(gps.fixType);
     _satellites = gps.satellitesVisible;
-    
+
     _eventController.add(MAVLinkEvent(
-      MAVLinkEventType.gpsInfo, 
+      MAVLinkEventType.gpsInfo,
       {
         'fixType': _gpsFixType,
         'satellites': _satellites,
@@ -402,9 +402,9 @@ class DroneMAVLinkAPI {
     try {
       String statusText = text.text;
       int severity = text.severity;
-      
+
       _eventController.add(MAVLinkEvent(
-        MAVLinkEventType.statusText, 
+        MAVLinkEventType.statusText,
         {
           'severity': _getStatusSeverity(severity),
           'text': statusText
@@ -422,12 +422,12 @@ class DroneMAVLinkAPI {
     terminatedIndex = terminatedIndex == -1 ? param.paramId.length : terminatedIndex;
     var trimmed = param.paramId.sublist(0, terminatedIndex);
     var paramId = String.fromCharCodes(trimmed);
-    
+
     // Add to parameters map
     _parameters[paramId] = param.paramValue;
-    
+
     _eventController.add(MAVLinkEvent(
-      MAVLinkEventType.parameterReceived, 
+      MAVLinkEventType.parameterReceived,
       {
         'id': paramId,
         'value': param.paramValue,
@@ -436,12 +436,12 @@ class DroneMAVLinkAPI {
         'count': param.paramCount
       }
     ));
-    
+
     // Check if this is the last parameter
     if (param.paramIndex == param.paramCount - 1) {
       _requestingParameters = false;
       _eventController.add(MAVLinkEvent(
-        MAVLinkEventType.allParametersReceived, 
+        MAVLinkEventType.allParametersReceived,
         _parameters
       ));
     }
@@ -474,20 +474,20 @@ class DroneMAVLinkAPI {
   /// Request all available MAVLink data streams
   void requestAllDataStreams() {
     if (!_isConnected || _serialPort == null) return;
-    
+
     try {
       // Request all data types at 4Hz
       _requestDataStream(MAV_DATA_STREAM_ALL, 4);
-      
+
       // Request attitude data at higher rate (10Hz)
       _requestDataStream(MAV_DATA_STREAM_EXTRA1, 10);
-      
+
       // Request VFR_HUD data (speed, altitude) at 5Hz
       _requestDataStream(MAV_DATA_STREAM_EXTRA2, 5);
-      
+
       // Request position data at 3Hz
       _requestDataStream(MAV_DATA_STREAM_POSITION, 3);
-      
+
       // Request extended status data at 2Hz
       _requestDataStream(MAV_DATA_STREAM_EXTENDED_STATUS, 2);
     } catch (e) {
@@ -498,7 +498,7 @@ class DroneMAVLinkAPI {
   /// Request a specific data stream with the given rate
   void _requestDataStream(int streamId, int rate) {
     if (!_isConnected || _serialPort == null) return;
-    
+
     try {
       // Create message
       var requestDataStream = RequestDataStream(
@@ -508,15 +508,15 @@ class DroneMAVLinkAPI {
         reqMessageRate: rate,
         startStop: 1,  // 1 = start, 0 = stop
       );
-      
+
       // Create frame - use v2 for better compatibility
       var frm = MavlinkFrame.v2(_sequence, 255, 0, requestDataStream);
       _sequence = (_sequence + 1) % 255; // Increment sequence number
-      
+
       // Serialize and send
       final data = frm.serialize();
       _serialPort!.write(data);
-      
+
       // Send command again after a delay to ensure it's received
       Future.delayed(const Duration(milliseconds: 300), () {
         if (_isConnected && _serialPort != null) {
@@ -531,31 +531,31 @@ class DroneMAVLinkAPI {
   /// Request all parameters from the vehicle
   void requestAllParameters() {
     if (!_isConnected || _serialPort == null) return;
-    
+
     try {
       _parameters.clear();
       _requestingParameters = true;
-      
+
       // Create ParamRequestList message
       var paramRequestList = ParamRequestList(
         targetSystem: _systemId,
         targetComponent: _componentId,
       );
-      
+
       // Create and send frame
       var frm = MavlinkFrame.v1(_sequence++, 255, 0, paramRequestList);
       _sequence %= 255;
-      
+
       final data = frm.serialize();
       _serialPort!.write(data);
-      
+
       // Send again after delay to ensure receipt
       Future.delayed(const Duration(milliseconds: 300), () {
         if (_isConnected && _serialPort != null) {
           _serialPort!.write(data);
         }
       });
-      
+
       // Set timeout to clear the requesting flag if we don't receive all parameters
       Future.delayed(const Duration(seconds: 15), () {
         if (_requestingParameters) {
@@ -570,17 +570,17 @@ class DroneMAVLinkAPI {
   /// Request a specific parameter by name
   void requestParameter(String paramName) {
     if (!_isConnected || _serialPort == null) return;
-    
+
     try {
       // Convert parameter name to byte array
       final List<int> paramId = List<int>.filled(16, 0);
       final List<int> bytes = paramName.codeUnits;
-      
+
       // Copy parameter name to parameter ID field (max 16 bytes)
       for (int i = 0; i < bytes.length && i < 16; i++) {
         paramId[i] = bytes[i];
       }
-      
+
       // Create ParamRequestRead message
       var paramRequestRead = ParamRequestRead(
         paramIndex: -1, // -1 to use param_id instead of index
@@ -588,11 +588,11 @@ class DroneMAVLinkAPI {
         targetComponent: _componentId,
         paramId: paramId,
       );
-      
+
       // Create and send frame
       var frm = MavlinkFrame.v1(_sequence++, 255, 0, paramRequestRead);
       _sequence %= 255;
-      
+
       _serialPort!.write(frm.serialize());
     } catch (e) {
       // Handle errors silently
@@ -602,17 +602,17 @@ class DroneMAVLinkAPI {
   /// Set a parameter value on the vehicle
   void setParameter(String paramName, double value) {
     if (!_isConnected || _serialPort == null) return;
-    
+
     try {
       // Convert parameter name to byte array
       final List<int> paramId = List<int>.filled(16, 0);
       final List<int> bytes = paramName.codeUnits;
-      
+
       // Copy parameter name to parameter ID field (max 16 bytes)
       for (int i = 0; i < bytes.length && i < 16; i++) {
         paramId[i] = bytes[i];
       }
-      
+
       // Create ParamSet message
       var paramSet = ParamSet(
         paramValue: value,
@@ -621,11 +621,11 @@ class DroneMAVLinkAPI {
         paramId: paramId,
         paramType: 9, // MAV_PARAM_TYPE_REAL32
       );
-      
+
       // Create and send frame
       var frm = MavlinkFrame.v1(_sequence++, 255, 0, paramSet);
       _sequence %= 255;
-      
+
       _serialPort!.write(frm.serialize());
     } catch (e) {
       // Handle errors silently
@@ -635,7 +635,7 @@ class DroneMAVLinkAPI {
   /// Send a command to arm or disarm the vehicle
   void sendArmCommand(bool arm) {
     if (!_isConnected || _serialPort == null) return;
-    
+
     try {
       // Create CommandLong message for arming/disarming
       var commandLong = CommandLong(
@@ -651,11 +651,11 @@ class DroneMAVLinkAPI {
         targetComponent: _componentId,
         confirmation: 0,
       );
-      
+
       // Create and send frame
       var frm = MavlinkFrame.v1(_sequence++, 255, 0, commandLong);
       _sequence %= 255;
-      
+
       _serialPort!.write(frm.serialize());
     } catch (e) {
       // Handle errors silently
@@ -665,7 +665,7 @@ class DroneMAVLinkAPI {
   /// Send command to change flight mode
   void setFlightMode(int mode) {
     if (!_isConnected || _serialPort == null) return;
-    
+
     try {
       // Create SetMode message
       var setMode = SetMode(
@@ -673,11 +673,11 @@ class DroneMAVLinkAPI {
         baseMode: 1, // MAV_MODE_FLAG_CUSTOM_MODE_ENABLED
         customMode: mode,
       );
-      
+
       // Create and send frame
       var frm = MavlinkFrame.v1(_sequence++, 255, 0, setMode);
       _sequence %= 255;
-      
+
       _serialPort!.write(frm.serialize());
     } catch (e) {
       // Handle errors silently
@@ -692,7 +692,7 @@ class DroneMAVLinkAPI {
   }
 
   // Helper methods for decoding MAVLink enumerations
-  
+
   String _getSystemType(int type) {
     switch(type) {
       case 0: return 'Generic';
@@ -715,7 +715,7 @@ class DroneMAVLinkAPI {
       default: return 'Unknown ($type)';
     }
   }
-  
+
   String _getAutopilotType(int type) {
     switch(type) {
       case 0: return 'Generic';
@@ -724,7 +724,7 @@ class DroneMAVLinkAPI {
       default: return 'Unknown ($type)';
     }
   }
-  
+
   String _getSystemStatus(int status) {
     switch(status) {
       case 0: return 'Uninit';
@@ -739,7 +739,7 @@ class DroneMAVLinkAPI {
       default: return 'Unknown ($status)';
     }
   }
-  
+
   String _getGpsFix(int fixType) {
     switch(fixType) {
       case 0: return 'No GPS';
@@ -754,7 +754,7 @@ class DroneMAVLinkAPI {
       default: return 'Unknown ($fixType)';
     }
   }
-  
+
   String _getStatusSeverity(int severity) {
     switch(severity) {
       case 0: return 'Emergency';
@@ -768,7 +768,7 @@ class DroneMAVLinkAPI {
       default: return 'Unknown ($severity)';
     }
   }
-  
+
   String _getParamType(int paramType) {
     switch(paramType) {
       case 1: return 'uint8_t';
@@ -784,29 +784,29 @@ class DroneMAVLinkAPI {
       default: return 'Unknown ($paramType)';
     }
   }
-  
+
   String _decodeFlightMode(int baseMode, int customMode) {
     // This is primarily for ArduPilot - if you need to support other autopilots
     // like PX4, you'll need to add their mode decoding logic
     const List<String> arduPilotModes = [
       'MANUAL', 'CIRCLE', 'STABILIZE', 'TRAINING', 'ACRO', 'FBWA',
-      'FBWB', 'CRUISE', 'AUTOTUNE', 'AUTO', 'RTL', 'LOITER', 
+      'FBWB', 'CRUISE', 'AUTOTUNE', 'AUTO', 'RTL', 'LOITER',
       'TAKEOFF', 'AVOID_ADSB', 'GUIDED', 'INITIALIZING', 'QSTABILIZE',
       'QHOVER', 'QLOITER', 'QLAND', 'QRTL', 'QAUTOTUNE', 'QACRO'
     ];
-    
+
     if (customMode < arduPilotModes.length) {
       return arduPilotModes[customMode];
     }
-    
+
     return 'UNKNOWN MODE ($customMode)';
   }
-  
+
   String _decodeEkfStatus(int flags) {
     if (flags == 0) return 'EKF Inactive';
-    
+
     List<String> status = [];
-    
+
     if ((flags & 0x01) != 0) status.add('OK');
     if ((flags & 0x02) != 0) status.add('Attitude Error');
     if ((flags & 0x04) != 0) status.add('Horizontal Pos Error');
@@ -815,10 +815,10 @@ class DroneMAVLinkAPI {
     if ((flags & 0x20) != 0) status.add('Velocity Error');
     if ((flags & 0x40) != 0) status.add('Position Horiz Error');
     if ((flags & 0x80) != 0) status.add('Position Vert Error');
-    
+
     return status.join(', ');
   }
-  
+
   String _getCommandResult(int result) {
     switch(result) {
       case 0: return 'Accepted';
@@ -831,7 +831,7 @@ class DroneMAVLinkAPI {
       default: return 'Unknown ($result)';
     }
   }
-  
+
   String _getBatteryFunction(int function) {
     switch(function) {
       case 0: return 'Unknown';

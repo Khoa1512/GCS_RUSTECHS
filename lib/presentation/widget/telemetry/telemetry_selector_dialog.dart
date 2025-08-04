@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:skylink/core/constant/app_color.dart';
 import 'package:skylink/data/telemetry_data.dart';
 import 'package:skylink/data/constants/telemetry_constants.dart';
+import 'package:skylink/services/telemetry_service.dart';
+import 'dart:async';
 
 class TelemetrySelector {
   static void show({
@@ -43,27 +45,56 @@ class TelemetrySelectorDialog extends StatefulWidget {
 class _TelemetrySelectorDialogState extends State<TelemetrySelectorDialog> {
   String searchQuery = '';
   List<TelemetryData> filteredTelemetry = [];
+  final TelemetryService _telemetryService = TelemetryService();
+  StreamSubscription? _telemetrySubscription;
 
   @override
   void initState() {
     super.initState();
-    filteredTelemetry = TelemetryConstants.allTelemetryData;
+    _updateFilteredTelemetry();
+
+    // Listen to telemetry updates to refresh values in real-time
+    _telemetrySubscription = _telemetryService.telemetryStream.listen((
+      telemetryData,
+    ) {
+      if (mounted) {
+        setState(() {
+          _updateFilteredTelemetry();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _telemetrySubscription?.cancel();
+    super.dispose();
+  }
+
+  void _updateFilteredTelemetry() {
+    // Get all available telemetry options with real-time data
+    var allTelemetry = TelemetryConstants.allTelemetryData.map((item) {
+      // Update values with real data if connected
+      return TelemetryConstants.getUpdatedTelemetryItem(item);
+    }).toList();
+
+    if (searchQuery.isEmpty) {
+      filteredTelemetry = allTelemetry;
+    } else {
+      filteredTelemetry = allTelemetry
+          .where(
+            (telemetry) => telemetry.label.toLowerCase().contains(
+              searchQuery.toLowerCase(),
+            ),
+          )
+          .toList();
+    }
   }
 
   void _filterTelemetry(String query) {
     setState(() {
       searchQuery = query;
-      if (query.isEmpty) {
-        filteredTelemetry = TelemetryConstants.allTelemetryData;
-      } else {
-        filteredTelemetry = TelemetryConstants.allTelemetryData
-            .where(
-              (telemetry) =>
-                  telemetry.label.toLowerCase().contains(query.toLowerCase()) ||
-                  telemetry.unit.toLowerCase().contains(query.toLowerCase()),
-            )
-            .toList();
-      }
+      _updateFilteredTelemetry();
     });
   }
 

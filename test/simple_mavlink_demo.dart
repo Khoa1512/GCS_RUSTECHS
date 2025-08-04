@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import '../lib/api/telemetry/mavlink_api.dart';
+import 'package:skylink/api/telemetry/mavlink_api.dart';
 
 /// Simple MAVLink API Demo
 /// Ví dụ đơn giản để test kết nối và nhận dữ liệu từ drone
@@ -9,6 +9,8 @@ void main() {
 }
 
 class SimpleMAVLinkDemo extends StatelessWidget {
+  const SimpleMAVLinkDemo({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -20,6 +22,8 @@ class SimpleMAVLinkDemo extends StatelessWidget {
 }
 
 class MAVLinkSimpleTest extends StatefulWidget {
+  const MAVLinkSimpleTest({super.key});
+
   @override
   _MAVLinkSimpleTestState createState() => _MAVLinkSimpleTestState();
 }
@@ -27,11 +31,11 @@ class MAVLinkSimpleTest extends StatefulWidget {
 class _MAVLinkSimpleTestState extends State<MAVLinkSimpleTest> {
   late DroneMAVLinkAPI _api;
   late StreamSubscription _eventSubscription;
-  
+
   bool _isConnected = false;
   String _selectedPort = '';
   List<String> _availablePorts = [];
-  
+
   // Basic telemetry data
   String _flightMode = 'Unknown';
   bool _isArmed = false;
@@ -49,48 +53,49 @@ class _MAVLinkSimpleTestState extends State<MAVLinkSimpleTest> {
 
   void _initAPI() {
     _api = DroneMAVLinkAPI();
-    
+
     // Listen to MAVLink events
     _eventSubscription = _api.eventStream.listen((event) {
       if (!mounted) return;
-      
+
       setState(() {
         switch (event.type) {
           case MAVLinkEventType.connectionStateChanged:
             _isConnected = event.data == MAVLinkConnectionState.connected;
             _lastMessage = 'Connection state: ${event.data}';
             break;
-            
+
           case MAVLinkEventType.heartbeat:
             _flightMode = event.data['mode'] ?? 'Unknown';
             _isArmed = event.data['armed'] ?? false;
             _lastMessage = 'Heartbeat: Mode=$_flightMode, Armed=$_isArmed';
             break;
-            
+
           case MAVLinkEventType.attitude:
             _roll = event.data['roll'] ?? 0.0;
             _pitch = event.data['pitch'] ?? 0.0;
             _yaw = event.data['yaw'] ?? 0.0;
-            _lastMessage = 'Attitude: R=${_roll.toStringAsFixed(1)}°, P=${_pitch.toStringAsFixed(1)}°, Y=${_yaw.toStringAsFixed(1)}°';
+            _lastMessage =
+                'Attitude: R=${_roll.toStringAsFixed(1)}°, P=${_pitch.toStringAsFixed(1)}°, Y=${_yaw.toStringAsFixed(1)}°';
             break;
-            
+
           case MAVLinkEventType.batteryStatus:
             _batteryPercent = event.data['batteryPercent'] ?? 0;
             _lastMessage = 'Battery: $_batteryPercent%';
             break;
-            
+
           case MAVLinkEventType.statusText:
             String text = event.data['text'] ?? '';
             _lastMessage = 'Status: $text';
             break;
-            
+
           default:
             _lastMessage = 'Event: ${event.type}';
             break;
         }
       });
     });
-    
+
     // Get available ports
     _refreshPorts();
   }
@@ -106,25 +111,48 @@ class _MAVLinkSimpleTestState extends State<MAVLinkSimpleTest> {
 
   Future<void> _connect() async {
     if (_selectedPort.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please select a port')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Please select a port')));
       return;
     }
-    
+
     setState(() {
       _lastMessage = 'Connecting to $_selectedPort...';
     });
-    
-    bool success = await _api.connect(_selectedPort, baudRate: 115200);
-    
-    setState(() {
+
+    // Force 9600 baud only since Python test confirmed it works
+    List<int> baudRates = [9600]; // Only test the known working baud rate
+    bool connected = false;
+
+    for (int baudRate in baudRates) {
+      setState(() {
+        _lastMessage = 'Trying $_selectedPort at $baudRate baud...';
+      });
+
+      bool success = await _api.connect(_selectedPort, baudRate: baudRate);
+
       if (success) {
-        _lastMessage = 'Connected successfully to $_selectedPort';
+        setState(() {
+          _isConnected = true;
+          _lastMessage = 'Connected to $_selectedPort at $baudRate baud!';
+        });
+        connected = true;
+        break;
       } else {
-        _lastMessage = 'Failed to connect to $_selectedPort';
+        setState(() {
+          _lastMessage = 'Failed at $baudRate baud, trying next...';
+        });
+        // Small delay between attempts
+        await Future.delayed(Duration(milliseconds: 500));
       }
-    });
+    }
+
+    if (!connected) {
+      setState(() {
+        _lastMessage = 'Failed to connect to $_selectedPort at all baud rates';
+      });
+    }
   }
 
   void _disconnect() {
@@ -136,7 +164,7 @@ class _MAVLinkSimpleTestState extends State<MAVLinkSimpleTest> {
 
   void _armDisarm() {
     if (!_isConnected) return;
-    
+
     _api.sendArmCommand(!_isArmed);
     setState(() {
       _lastMessage = _isArmed ? 'Disarm command sent' : 'Arm command sent';
@@ -163,10 +191,13 @@ class _MAVLinkSimpleTestState extends State<MAVLinkSimpleTest> {
                   children: [
                     Text(
                       'Connection',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     SizedBox(height: 10),
-                    
+
                     // Port selection
                     DropdownButton<String>(
                       value: _selectedPort.isEmpty ? null : _selectedPort,
@@ -184,19 +215,23 @@ class _MAVLinkSimpleTestState extends State<MAVLinkSimpleTest> {
                         });
                       },
                     ),
-                    
+
                     SizedBox(height: 10),
-                    
+
                     // Connection buttons
                     Row(
                       children: [
                         Expanded(
                           child: ElevatedButton(
                             onPressed: _isConnected ? _disconnect : _connect,
-                            child: Text(_isConnected ? 'Disconnect' : 'Connect'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: _isConnected ? Colors.red : Colors.green,
+                              backgroundColor: _isConnected
+                                  ? Colors.red
+                                  : Colors.green,
                               foregroundColor: Colors.white,
+                            ),
+                            child: Text(
+                              _isConnected ? 'Disconnect' : 'Connect',
                             ),
                           ),
                         ),
@@ -213,9 +248,9 @@ class _MAVLinkSimpleTestState extends State<MAVLinkSimpleTest> {
                 ),
               ),
             ),
-            
+
             SizedBox(height: 20),
-            
+
             // Status Card
             Card(
               child: Padding(
@@ -225,27 +260,51 @@ class _MAVLinkSimpleTestState extends State<MAVLinkSimpleTest> {
                   children: [
                     Text(
                       'Vehicle Status',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     SizedBox(height: 10),
-                    
-                    _buildStatusRow('Connection', _isConnected ? 'CONNECTED' : 'DISCONNECTED', 
-                        _isConnected ? Colors.green : Colors.red),
+
+                    _buildStatusRow(
+                      'Connection',
+                      _isConnected ? 'CONNECTED' : 'DISCONNECTED',
+                      _isConnected ? Colors.green : Colors.red,
+                    ),
                     _buildStatusRow('Flight Mode', _flightMode, Colors.blue),
-                    _buildStatusRow('Armed', _isArmed ? 'YES' : 'NO', 
-                        _isArmed ? Colors.red : Colors.green),
-                    _buildStatusRow('Battery', '$_batteryPercent%', 
-                        _batteryPercent > 30 ? Colors.green : Colors.red),
-                    _buildStatusRow('Roll', '${_roll.toStringAsFixed(1)}°', Colors.orange),
-                    _buildStatusRow('Pitch', '${_pitch.toStringAsFixed(1)}°', Colors.orange),
-                    _buildStatusRow('Yaw', '${_yaw.toStringAsFixed(1)}°', Colors.orange),
+                    _buildStatusRow(
+                      'Armed',
+                      _isArmed ? 'YES' : 'NO',
+                      _isArmed ? Colors.red : Colors.green,
+                    ),
+                    _buildStatusRow(
+                      'Battery',
+                      '$_batteryPercent%',
+                      _batteryPercent > 30 ? Colors.green : Colors.red,
+                    ),
+                    _buildStatusRow(
+                      'Roll',
+                      '${_roll.toStringAsFixed(1)}°',
+                      Colors.orange,
+                    ),
+                    _buildStatusRow(
+                      'Pitch',
+                      '${_pitch.toStringAsFixed(1)}°',
+                      Colors.orange,
+                    ),
+                    _buildStatusRow(
+                      'Yaw',
+                      '${_yaw.toStringAsFixed(1)}°',
+                      Colors.orange,
+                    ),
                   ],
                 ),
               ),
             ),
-            
+
             SizedBox(height: 20),
-            
+
             // Control Card
             Card(
               child: Padding(
@@ -254,26 +313,29 @@ class _MAVLinkSimpleTestState extends State<MAVLinkSimpleTest> {
                   children: [
                     Text(
                       'Basic Controls',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     SizedBox(height: 10),
-                    
+
                     ElevatedButton(
                       onPressed: _isConnected ? _armDisarm : null,
-                      child: Text(_isArmed ? 'DISARM' : 'ARM'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _isArmed ? Colors.green : Colors.red,
                         foregroundColor: Colors.white,
                         minimumSize: Size(double.infinity, 40),
                       ),
+                      child: Text(_isArmed ? 'DISARM' : 'ARM'),
                     ),
                   ],
                 ),
               ),
             ),
-            
+
             SizedBox(height: 20),
-            
+
             // Last Message Card
             Card(
               child: Padding(
@@ -283,7 +345,10 @@ class _MAVLinkSimpleTestState extends State<MAVLinkSimpleTest> {
                   children: [
                     Text(
                       'Last Message',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     SizedBox(height: 10),
                     Text(
@@ -313,10 +378,7 @@ class _MAVLinkSimpleTestState extends State<MAVLinkSimpleTest> {
           Text(label, style: TextStyle(fontWeight: FontWeight.w500)),
           Text(
             value,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: color, fontWeight: FontWeight.bold),
           ),
         ],
       ),

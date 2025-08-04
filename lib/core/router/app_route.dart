@@ -4,4 +4,5 @@ class AppRoute {
   static const String map = '/map';
   static const String allDrone = '/all-drone';
   static const String route = '/route';
+  static const String file = '/file';
 }

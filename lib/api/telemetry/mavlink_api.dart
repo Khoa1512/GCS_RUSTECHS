@@ -20,12 +20,7 @@ enum MAVLinkEventType {
 }
 
 /// Connection state of the MAVLink connection
-enum MAVLinkConnectionState {
-  disconnected,
-  connected,
-  connecting,
-  error,
-}
+enum MAVLinkConnectionState { disconnected, connected, connecting, error }
 
 /// A class representing a MAVLink message event
 class MAVLinkEvent {
@@ -69,8 +64,8 @@ class DroneMAVLinkAPI {
   static const int MAV_DATA_STREAM_RC_CHANNELS = 3;
   static const int MAV_DATA_STREAM_RAW_CONTROLLER = 4;
   static const int MAV_DATA_STREAM_POSITION = 6;
-  static const int MAV_DATA_STREAM_EXTRA1 = 10;  // Attitude data
-  static const int MAV_DATA_STREAM_EXTRA2 = 11;  // VFR HUD data
+  static const int MAV_DATA_STREAM_EXTRA1 = 10; // Attitude data
+  static const int MAV_DATA_STREAM_EXTRA2 = 11; // VFR HUD data
   static const int MAV_DATA_STREAM_EXTRA3 = 12;
 
   // Vehicle state storage
@@ -80,6 +75,12 @@ class DroneMAVLinkAPI {
   int _totalWaypoints = -1;
   Map<String, double> _homePosition = {};
   String _ekfStatus = 'Unknown';
+
+  // Flight mode debounce control
+  String _pendingMode = 'Unknown';
+  DateTime? _modeChangeTime;
+  Timer? _modeDebounceTimer;
+  static const Duration _modeDebounceDelay = Duration(seconds: 1);
 
   // Attitude data
   double _roll = 0.0;
@@ -97,6 +98,13 @@ class DroneMAVLinkAPI {
   // GPS data
   String _gpsFixType = 'No GPS';
   int _satellites = 0;
+  double _gpsLatitude = 0.0;
+  double _gpsLongitude = 0.0;
+  double _gpsAltitude = 0.0;
+  double _gpsHorizontalAccuracy = 0.0;
+  double _gpsVerticalAccuracy = 0.0;
+  double _gpsSpeed = 0.0;
+  double _gpsCourse = 0.0;
 
   // Battery data
   int _batteryPercent = 0;
@@ -122,6 +130,13 @@ class DroneMAVLinkAPI {
   double get altitudeRelative => _altRelative;
   String get gpsFixType => _gpsFixType;
   int get satellites => _satellites;
+  double get gpsLatitude => _gpsLatitude;
+  double get gpsLongitude => _gpsLongitude;
+  double get gpsAltitude => _gpsAltitude;
+  double get gpsHorizontalAccuracy => _gpsHorizontalAccuracy;
+  double get gpsVerticalAccuracy => _gpsVerticalAccuracy;
+  double get gpsSpeed => _gpsSpeed;
+  double get gpsCourse => _gpsCourse;
   int get batteryPercent => _batteryPercent;
   Map<String, double> get parameters => _parameters;
 
@@ -167,7 +182,12 @@ class DroneMAVLinkAPI {
         _serialPort!.config.setFlowControl(SerialPortFlowControl.none);
 
         _isConnected = true;
-        _eventController.add(MAVLinkEvent(MAVLinkEventType.connectionStateChanged, MAVLinkConnectionState.connected));
+        _eventController.add(
+          MAVLinkEvent(
+            MAVLinkEventType.connectionStateChanged,
+            MAVLinkConnectionState.connected,
+          ),
+        );
 
         // Read data at high frequency to catch all packets
         _timer = Timer.periodic(const Duration(milliseconds: 10), (_) {
@@ -180,11 +200,21 @@ class DroneMAVLinkAPI {
 
         return true;
       } else {
-        _eventController.add(MAVLinkEvent(MAVLinkEventType.connectionStateChanged, MAVLinkConnectionState.error));
+        _eventController.add(
+          MAVLinkEvent(
+            MAVLinkEventType.connectionStateChanged,
+            MAVLinkConnectionState.error,
+          ),
+        );
         return false;
       }
     } catch (e) {
-      _eventController.add(MAVLinkEvent(MAVLinkEventType.connectionStateChanged, MAVLinkConnectionState.error));
+      _eventController.add(
+        MAVLinkEvent(
+          MAVLinkEventType.connectionStateChanged,
+          MAVLinkConnectionState.error,
+        ),
+      );
       return false;
     }
   }
@@ -196,7 +226,77 @@ class DroneMAVLinkAPI {
     _serialPort?.close();
 
     _isConnected = false;
-    _eventController.add(MAVLinkEvent(MAVLinkEventType.connectionStateChanged, MAVLinkConnectionState.disconnected));
+    
+    // Reset all telemetry data to default values
+    _resetTelemetryData();
+    
+    // Send GPS reset event to update UI immediately
+    _eventController.add(MAVLinkEvent(
+      MAVLinkEventType.gpsInfo,
+      {
+        'fixType': _gpsFixType,
+        'satellites': _satellites,
+        'lat': _gpsLatitude,
+        'lon': _gpsLongitude,
+        'alt': _gpsAltitude,
+        'eph': _gpsHorizontalAccuracy,
+        'epv': _gpsVerticalAccuracy,
+        'vel': _gpsSpeed,
+        'cog': _gpsCourse
+      }
+    ));
+    
+    _eventController.add(
+      MAVLinkEvent(
+        MAVLinkEventType.connectionStateChanged,
+        MAVLinkConnectionState.disconnected,
+      ),
+    );
+  }
+
+  /// Reset all telemetry data to default values
+  void _resetTelemetryData() {
+    // Reset attitude data
+    _roll = 0.0;
+    _pitch = 0.0;
+    _yaw = 0.0;
+
+    // Reset speed data
+    _airSpeed = 0.0;
+    _groundSpeed = 0.0;
+
+    // Reset altitude data
+    _altMSL = 0.0;
+    _altRelative = 0.0;
+
+    // Reset GPS data to default "No GPS" state
+    _gpsFixType = 'No GPS';
+    _satellites = 0;
+    _gpsLatitude = 0.0;
+    _gpsLongitude = 0.0;
+    _gpsAltitude = 0.0;
+    _gpsHorizontalAccuracy = 0.0;
+    _gpsVerticalAccuracy = 0.0;
+    _gpsSpeed = 0.0;
+    _gpsCourse = 0.0;
+
+    // Reset battery data
+    _batteryPercent = 0;
+
+    // Reset vehicle state
+    _currentMode = 'Unknown';
+    _isArmed = false;
+    _currentWaypoint = -1;
+    _totalWaypoints = -1;
+    _homePosition.clear();
+    _ekfStatus = 'Unknown';
+    _parameters.clear();
+    
+    // Reset flight mode debounce
+    _pendingMode = 'Unknown';
+    _modeChangeTime = null;
+    _modeDebounceTimer?.cancel();
+    _modeDebounceTimer = null;
   }
 
   /// Read data from the serial port
@@ -236,105 +336,128 @@ class DroneMAVLinkAPI {
     // Process different message types
     if (frm.message is Heartbeat) {
       _processHeartbeat(frm.message as Heartbeat);
-    }
-    else if (frm.message is SysStatus) {
+    } else if (frm.message is SysStatus) {
       _processSysStatus(frm.message as SysStatus);
-    }
-    else if (frm.message is Attitude) {
+    } else if (frm.message is Attitude) {
       _processAttitude(frm.message as Attitude);
-    }
-    else if (frm.message is GlobalPositionInt) {
+    } else if (frm.message is GlobalPositionInt) {
       _processGlobalPosition(frm.message as GlobalPositionInt);
-    }
-    else if (frm.message is VfrHud) {
+    } else if (frm.message is VfrHud) {
       _processVfrHud(frm.message as VfrHud);
-    }
-    else if (frm.message is GpsRawInt) {
+    } else if (frm.message is GpsRawInt) {
       _processGpsRawInt(frm.message as GpsRawInt);
-    }
-    else if (frm.message.runtimeType.toString() == 'StatusText') {
+    } else if (frm.message.runtimeType.toString() == 'StatusText') {
       _processStatusText(frm.message);
-    }
-    else if (frm.message is ParamValue) {
+    } else if (frm.message is ParamValue) {
       _processParamValue(frm.message as ParamValue);
-    }
-    else if (frm.message.runtimeType.toString() == 'MissionCurrent') {
+    } else if (frm.message.runtimeType.toString() == 'MissionCurrent') {
       _processMissionCurrent(frm.message);
-    }
-    else if (frm.message.runtimeType.toString() == 'MissionCount') {
+    } else if (frm.message.runtimeType.toString() == 'MissionCount') {
       _processMissionCount(frm.message);
-    }
-    else if (frm.message.runtimeType.toString() == 'HomePosition') {
+    } else if (frm.message.runtimeType.toString() == 'HomePosition') {
       _processHomePosition(frm.message);
-    }
-    else if (frm.message.runtimeType.toString() == 'EkfStatusReport') {
+    } else if (frm.message.runtimeType.toString() == 'EkfStatusReport') {
       _processEkfStatus(frm.message);
     }
   }
 
   /// Process heartbeat message
   void _processHeartbeat(Heartbeat heartbeat) {
-    // Update flight mode
-    _currentMode = _decodeFlightMode(heartbeat.baseMode, heartbeat.customMode);
-    // Update armed status
+    // Decode new flight mode
+    String newMode = _decodeFlightMode(heartbeat.baseMode, heartbeat.customMode);
+    
+    // Update armed status immediately (no debounce needed for armed status)
     _isArmed = (heartbeat.baseMode & 0x80) != 0;
 
-    // Send event
-    _eventController.add(MAVLinkEvent(
-      MAVLinkEventType.heartbeat,
-      {
-        'mode': _currentMode,
+    // Handle flight mode with debounce
+    if (newMode != _pendingMode) {
+      // New mode detected, start debounce timer
+      _pendingMode = newMode;
+      _modeChangeTime = DateTime.now();
+      
+      // Cancel existing timer if any
+      _modeDebounceTimer?.cancel();
+      
+      // Start new debounce timer
+      _modeDebounceTimer = Timer(_modeDebounceDelay, () {
+        // After debounce delay, check if mode is still the same
+        if (_pendingMode == newMode && _modeChangeTime != null) {
+          // Mode has been stable for the debounce period, update it
+          String oldMode = _currentMode;
+          _currentMode = _pendingMode;
+          
+          // Only send event if mode actually changed
+          if (oldMode != _currentMode) {
+            print('Flight mode changed: $oldMode -> $_currentMode (after ${_modeDebounceDelay.inMilliseconds}ms debounce)');
+          }
+          
+          // Send event with updated mode
+          _sendHeartbeatEvent(heartbeat);
+        }
+      });
+    } else {
+      // Same mode as pending, update timestamp
+      _modeChangeTime = DateTime.now();
+    }
+
+    // Always send heartbeat event for armed status updates (mode might be pending)
+    _sendHeartbeatEvent(heartbeat);
+  }
+
+  /// Send heartbeat event with current stable mode
+  void _sendHeartbeatEvent(Heartbeat heartbeat) {
+    _eventController.add(
+      MAVLinkEvent(MAVLinkEventType.heartbeat, {
+        'mode': _currentMode, // Use stable mode, not pending
         'armed': _isArmed,
         'type': _getSystemType(heartbeat.type),
         'autopilot': _getAutopilotType(heartbeat.autopilot),
         'baseMode': heartbeat.baseMode,
         'customMode': heartbeat.customMode,
         'systemStatus': _getSystemStatus(heartbeat.systemStatus),
-        'mavlinkVersion': heartbeat.mavlinkVersion
-      }
-    ));
+        'mavlinkVersion': heartbeat.mavlinkVersion,
+      }),
+    );
   }
 
   /// Process system status message
   void _processSysStatus(SysStatus status) {
     _batteryPercent = status.batteryRemaining;
 
-    _eventController.add(MAVLinkEvent(
-      MAVLinkEventType.batteryStatus,
-      {
+    _eventController.add(
+      MAVLinkEvent(MAVLinkEventType.batteryStatus, {
         'batteryPercent': status.batteryRemaining,
         'voltageBattery': status.voltageBattery / 1000, // Convert to volts
-        'currentBattery': status.currentBattery / 100,  // Convert to amps
+        'currentBattery': status.currentBattery / 100, // Convert to amps
         'cpuLoad': status.load / 10, // Convert to percentage
         'commDropRate': status.dropRateComm,
         'errorsComm': status.errorsComm,
-        'sensorHealth': status.onboardControlSensorsHealth
-      }
-    ));
+        'sensorHealth': status.onboardControlSensorsHealth,
+      }),
+    );
   }
 
   /// Process attitude message
   void _processAttitude(Attitude attitude) {
-    _roll = attitude.roll * 180 / pi;   // Convert to degrees
+    _roll = attitude.roll * 180 / pi; // Convert to degrees
     _pitch = attitude.pitch * 180 / pi; // Convert to degrees
-    _yaw = attitude.yaw * 180 / pi;     // Convert to degrees
+    _yaw = attitude.yaw * 180 / pi; // Convert to degrees
 
-    _eventController.add(MAVLinkEvent(
-      MAVLinkEventType.attitude,
-      {
+    _eventController.add(
+      MAVLinkEvent(MAVLinkEventType.attitude, {
         'roll': _roll,
         'pitch': _pitch,
         'yaw': _yaw,
         'rollSpeed': attitude.rollspeed * 180 / pi, // Convert to deg/s
         'pitchSpeed': attitude.pitchspeed * 180 / pi, // Convert to deg/s
-        'yawSpeed': attitude.yawspeed * 180 / pi // Convert to deg/s
-      }
-    ));
+        'yawSpeed': attitude.yawspeed * 180 / pi, // Convert to deg/s
+      }),
+    );
   }
 
   /// Process global position message
   void _processGlobalPosition(GlobalPositionInt pos) {
-    _altMSL = pos.alt / 1000;           // Convert to meters
+    _altMSL = pos.alt / 1000; // Convert to meters
     _altRelative = pos.relativeAlt / 1000; // Convert to meters
 
     // Calculate ground speed from North and East velocities
@@ -342,20 +465,19 @@ class DroneMAVLinkAPI {
     double vy = pos.vy / 100; // m/s
     _groundSpeed = sqrt(vx * vx + vy * vy);
 
-    _eventController.add(MAVLinkEvent(
-      MAVLinkEventType.position,
-      {
-        'lat': pos.lat / 1e7,  // Convert to degrees
-        'lon': pos.lon / 1e7,  // Convert to degrees
+    _eventController.add(
+      MAVLinkEvent(MAVLinkEventType.position, {
+        'lat': pos.lat / 1e7, // Convert to degrees
+        'lon': pos.lon / 1e7, // Convert to degrees
         'altMSL': _altMSL,
         'altRelative': _altRelative,
         'vx': vx, // North velocity in m/s
         'vy': vy, // East velocity in m/s
         'vz': pos.vz / 100, // Down velocity in m/s
         'heading': pos.hdg / 100, // Heading in degrees
-        'groundSpeed': _groundSpeed
-      }
-    ));
+        'groundSpeed': _groundSpeed,
+      }),
+    );
   }
 
   /// Process VFR HUD message
@@ -363,38 +485,43 @@ class DroneMAVLinkAPI {
     _airSpeed = hud.airspeed;
     _groundSpeed = hud.groundspeed; // More accurate ground speed
 
-    _eventController.add(MAVLinkEvent(
-      MAVLinkEventType.vfrHud,
-      {
+    _eventController.add(
+      MAVLinkEvent(MAVLinkEventType.vfrHud, {
         'airspeed': _airSpeed,
         'groundspeed': _groundSpeed,
         'heading': hud.heading,
         'throttle': hud.throttle,
         'alt': hud.alt,
-        'climb': hud.climb
-      }
-    ));
+        'climb': hud.climb,
+      }),
+    );
   }
 
   /// Process GPS raw message
   void _processGpsRawInt(GpsRawInt gps) {
     _gpsFixType = _getGpsFix(gps.fixType);
     _satellites = gps.satellitesVisible;
+    _gpsLatitude = gps.lat / 1e7; // Convert to degrees
+    _gpsLongitude = gps.lon / 1e7; // Convert to degrees
+    _gpsAltitude = gps.alt / 1000; // Convert to meters
+    _gpsHorizontalAccuracy = gps.eph / 100; // Horizontal accuracy in meters
+    _gpsVerticalAccuracy = gps.epv / 100; // Vertical accuracy in meters
+    _gpsSpeed = gps.vel / 100; // Speed in m/s
+    _gpsCourse = gps.cog / 100; // Course in degrees
 
-    _eventController.add(MAVLinkEvent(
-      MAVLinkEventType.gpsInfo,
-      {
+    _eventController.add(
+      MAVLinkEvent(MAVLinkEventType.gpsInfo, {
         'fixType': _gpsFixType,
         'satellites': _satellites,
-        'lat': gps.lat / 1e7,  // Convert to degrees
-        'lon': gps.lon / 1e7,  // Convert to degrees
-        'alt': gps.alt / 1000, // Convert to meters
-        'eph': gps.eph / 100,  // Horizontal accuracy in meters
-        'epv': gps.epv / 100,  // Vertical accuracy in meters
-        'vel': gps.vel / 100,  // Speed in m/s
-        'cog': gps.cog / 100   // Course in degrees
-      }
-    ));
+        'lat': _gpsLatitude,
+        'lon': _gpsLongitude,
+        'alt': _gpsAltitude,
+        'eph': _gpsHorizontalAccuracy,
+        'epv': _gpsVerticalAccuracy,
+        'vel': _gpsSpeed,
+        'cog': _gpsCourse,
+      }),
+    );
   }
 
   /// Process status text message
@@ -403,13 +530,12 @@ class DroneMAVLinkAPI {
       String statusText = text.text;
       int severity = text.severity;
 
-      _eventController.add(MAVLinkEvent(
-        MAVLinkEventType.statusText,
-        {
+      _eventController.add(
+        MAVLinkEvent(MAVLinkEventType.statusText, {
           'severity': _getStatusSeverity(severity),
-          'text': statusText
-        }
-      ));
+          'text': statusText,
+        }),
+      );
     } catch (e) {
       // Handle any errors silently
     }
@@ -419,31 +545,31 @@ class DroneMAVLinkAPI {
   void _processParamValue(ParamValue param) {
     // Convert paramId from byte array to string and trim trailing zeros
     var terminatedIndex = param.paramId.indexOf(0);
-    terminatedIndex = terminatedIndex == -1 ? param.paramId.length : terminatedIndex;
+    terminatedIndex = terminatedIndex == -1
+        ? param.paramId.length
+        : terminatedIndex;
     var trimmed = param.paramId.sublist(0, terminatedIndex);
     var paramId = String.fromCharCodes(trimmed);
 
     // Add to parameters map
     _parameters[paramId] = param.paramValue;
 
-    _eventController.add(MAVLinkEvent(
-      MAVLinkEventType.parameterReceived,
-      {
+    _eventController.add(
+      MAVLinkEvent(MAVLinkEventType.parameterReceived, {
         'id': paramId,
         'value': param.paramValue,
         'type': _getParamType(param.paramType),
         'index': param.paramIndex,
-        'count': param.paramCount
-      }
-    ));
+        'count': param.paramCount,
+      }),
+    );
 
     // Check if this is the last parameter
     if (param.paramIndex == param.paramCount - 1) {
       _requestingParameters = false;
-      _eventController.add(MAVLinkEvent(
-        MAVLinkEventType.allParametersReceived,
-        _parameters
-      ));
+      _eventController.add(
+        MAVLinkEvent(MAVLinkEventType.allParametersReceived, _parameters),
+      );
     }
   }
 
@@ -506,7 +632,7 @@ class DroneMAVLinkAPI {
         targetComponent: _componentId,
         reqStreamId: streamId,
         reqMessageRate: rate,
-        startStop: 1,  // 1 = start, 0 = stop
+        startStop: 1, // 1 = start, 0 = stop
       );
 
       // Create frame - use v2 for better compatibility
@@ -694,94 +820,156 @@ class DroneMAVLinkAPI {
   // Helper methods for decoding MAVLink enumerations
 
   String _getSystemType(int type) {
-    switch(type) {
-      case 0: return 'Generic';
-      case 1: return 'Fixed Wing';
-      case 2: return 'Quadrotor';
-      case 3: return 'Coaxial helicopter';
-      case 4: return 'Helicopter';
-      case 5: return 'Antenna Tracker';
-      case 6: return 'GCS';
-      case 7: return 'Airship';
-      case 8: return 'Free Balloon';
-      case 9: return 'Rocket';
-      case 10: return 'Ground Rover';
-      case 11: return 'Surface Boat';
-      case 12: return 'Submarine';
-      case 13: return 'Hexarotor';
-      case 14: return 'Octorotor';
-      case 15: return 'Tricopter';
-      case 19: return 'VTOL';
-      default: return 'Unknown ($type)';
+    switch (type) {
+      case 0:
+        return 'Generic';
+      case 1:
+        return 'Fixed Wing';
+      case 2:
+        return 'Quadrotor';
+      case 3:
+        return 'Coaxial helicopter';
+      case 4:
+        return 'Helicopter';
+      case 5:
+        return 'Antenna Tracker';
+      case 6:
+        return 'GCS';
+      case 7:
+        return 'Airship';
+      case 8:
+        return 'Free Balloon';
+      case 9:
+        return 'Rocket';
+      case 10:
+        return 'Ground Rover';
+      case 11:
+        return 'Surface Boat';
+      case 12:
+        return 'Submarine';
+      case 13:
+        return 'Hexarotor';
+      case 14:
+        return 'Octorotor';
+      case 15:
+        return 'Tricopter';
+      case 19:
+        return 'VTOL';
+      default:
+        return 'Unknown ($type)';
     }
   }
 
   String _getAutopilotType(int type) {
-    switch(type) {
-      case 0: return 'Generic';
-      case 3: return 'ArduPilot';
-      case 4: return 'PX4';
-      default: return 'Unknown ($type)';
+    switch (type) {
+      case 0:
+        return 'Generic';
+      case 3:
+        return 'ArduPilot';
+      case 4:
+        return 'PX4';
+      default:
+        return 'Unknown ($type)';
     }
   }
 
   String _getSystemStatus(int status) {
-    switch(status) {
-      case 0: return 'Uninit';
-      case 1: return 'Boot';
-      case 2: return 'Calibrating';
-      case 3: return 'Standby';
-      case 4: return 'Active';
-      case 5: return 'Critical';
-      case 6: return 'Emergency';
-      case 7: return 'Poweroff';
-      case 8: return 'Flight Termination';
-      default: return 'Unknown ($status)';
+    switch (status) {
+      case 0:
+        return 'Uninit';
+      case 1:
+        return 'Boot';
+      case 2:
+        return 'Calibrating';
+      case 3:
+        return 'Standby';
+      case 4:
+        return 'Active';
+      case 5:
+        return 'Critical';
+      case 6:
+        return 'Emergency';
+      case 7:
+        return 'Poweroff';
+      case 8:
+        return 'Flight Termination';
+      default:
+        return 'Unknown ($status)';
     }
   }
 
   String _getGpsFix(int fixType) {
-    switch(fixType) {
-      case 0: return 'No GPS';
-      case 1: return 'No Fix';
-      case 2: return '2D Fix';
-      case 3: return '3D Fix';
-      case 4: return 'DGPS';
-      case 5: return 'RTK Float';
-      case 6: return 'RTK Fixed';
-      case 7: return 'Static';
-      case 8: return 'PPP';
-      default: return 'Unknown ($fixType)';
+    switch (fixType) {
+      case 0:
+        return 'No GPS';
+      case 1:
+        return 'No Fix';
+      case 2:
+        return '2D Fix';
+      case 3:
+        return '3D Fix';
+      case 4:
+        return 'DGPS';
+      case 5:
+        return 'RTK Float';
+      case 6:
+        return 'RTK Fixed';
+      case 7:
+        return 'Static';
+      case 8:
+        return 'PPP';
+      default:
+        return 'Unknown ($fixType)';
     }
   }
 
   String _getStatusSeverity(int severity) {
-    switch(severity) {
-      case 0: return 'Emergency';
-      case 1: return 'Alert';
-      case 2: return 'Critical';
-      case 3: return 'Error';
-      case 4: return 'Warning';
-      case 5: return 'Notice';
-      case 6: return 'Info';
-      case 7: return 'Debug';
-      default: return 'Unknown ($severity)';
+    switch (severity) {
+      case 0:
+        return 'Emergency';
+      case 1:
+        return 'Alert';
+      case 2:
+        return 'Critical';
+      case 3:
+        return 'Error';
+      case 4:
+        return 'Warning';
+      case 5:
+        return 'Notice';
+      case 6:
+        return 'Info';
+      case 7:
+        return 'Debug';
+      default:
+        return 'Unknown ($severity)';
     }
   }
 
   String _getParamType(int paramType) {
-    switch(paramType) {
-      case 1: return 'uint8_t';
-      case 2: return 'int8_t';
-      case 3: return 'uint16_t';
-      case 4: return 'int16_t';
-      case 5: return 'uint32_t';
-      case 6: return 'int32_t';
-      case 7: return 'uint64_t';
-      case 8: return 'int64_t';
-      case 9: return 'float';
-      case 10: return 'double';
-      default: return 'Unknown ($paramType)';
+    switch (paramType) {
+      case 1:
+        return 'uint8_t';
+      case 2:
+        return 'int8_t';
+      case 3:
+        return 'uint16_t';
+      case 4:
+        return 'int16_t';
+      case 5:
+        return 'uint32_t';
+      case 6:
+        return 'int32_t';
+      case 7:
+        return 'uint64_t';
+      case 8:
+        return 'int64_t';
+      case 9:
+        return 'float';
+      case 10:
+        return 'double';
+      default:
+        return 'Unknown ($paramType)';
     }
   }
 
@@ -789,17 +977,42 @@ class DroneMAVLinkAPI {
     // This is primarily for ArduPilot - if you need to support other autopilots
     // like PX4, you'll need to add their mode decoding logic
     const List<String> arduPilotModes = [
-      'MANUAL', 'CIRCLE', 'STABILIZE', 'TRAINING', 'ACRO', 'FBWA',
-      'FBWB', 'CRUISE', 'AUTOTUNE', 'AUTO', 'RTL', 'LOITER',
-      'TAKEOFF', 'AVOID_ADSB', 'GUIDED', 'INITIALIZING', 'QSTABILIZE',
-      'QHOVER', 'QLOITER', 'QLAND', 'QRTL', 'QAUTOTUNE', 'QACRO'
+      'MANUAL',
+      'CIRCLE',
+      'STABILIZE',
+      'TRAINING',
+      'ACRO',
+      'FBWA',
+      'FBWB',
+      'CRUISE',
+      'AUTOTUNE',
+      'AUTO',
+      'RTL',
+      'LOITER',
+      'TAKEOFF',
+      'AVOID_ADSB',
+      'GUIDED',
+      'INITIALIZING',
+      'QSTABILIZE',
+      'QLAND',
+      'QHOVER',
+      'QLOITER',
+      'QAUTOTUNE',
+      'QRTL',
+      'QACRO',
     ];
 
+    String mode;
     if (customMode < arduPilotModes.length) {
-      return arduPilotModes[customMode];
+      mode = arduPilotModes[customMode];
+    } else {
+      mode = 'UNKNOWN MODE ($customMode)';
     }
-
-    return 'UNKNOWN MODE ($customMode)';
+    
+    // Debug: Log mode decoding
+    print('Decoded flight mode: baseMode=0x${baseMode.toRadixString(16)}, customMode=$customMode -> $mode');
+    
+    return mode;
   }
 
   String _decodeEkfStatus(int flags) {
@@ -820,26 +1033,40 @@ class DroneMAVLinkAPI {
   }
 
   String _getCommandResult(int result) {
-    switch(result) {
-      case 0: return 'Accepted';
-      case 1: return 'Temporarily Rejected';
-      case 2: return 'Denied';
-      case 3: return 'Unsupported';
-      case 4: return 'Failed';
-      case 5: return 'In Progress';
-      case 6: return 'Cancelled';
-      default: return 'Unknown ($result)';
+    switch (result) {
+      case 0:
+        return 'Accepted';
+      case 1:
+        return 'Temporarily Rejected';
+      case 2:
+        return 'Denied';
+      case 3:
+        return 'Unsupported';
+      case 4:
+        return 'Failed';
+      case 5:
+        return 'In Progress';
+      case 6:
+        return 'Cancelled';
+      default:
+        return 'Unknown ($result)';
     }
   }
 
   String _getBatteryFunction(int function) {
-    switch(function) {
-      case 0: return 'Unknown';
-      case 1: return 'All';
-      case 2: return 'Propulsion';
-      case 3: return 'Comms';
-      case 4: return 'Camera';
-      default: return 'Other ($function)';
+    switch (function) {
+      case 0:
+        return 'Unknown';
+      case 1:
+        return 'All';
+      case 2:
+        return 'Propulsion';
+      case 3:
+        return 'Comms';
+      case 4:
+        return 'Camera';
+      default:
+        return 'Other ($function)';
     }
   }
 }

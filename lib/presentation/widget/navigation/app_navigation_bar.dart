@@ -18,6 +18,7 @@ class _AppNavigationBarState extends State<AppNavigationBar>
     GlobalKey(),
     GlobalKey(),
     GlobalKey(),
+    GlobalKey(),
   ];
 
   int _selectedIndex = 0;
@@ -37,6 +38,7 @@ class _AppNavigationBarState extends State<AppNavigationBar>
         AppRoute.map,
         AppRoute.allDrone,
         AppRoute.route,
+        AppRoute.file,
       ];
       final newIndex = routes.indexOf(currentRoute);
 
@@ -208,9 +210,16 @@ class _AppNavigationBarState extends State<AppNavigationBar>
       AppRoute.map,
       AppRoute.allDrone,
       AppRoute.route,
+      AppRoute.file,
     ];
-    final labels = ['Home', 'Map', 'All Drone', 'Route'];
-    final icons = [Icons.home, Icons.map, Icons.flight, Icons.route];
+    final labels = ['Home', 'Map', 'All Drone', 'Route', 'File'];
+    final icons = [
+      Icons.home,
+      Icons.map,
+      Icons.flight,
+      Icons.route,
+      Icons.file_copy,
+    ];
 
     final buttons = <Widget>[];
 

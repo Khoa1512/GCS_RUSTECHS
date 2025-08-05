@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:skylink/core/constant/app_color.dart';
 import 'package:skylink/data/telemetry_data.dart';
-import 'package:skylink/data/constants/telemetry_constants.dart';
 import 'package:skylink/services/telemetry_service.dart';
 import 'dart:async';
 
@@ -72,11 +71,8 @@ class _TelemetrySelectorDialogState extends State<TelemetrySelectorDialog> {
   }
 
   void _updateFilteredTelemetry() {
-    // Get all available telemetry options with real-time data
-    var allTelemetry = TelemetryConstants.allTelemetryData.map((item) {
-      // Update values with real data if connected
-      return TelemetryConstants.getUpdatedTelemetryItem(item);
-    }).toList();
+    // Get all available telemetry options with real-time data from service
+    var allTelemetry = _telemetryService.getAllAvailableTelemetryData();
 
     if (searchQuery.isEmpty) {
       filteredTelemetry = allTelemetry;

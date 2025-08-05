@@ -3,6 +3,7 @@ import 'package:skylink/responsive/demension.dart';
 import 'package:skylink/services/telemetry_service.dart';
 import 'package:skylink/presentation/widget/connection/connection_dialog.dart';
 import 'dart:async';
+import 'package:intl/intl.dart';
 
 class AppStatusBar extends StatefulWidget {
   const AppStatusBar({super.key});
@@ -16,6 +17,10 @@ class _AppStatusBarState extends State<AppStatusBar> {
   final TelemetryService _telemetryService = TelemetryService();
   StreamSubscription? _connectionSubscription;
   bool _isConnected = false;
+  
+  // Time variables
+  String _currentTime = '';
+  Timer? _timeTimer;
 
   @override
   void initState() {
@@ -32,16 +37,38 @@ class _AppStatusBarState extends State<AppStatusBar> {
         });
       }
     });
+
+    // Initialize time and start timer
+    _updateTime();
+    _startTimeUpdates();
   }
 
   @override
   void dispose() {
     _connectionSubscription?.cancel();
+    _timeTimer?.cancel();
     super.dispose();
   }
 
   void _showConnectionDialog() {
     ConnectionDialog.show(context);
+  }
+
+  void _updateTime() {
+    final now = DateTime.now();
+    final formatter = DateFormat('h:mm a');
+    if (mounted) {
+      setState(() {
+        _currentTime = formatter.format(now);
+      });
+    }
+  }
+
+  void _startTimeUpdates() {
+    // Update time every minute
+    _timeTimer = Timer.periodic(Duration(minutes: 1), (timer) {
+      _updateTime();
+    });
   }
 
   @override
@@ -121,7 +148,7 @@ class _AppStatusBarState extends State<AppStatusBar> {
                     SizedBox(width: ResponsiveDimensions.spacingM),
                     _buildDroneConnection(),
                     SizedBox(width: ResponsiveDimensions.spacingM),
-                    _buildTimeItem(text: '11:43 AM'),
+                    _buildTimeItem(text: _currentTime.isNotEmpty ? _currentTime : '11:43 AM'),
                     SizedBox(width: ResponsiveDimensions.spacingS),
                     _buildBatteryIcon(),
                   ],

@@ -88,7 +88,7 @@ class TelemetryService {
           break;
         default:
           // Update all data on any telemetry event
-          _updateAllTelemetryData();
+          _updateTelemetryData();
           break;
       }
     });
@@ -135,6 +135,13 @@ class TelemetryService {
     _currentTelemetry.addAll({
       'satellites': _api.satellites.toDouble(),
       'gps_fix': _getGpsFixValue(_api.gpsFixType),
+      'gps_latitude': _api.gpsLatitude,
+      'gps_longitude': _api.gpsLongitude,
+      'gps_altitude': _api.gpsAltitude,
+      'gps_speed': _api.gpsSpeed,
+      'gps_course': _api.gpsCourse,
+      'gps_horizontal_accuracy': _api.gpsHorizontalAccuracy,
+      'gps_vertical_accuracy': _api.gpsVerticalAccuracy,
     });
     _telemetryController.add(_currentTelemetry);
   }
@@ -145,16 +152,16 @@ class TelemetryService {
     _telemetryController.add(_currentTelemetry);
   }
 
-  /// Update all telemetry data at once
-  void _updateAllTelemetryData() {
+  /// Update current telemetry data based on API state
+  void _updateTelemetryData() {
     _currentTelemetry = {
       // Attitude
       'roll': _api.roll,
       'pitch': _api.pitch,
       'yaw': _api.yaw,
 
-      // Heading/Compass - use yaw for compass until GPS heading is available
-      'compass_heading': _api.yaw,
+      // Heading/Compass - use GPS course when available, otherwise yaw
+      'compass_heading': _api.gpsCourse != 0.0 ? _api.gpsCourse : _api.yaw,
 
       // Speed
       'airspeed': _api.airSpeed,
@@ -164,9 +171,18 @@ class TelemetryService {
       'altitude_msl': _api.altitudeMSL,
       'altitude_rel': _api.altitudeRelative,
 
-      // GPS
+      // GPS Position
+      'gps_latitude': _api.gpsLatitude,
+      'gps_longitude': _api.gpsLongitude,
+      'gps_altitude': _api.gpsAltitude,
+      'gps_speed': _api.gpsSpeed,
+      'gps_course': _api.gpsCourse,
+
+      // GPS Quality
       'satellites': _api.satellites.toDouble(),
       'gps_fix': _getGpsFixValue(_api.gpsFixType),
+      'gps_horizontal_accuracy': _api.gpsHorizontalAccuracy,
+      'gps_vertical_accuracy': _api.gpsVerticalAccuracy,
 
       // Battery
       'battery': _api.batteryPercent.toDouble(),
@@ -253,6 +269,42 @@ class TelemetryService {
           color: Colors.amber,
         ),
         TelemetryData(
+          label: 'GPS Lat',
+          value: '0.0',
+          unit: '°',
+          color: Colors.deepOrange,
+        ),
+        TelemetryData(
+          label: 'GPS Lon',
+          value: '0.0',
+          unit: '°',
+          color: Colors.deepPurple,
+        ),
+        TelemetryData(
+          label: 'GPS Alt',
+          value: '0.0',
+          unit: 'm',
+          color: Colors.indigo,
+        ),
+        TelemetryData(
+          label: 'GPS Speed',
+          value: '0.0',
+          unit: 'm/s',
+          color: Colors.lime,
+        ),
+        TelemetryData(
+          label: 'GPS Course',
+          value: '0.0',
+          unit: '°',
+          color: Colors.brown,
+        ),
+        TelemetryData(
+          label: 'GPS H.Acc',
+          value: '0.0',
+          unit: 'm',
+          color: Colors.grey,
+        ),
+        TelemetryData(
           label: 'Battery',
           value: '0',
           unit: '%',
@@ -311,10 +363,174 @@ class TelemetryService {
         color: Colors.amber,
       ),
       TelemetryData(
+        label: 'GPS Lat',
+        value: (_currentTelemetry['gps_latitude'] ?? 0.0).toStringAsFixed(6),
+        unit: '°',
+        color: Colors.deepOrange,
+      ),
+      TelemetryData(
+        label: 'GPS Lon',
+        value: (_currentTelemetry['gps_longitude'] ?? 0.0).toStringAsFixed(6),
+        unit: '°',
+        color: Colors.deepPurple,
+      ),
+      TelemetryData(
+        label: 'GPS Alt',
+        value: (_currentTelemetry['gps_altitude'] ?? 0.0).toStringAsFixed(1),
+        unit: 'm',
+        color: Colors.indigo,
+      ),
+      TelemetryData(
+        label: 'GPS Speed',
+        value: (_currentTelemetry['gps_speed'] ?? 0.0).toStringAsFixed(1),
+        unit: 'm/s',
+        color: Colors.lime,
+      ),
+      TelemetryData(
+        label: 'GPS Course',
+        value: (_currentTelemetry['gps_course'] ?? 0.0).toStringAsFixed(1),
+        unit: '°',
+        color: Colors.brown,
+      ),
+      TelemetryData(
+        label: 'GPS H.Acc',
+        value: (_currentTelemetry['gps_horizontal_accuracy'] ?? 0.0)
+            .toStringAsFixed(2),
+        unit: 'm',
+        color: Colors.grey,
+      ),
+      TelemetryData(
         label: 'Battery',
         value: (_currentTelemetry['battery'] ?? 0.0).toInt().toString(),
         unit: '%',
         color: Colors.teal,
+      ),
+    ];
+  }
+
+  /// Get all available telemetry data items for selector dialog
+  List<TelemetryData> getAllAvailableTelemetryData() {
+    return [
+      // Flight Attitude
+      TelemetryData(
+        label: 'Roll',
+        value: (_currentTelemetry['roll'] ?? 0.0).toStringAsFixed(1),
+        unit: '°',
+        color: Colors.blue,
+      ),
+      TelemetryData(
+        label: 'Pitch',
+        value: (_currentTelemetry['pitch'] ?? 0.0).toStringAsFixed(1),
+        unit: '°',
+        color: Colors.green,
+      ),
+      TelemetryData(
+        label: 'Yaw',
+        value: (_currentTelemetry['yaw'] ?? 0.0).toStringAsFixed(1),
+        unit: '°',
+        color: Colors.purple,
+      ),
+
+      // Speed Data
+      TelemetryData(
+        label: 'Airspeed',
+        value: (_currentTelemetry['airspeed'] ?? 0.0).toStringAsFixed(1),
+        unit: 'm/s',
+        color: Colors.orange,
+      ),
+      TelemetryData(
+        label: 'Groundspeed',
+        value: (_currentTelemetry['groundspeed'] ?? 0.0).toStringAsFixed(1),
+        unit: 'm/s',
+        color: Colors.cyan,
+      ),
+
+      // Altitude Data
+      TelemetryData(
+        label: 'Altitude MSL',
+        value: (_currentTelemetry['altitude_msl'] ?? 0.0).toStringAsFixed(1),
+        unit: 'm',
+        color: Colors.red,
+      ),
+      TelemetryData(
+        label: 'Altitude Rel',
+        value: (_currentTelemetry['altitude_rel'] ?? 0.0).toStringAsFixed(1),
+        unit: 'm',
+        color: Colors.pink,
+      ),
+
+      // GPS Data
+      TelemetryData(
+        label: 'GPS Latitude',
+        value: (_currentTelemetry['gps_latitude'] ?? 0.0).toStringAsFixed(6),
+        unit: '°',
+        color: Colors.deepOrange,
+      ),
+      TelemetryData(
+        label: 'GPS Longitude',
+        value: (_currentTelemetry['gps_longitude'] ?? 0.0).toStringAsFixed(6),
+        unit: '°',
+        color: Colors.deepPurple,
+      ),
+      TelemetryData(
+        label: 'GPS Altitude',
+        value: (_currentTelemetry['gps_altitude'] ?? 0.0).toStringAsFixed(1),
+        unit: 'm',
+        color: Colors.indigo,
+      ),
+      TelemetryData(
+        label: 'GPS Speed',
+        value: (_currentTelemetry['gps_speed'] ?? 0.0).toStringAsFixed(1),
+        unit: 'm/s',
+        color: Colors.lime,
+      ),
+      TelemetryData(
+        label: 'GPS Course',
+        value: (_currentTelemetry['gps_course'] ?? 0.0).toStringAsFixed(1),
+        unit: '°',
+        color: Colors.brown,
+      ),
+      TelemetryData(
+        label: 'GPS H.Accuracy',
+        value: (_currentTelemetry['gps_horizontal_accuracy'] ?? 0.0)
+            .toStringAsFixed(2),
+        unit: 'm',
+        color: Colors.grey,
+      ),
+      TelemetryData(
+        label: 'GPS V.Accuracy',
+        value: (_currentTelemetry['gps_vertical_accuracy'] ?? 0.0)
+            .toStringAsFixed(2),
+        unit: 'm',
+        color: Colors.blueGrey,
+      ),
+      TelemetryData(
+        label: 'GPS Fix Type',
+        value: _currentTelemetry['gps_fix_type']?.toString() ?? 'No GPS',
+        unit: '',
+        color: Colors.lightGreen,
+      ),
+      TelemetryData(
+        label: 'Satellites',
+        value: (_currentTelemetry['satellites'] ?? 0.0).toInt().toString(),
+        unit: '',
+        color: Colors.amber,
+      ),
+
+      // Battery & Power
+      TelemetryData(
+        label: 'Battery',
+        value: (_currentTelemetry['battery'] ?? 0.0).toInt().toString(),
+        unit: '%',
+        color: Colors.teal,
+      ),
+
+      // Flight Status
+      TelemetryData(
+        label: 'Flight Mode',
+        value: _currentTelemetry['mode']?.toString() ?? 'Unknown',
+        unit: '',
+        color: Colors.deepOrangeAccent,
       ),
     ];
   }
@@ -334,6 +550,27 @@ class TelemetryService {
 
   /// Check if drone is armed
   bool get isArmed => _api.isArmed;
+
+  /// Get GPS related data
+  double get gpsLatitude => _api.gpsLatitude;
+  double get gpsLongitude => _api.gpsLongitude;
+  double get gpsAltitude => _api.gpsAltitude;
+  double get gpsSpeed => _api.gpsSpeed;
+  double get gpsCourse => _api.gpsCourse;
+  double get gpsHorizontalAccuracy => _api.gpsHorizontalAccuracy;
+  double get gpsVerticalAccuracy => _api.gpsVerticalAccuracy;
+  String get gpsFixType => _api.gpsFixType;
+  int get gpsFixValue => _getGpsFixValue(_api.gpsFixType).toInt();
+
+  /// Check if GPS has a valid fix
+  bool get hasValidGpsFix =>
+      _api.gpsFixType != 'No GPS' && _api.gpsFixType != 'No Fix';
+
+  /// Get GPS accuracy in human readable format
+  String get gpsAccuracyString {
+    if (!hasValidGpsFix) return 'No GPS';
+    return '±${_api.gpsHorizontalAccuracy.toStringAsFixed(1)}m';
+  }
 
   /// Dispose service and cleanup resources
   void dispose() {

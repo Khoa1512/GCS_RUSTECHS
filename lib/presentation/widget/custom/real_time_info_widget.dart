@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:skylink/core/constant/app_color.dart';
 import 'package:skylink/data/telemetry_data.dart';
-import 'package:skylink/data/constants/telemetry_constants.dart';
 import 'package:skylink/presentation/widget/telemetry/telemetry_selector_dialog.dart';
 import 'package:skylink/presentation/widget/telemetry/telemetry_item_widget.dart';
 import 'package:skylink/services/telemetry_service.dart';
@@ -59,8 +58,6 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   int _lastSatelliteCount = -1;
   int _lastBatteryPercent = -1;
   bool _connectionEstablished = false;
-  bool _prearmChecksPassed = false;
-  String? _lastSystemStatus;
 
   @override
   void initState() {
@@ -120,12 +117,10 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
     // Clear messages and reset all tracking when disconnected
     _statusMessages.clear();
     _connectionEstablished = false;
-    _prearmChecksPassed = false;
     _lastFlightMode = null;
     _lastGpsFixType = null;
     _lastSatelliteCount = -1;
     _lastBatteryPercent = -1;
-    _lastSystemStatus = null;
   }
 
   // ============================================================================
@@ -185,9 +180,6 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
       case MAVLinkEventType.vfrHud:
       case MAVLinkEventType.parameterReceived:
         // These are for telemetry display, NOT status messages
-        break;
-
-      default:
         break;
     }
   }
@@ -403,13 +395,8 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   void _updateDisplayedTelemetry() {
-    if (_telemetryService.isConnected) {
-      // Use real telemetry data from service
-      displayedTelemetry = _telemetryService.getTelemetryDataList();
-    } else {
-      // Use default telemetry when not connected
-      displayedTelemetry = TelemetryConstants.getDefaultTelemetry();
-    }
+    // Always use real telemetry data from service
+    displayedTelemetry = _telemetryService.getTelemetryDataList();
   }
 
   void _onTelemetrySelected(int index, TelemetryData newTelemetry) {

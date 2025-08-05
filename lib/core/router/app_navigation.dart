@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skylink/core/router/app_route.dart';
+import 'package:skylink/presentation/view/file/file_page.dart';
 import 'package:skylink/presentation/view/main/home/homepage.dart';
 import 'package:skylink/presentation/view/main/map/map_page.dart';
 import 'package:skylink/presentation/view/main/all_drone/all_drone_page.dart';
@@ -18,6 +19,8 @@ class AppNavigation {
       GlobalKey<NavigatorState>(debugLabel: 'allDroneNavigator');
   static final GlobalKey<NavigatorState> _routeNavigatorKey =
       GlobalKey<NavigatorState>(debugLabel: 'routeNavigator');
+  static final GlobalKey<NavigatorState> _fileNavigatorKey =
+      GlobalKey<NavigatorState>(debugLabel: 'fileNavigator');
 
   static final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
@@ -32,6 +35,7 @@ class AppNavigation {
         _buildMapBranch(),
         _buildAllDroneBranch(),
         _buildRouteBranch(),
+        _buildFileBranch()
       ],
     );
   }
@@ -83,6 +87,19 @@ class AppNavigation {
           path: AppRoute.route,
           name: AppRoute.route,
           builder: (context, state) => const RoutePage(),
+        ),
+      ],
+    );
+  }
+
+  static StatefulShellBranch _buildFileBranch() {
+    return StatefulShellBranch(
+      navigatorKey: _fileNavigatorKey,
+      routes: [
+        GoRoute(
+          path: AppRoute.file,
+          name: AppRoute.file,
+          builder: (context, state) => const FilePage(),
         ),
       ],
     );

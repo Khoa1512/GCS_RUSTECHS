@@ -136,3 +136,6 @@ lcov.info
 *.tmp
 *.temp
 .metadata
+
+# Videos assets (don't commit large video files)
+assets/videos/

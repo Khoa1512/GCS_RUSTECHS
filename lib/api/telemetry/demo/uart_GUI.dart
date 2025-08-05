@@ -164,9 +164,7 @@ class _UartDisplayState extends State<UartDisplay>
           }
 
           _receivedData.add(
-            '  ├─ [Heartbeat] Type: ${_getSystemType(heartbeat.type)}, ' 'Autopilot: ${_getAutopilotType(heartbeat.autopilot)}, ' 'Base Mode: 0x${heartbeat.baseMode.toRadixString(16).padLeft(2, '0')}, ' +
-                'Custom Mode: ${heartbeat.customMode}, ' +
-                'System Status: ${_getSystemStatus(heartbeat.systemStatus)}',
+            '  ├─ [Heartbeat] Type: ${_getSystemType(heartbeat.type)}, ' 'Autopilot: ${_getAutopilotType(heartbeat.autopilot)}, ' 'Base Mode: 0x${heartbeat.baseMode.toRadixString(16).padLeft(2, '0')}, ' 'Custom Mode: ${heartbeat.customMode}, ' 'System Status: ${_getSystemStatus(heartbeat.systemStatus)}',
           );
           _receivedData.add(
             '  └─ Version: MAVLink ${heartbeat.mavlinkVersion}',
@@ -182,8 +180,7 @@ class _UartDisplayState extends State<UartDisplay>
             '  ├─ [SysStatus] Battery: $_batteryPercent%, ' 'Voltage: ${status.voltageBattery / 1000} V, ' 'Current: ${status.currentBattery / 100} A',
           );
           _receivedData.add(
-            '  └─ CPU Load: ${status.load / 10}%, ' 'Comms Drop: ${status.dropRateComm}%, ' 'Errors: Comm: ${status.errorsComm}, ' +
-                'Sensor Health: 0x${status.onboardControlSensorsHealth.toRadixString(16)}',
+            '  └─ CPU Load: ${status.load / 10}%, ' 'Comms Drop: ${status.dropRateComm}%, ' 'Errors: Comm: ${status.errorsComm}, ' 'Sensor Health: 0x${status.onboardControlSensorsHealth.toRadixString(16)}',
           );
         } else if (frm.message is Attitude) {
           var attitude = frm.message as Attitude;
@@ -219,8 +216,7 @@ class _UartDisplayState extends State<UartDisplay>
             '  ├─ Alt (MSL): ${_altMSL.toStringAsFixed(2)}m, ' 'Alt (Rel): ${_altRelative.toStringAsFixed(2)}m',
           );
           _receivedData.add(
-            '  └─ Speed: N: ${vx.toStringAsFixed(1)}m/s, ' 'E: ${vy.toStringAsFixed(1)}m/s, ' 'D: ${(pos.vz / 100).toStringAsFixed(1)}m/s, ' +
-                'Heading: ${(pos.hdg / 100).toStringAsFixed(1)}°',
+            '  └─ Speed: N: ${vx.toStringAsFixed(1)}m/s, ' 'E: ${vy.toStringAsFixed(1)}m/s, ' 'D: ${(pos.vz / 100).toStringAsFixed(1)}m/s, ' 'Heading: ${(pos.hdg / 100).toStringAsFixed(1)}°',
           );
         } else if (frm.message is VfrHud) {
           var hud = frm.message as VfrHud;
@@ -235,8 +231,7 @@ class _UartDisplayState extends State<UartDisplay>
             '  ├─ [VFR HUD] Airspeed: ${_airSpeed.toStringAsFixed(1)}m/s, ' 'Groundspeed: ${_groundSpeed.toStringAsFixed(1)}m/s',
           );
           _receivedData.add(
-            '  └─ Alt: ${hud.alt.toStringAsFixed(1)}m, ' 'Climb: ${hud.climb.toStringAsFixed(1)}m/s, ' 'Heading: ${hud.heading}°, ' +
-                'Throttle: ${hud.throttle}%',
+            '  └─ Alt: ${hud.alt.toStringAsFixed(1)}m, ' 'Climb: ${hud.climb.toStringAsFixed(1)}m/s, ' 'Heading: ${hud.heading}°, ' 'Throttle: ${hud.throttle}%',
           );
         } else if (frm.message is RcChannelsRaw) {
           var rc = frm.message as RcChannelsRaw;

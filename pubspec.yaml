@@ -49,6 +49,7 @@ dependencies:
   dart_mavlink: ^0.1.0
   video_player: ^2.9.2
   webview_flutter: ^4.10.0
+  flutter_inappwebview: ^6.1.5
   chewie: ^1.8.5
   path_provider: ^2.1.2
   video_thumbnail: ^0.5.3

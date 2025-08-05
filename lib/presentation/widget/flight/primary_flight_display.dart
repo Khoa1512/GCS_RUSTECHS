@@ -83,6 +83,51 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
     return 'N';
   }
 
+  // Get flight mode colors based on the mode type
+  List<Color> _getFlightModeColors(String flightMode, bool isArmed) {
+    // Safety modes - Red
+    if (['RTL', 'LAND', 'QLAND', 'EMERGENCY'].contains(flightMode)) {
+      return [Color(0xFFE53935), Color(0xFFB71C1C)];
+    }
+    
+    // Autonomous modes - Blue  
+    if (['AUTO', 'GUIDED', 'TAKEOFF', 'LOITER', 'QLOITER', 'QRTL'].contains(flightMode)) {
+      return [Color(0xFF1976D2), Color(0xFF0D47A1)];
+    }
+    
+    // Manual/Stabilized modes - Green when armed, Orange when disarmed
+    if (['MANUAL', 'STABILIZE', 'ACRO', 'QSTABILIZE', 'QACRO', 'QHOVER'].contains(flightMode)) {
+      return isArmed 
+        ? [Color(0xFF4CAF50), Color(0xFF2E7D32)]
+        : [Color(0xFFFF9800), Color(0xFFE65100)];
+    }
+    
+    // Assisted modes - Purple
+    if (['FBWA', 'FBWB', 'CRUISE', 'AUTOTUNE', 'QAUTOTUNE', 'CIRCLE'].contains(flightMode)) {
+      return [Color(0xFF7B1FA2), Color(0xFF4A148C)];
+    }
+    
+    // Unknown or training modes - Gray
+    return [Color(0xFF757575), Color(0xFF424242)];
+  }
+  
+  // Get single flight mode color for shadow
+  Color _getFlightModeColor(String flightMode, bool isArmed) {
+    if (['RTL', 'LAND', 'QLAND', 'EMERGENCY'].contains(flightMode)) {
+      return Colors.red;
+    }
+    if (['AUTO', 'GUIDED', 'TAKEOFF', 'LOITER', 'QLOITER', 'QRTL'].contains(flightMode)) {
+      return Colors.blue;
+    }
+    if (['MANUAL', 'STABILIZE', 'ACRO', 'QSTABILIZE', 'QACRO', 'QHOVER'].contains(flightMode)) {
+      return isArmed ? Colors.green : Colors.orange;
+    }
+    if (['FBWA', 'FBWB', 'CRUISE', 'AUTOTUNE', 'QAUTOTUNE', 'CIRCLE'].contains(flightMode)) {
+      return Colors.purple;
+    }
+    return Colors.grey;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -230,9 +275,7 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: isConnected
-                            ? (isArmed
-                                  ? [Color(0xFF4CAF50), Color(0xFF2E7D32)]
-                                  : [Color(0xFFFF9800), Color(0xFFE65100)])
+                            ? _getFlightModeColors(flightMode, isArmed)
                             : [Color(0xFFE53935), Color(0xFFB71C1C)],
                       ),
                       borderRadius: BorderRadius.circular(20),
@@ -240,7 +283,7 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                         BoxShadow(
                           color:
                               (isConnected
-                                      ? (isArmed ? Colors.green : Colors.orange)
+                                      ? _getFlightModeColor(flightMode, isArmed)
                                       : Colors.red)
                                   .withOpacity(0.3),
                           blurRadius: 8,
@@ -253,9 +296,7 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                       children: [
                         Icon(
                           isConnected
-                              ? (isArmed
-                                    ? Icons.flight_takeoff
-                                    : Icons.flight_land)
+                              ? Icons.flight
                               : Icons.signal_wifi_off,
                           color: Colors.white,
                           size: 14,
@@ -263,9 +304,7 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                         SizedBox(width: 6),
                         Text(
                           isConnected
-                              ? (isArmed
-                                    ? flightMode.toUpperCase()
-                                    : 'DISARMED')
+                              ? flightMode.toUpperCase()
                               : 'DISCONNECTED',
                           style: TextStyle(
                             color: Colors.white,
@@ -335,6 +374,12 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                   compassHeading,
                   isConnected,
                 ),
+              ),
+              // ARM status - bottom right corner for prominence and no overlap
+              Positioned(
+                right: 20,
+                bottom: 20,
+                child: _buildArmStatusItem(isConnected, isArmed),
               ),
             ],
           ),
@@ -421,6 +466,81 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
               fontFamily: 'monospace',
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // Prominent ARM status display for safety
+  Widget _buildArmStatusItem(bool isConnected, bool isArmed) {
+    // Only show ARM status when connected, otherwise don't show anything
+    if (!isConnected) {
+      return SizedBox.shrink(); // Hidden when not connected
+    }
+
+    // Connected - show ARM status
+    Color statusColor = isArmed ? Colors.red : Colors.green;
+    Color backgroundColor = isArmed 
+        ? Colors.red.withOpacity(0.2) 
+        : Colors.green.withOpacity(0.2);
+    String statusText = isArmed ? 'ARMED' : 'DISARMED';
+    IconData statusIcon = isArmed ? Icons.warning : Icons.shield;
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: statusColor, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: statusColor.withOpacity(0.4),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(statusIcon, color: statusColor, size: 16),
+          SizedBox(width: 6),
+          Text(
+            statusText,
+            style: TextStyle(
+              color: statusColor,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8,
+            ),
+          ),
+          if (isArmed) ...[
+            SizedBox(width: 6),
+            // Blinking warning for armed status
+            AnimatedBuilder(
+              animation: _animationController,
+              builder: (context, child) {
+                return Opacity(
+                  opacity: 0.5 + 0.5 * (0.5 + 0.5 * _animationController.value),
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.red,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withOpacity(0.6),
+                          blurRadius: 4,
+                          offset: Offset(0, 0),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
         ],
       ),
     );
@@ -570,9 +690,6 @@ class AttitudeIndicatorPainter extends CustomPainter {
       if (y.abs() > radius * 1.5) continue; // Allow more extension
 
       bool isMajor = angle % 10 == 0; // Major lines every 10° (with numbers)
-      bool isMinor =
-          angle % 5 == 0 &&
-          !isMajor; // Minor lines at 5°, 15°, 25° (no numbers)
 
       // Different line lengths for major and minor
       final lineLength = isMajor
@@ -659,11 +776,6 @@ class AttitudeIndicatorPainter extends CustomPainter {
 
   void _drawRollIndicator(Canvas canvas, double radius) {
     final rollRadius = radius + 15;
-
-    // Draw roll scale marks with aviation standard intervals
-    final tickPaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 2;
 
     // Define roll angles with different mark types
     final rollAngles = [

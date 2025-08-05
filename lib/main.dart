@@ -5,7 +5,8 @@ import 'package:skylink/core/router/app_navigation.dart';
 import 'package:skylink/core/theme/app_theme.dart';
 import 'package:skylink/responsive/responsive_scaffold.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 

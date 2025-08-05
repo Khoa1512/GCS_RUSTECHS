@@ -89,40 +89,82 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
     if (['RTL', 'LAND', 'QLAND', 'EMERGENCY'].contains(flightMode)) {
       return [Color(0xFFE53935), Color(0xFFB71C1C)];
     }
-    
-    // Autonomous modes - Blue  
-    if (['AUTO', 'GUIDED', 'TAKEOFF', 'LOITER', 'QLOITER', 'QRTL'].contains(flightMode)) {
+
+    // Autonomous modes - Blue
+    if ([
+      'AUTO',
+      'GUIDED',
+      'TAKEOFF',
+      'LOITER',
+      'QLOITER',
+      'QRTL',
+    ].contains(flightMode)) {
       return [Color(0xFF1976D2), Color(0xFF0D47A1)];
     }
-    
+
     // Manual/Stabilized modes - Green when armed, Orange when disarmed
-    if (['MANUAL', 'STABILIZE', 'ACRO', 'QSTABILIZE', 'QACRO', 'QHOVER'].contains(flightMode)) {
-      return isArmed 
-        ? [Color(0xFF4CAF50), Color(0xFF2E7D32)]
-        : [Color(0xFFFF9800), Color(0xFFE65100)];
+    if ([
+      'MANUAL',
+      'STABILIZE',
+      'ACRO',
+      'QSTABILIZE',
+      'QACRO',
+      'QHOVER',
+    ].contains(flightMode)) {
+      return isArmed
+          ? [Color(0xFF4CAF50), Color(0xFF2E7D32)]
+          : [Color(0xFFFF9800), Color(0xFFE65100)];
     }
-    
+
     // Assisted modes - Purple
-    if (['FBWA', 'FBWB', 'CRUISE', 'AUTOTUNE', 'QAUTOTUNE', 'CIRCLE'].contains(flightMode)) {
+    if ([
+      'FBWA',
+      'FBWB',
+      'CRUISE',
+      'AUTOTUNE',
+      'QAUTOTUNE',
+      'CIRCLE',
+    ].contains(flightMode)) {
       return [Color(0xFF7B1FA2), Color(0xFF4A148C)];
     }
-    
+
     // Unknown or training modes - Gray
     return [Color(0xFF757575), Color(0xFF424242)];
   }
-  
+
   // Get single flight mode color for shadow
   Color _getFlightModeColor(String flightMode, bool isArmed) {
     if (['RTL', 'LAND', 'QLAND', 'EMERGENCY'].contains(flightMode)) {
       return Colors.red;
     }
-    if (['AUTO', 'GUIDED', 'TAKEOFF', 'LOITER', 'QLOITER', 'QRTL'].contains(flightMode)) {
+    if ([
+      'AUTO',
+      'GUIDED',
+      'TAKEOFF',
+      'LOITER',
+      'QLOITER',
+      'QRTL',
+    ].contains(flightMode)) {
       return Colors.blue;
     }
-    if (['MANUAL', 'STABILIZE', 'ACRO', 'QSTABILIZE', 'QACRO', 'QHOVER'].contains(flightMode)) {
+    if ([
+      'MANUAL',
+      'STABILIZE',
+      'ACRO',
+      'QSTABILIZE',
+      'QACRO',
+      'QHOVER',
+    ].contains(flightMode)) {
       return isArmed ? Colors.green : Colors.orange;
     }
-    if (['FBWA', 'FBWB', 'CRUISE', 'AUTOTUNE', 'QAUTOTUNE', 'CIRCLE'].contains(flightMode)) {
+    if ([
+      'FBWA',
+      'FBWB',
+      'CRUISE',
+      'AUTOTUNE',
+      'QAUTOTUNE',
+      'CIRCLE',
+    ].contains(flightMode)) {
       return Colors.purple;
     }
     return Colors.grey;
@@ -295,9 +337,7 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          isConnected
-                              ? Icons.flight
-                              : Icons.signal_wifi_off,
+                          isConnected ? Icons.flight : Icons.signal_wifi_off,
                           color: Colors.white,
                           size: 14,
                         ),
@@ -480,8 +520,8 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
 
     // Connected - show ARM status
     Color statusColor = isArmed ? Colors.red : Colors.green;
-    Color backgroundColor = isArmed 
-        ? Colors.red.withOpacity(0.2) 
+    Color backgroundColor = isArmed
+        ? Colors.red.withOpacity(0.2)
         : Colors.green.withOpacity(0.2);
     String statusText = isArmed ? 'ARMED' : 'DISARMED';
     IconData statusIcon = isArmed ? Icons.warning : Icons.shield;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 class CameraWebView extends StatefulWidget {
   final String streamUrl;
@@ -18,50 +19,14 @@ class CameraWebView extends StatefulWidget {
 }
 
 class _CameraWebViewState extends State<CameraWebView> {
-  late final WebViewController _controller;
+  InAppWebViewController? _controller;
   bool _isLoading = true;
   bool _hasError = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeWebView();
-  }
-
-  void _initializeWebView() {
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onProgress: (int progress) {
-            // Update loading bar
-            if (progress == 100) {
-              setState(() {
-                _isLoading = false;
-              });
-            }
-          },
-          onPageStarted: (String url) {
-            setState(() {
-              _isLoading = true;
-              _hasError = false;
-            });
-          },
-          onPageFinished: (String url) {
-            setState(() {
-              _isLoading = false;
-            });
-          },
-          onWebResourceError: (WebResourceError error) {
-            setState(() {
-              _hasError = true;
-              _isLoading = false;
-            });
-            debugPrint('WebView error: ${error.description}');
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse(widget.streamUrl));
+    print('Initializing camera stream: ${widget.streamUrl}');
   }
 
   @override
@@ -77,11 +42,54 @@ class _CameraWebViewState extends State<CameraWebView> {
         borderRadius: BorderRadius.circular(12),
         child: Stack(
           children: [
-            if (!_hasError)
-              WebViewWidget(controller: _controller)
-            else
-              _buildErrorWidget(),
+            // InAppWebView for camera stream
+            InAppWebView(
+              initialUrlRequest: URLRequest(
+                url: WebUri(widget.streamUrl),
+              ),
+              initialSettings: InAppWebViewSettings(
+                javaScriptEnabled: true,
+                mediaPlaybackRequiresUserGesture: false,
+                allowsInlineMediaPlayback: true,
+                supportZoom: false,
+                clearCache: true,
+                mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
+                isInspectable: kDebugMode,
+              ),
+              onWebViewCreated: (controller) {
+                _controller = controller;
+                print('InAppWebView created successfully');
+              },
+              onLoadStart: (controller, url) {
+                print('Loading started: $url');
+                setState(() {
+                  _isLoading = true;
+                  _hasError = false;
+                });
+              },
+              onLoadStop: (controller, url) {
+                print('Loading finished: $url');
+                setState(() {
+                  _isLoading = false;
+                });
+              },
+              onReceivedError: (controller, request, error) {
+                print('WebView error: ${error.description}');
+                setState(() {
+                  _hasError = true;
+                  _isLoading = false;
+                });
+              },
+              onProgressChanged: (controller, progress) {
+                if (progress == 100) {
+                  setState(() {
+                    _isLoading = false;
+                  });
+                }
+              },
+            ),
             if (_isLoading) _buildLoadingWidget(),
+            if (_hasError) _buildErrorWidget(),
           ],
         ),
       ),
@@ -133,8 +141,9 @@ class _CameraWebViewState extends State<CameraWebView> {
               onPressed: () {
                 setState(() {
                   _hasError = false;
+                  _isLoading = true;
                 });
-                _initializeWebView();
+                _controller?.reload();
               },
               child: const Text('Retry'),
             ),

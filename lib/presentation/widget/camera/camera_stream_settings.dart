@@ -20,7 +20,7 @@ class _CameraStreamSettingsState extends State<CameraStreamSettings> {
   late TextEditingController _urlController;
   final List<String> _commonUrls = [
     "https://mr2v2r37jzqd.connect.remote.it/",
-    "http://192.168.1.100:8080/stream",
+    "https://www.youtube.com/watch?v=Wrj-2zuhE-Q&list=RDWrj-2zuhE-Q&start_radio=1",
     "http://localhost:8080/video",
     "rtmp://example.com/live/stream",
     "https://example.com/camera/feed",

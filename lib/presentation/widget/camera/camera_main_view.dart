@@ -9,13 +9,17 @@ class CameraMainView extends StatefulWidget {
   State<CameraMainView> createState() => _CameraMainViewState();
 }
 
-class _CameraMainViewState extends State<CameraMainView> {
+class _CameraMainViewState extends State<CameraMainView>
+    with AutomaticKeepAliveClientMixin {
   // URL của camera stream từ web bên thứ 3
   // URL thực tế của gimbal camera stream
   String cameraStreamUrl = "https://mr2v2r37jzqd.connect.remote.it/";
 
   // Settings overlay
   bool showSettings = false;
+
+  @override
+  bool get wantKeepAlive => true; // Keep widget alive
 
   void _updateStreamUrl(String newUrl) {
     setState(() {
@@ -31,6 +35,8 @@ class _CameraMainViewState extends State<CameraMainView> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required by AutomaticKeepAliveClientMixin
+    
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
 

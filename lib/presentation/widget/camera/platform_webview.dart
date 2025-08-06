@@ -21,7 +21,8 @@ class PlatformWebView extends StatefulWidget {
   State<PlatformWebView> createState() => _PlatformWebViewState();
 }
 
-class _PlatformWebViewState extends State<PlatformWebView> {
+class _PlatformWebViewState extends State<PlatformWebView>
+    with AutomaticKeepAliveClientMixin {
   bool _isLoading = true;
   bool _hasError = false;
   
@@ -30,6 +31,9 @@ class _PlatformWebViewState extends State<PlatformWebView> {
   
   // For webview_windows (Windows)
   final windows.WebviewController _windowsController = windows.WebviewController();
+
+  @override
+  bool get wantKeepAlive => true; // Keep widget alive
 
   @override
   void initState() {
@@ -45,21 +49,27 @@ class _PlatformWebViewState extends State<PlatformWebView> {
         ..setNavigationDelegate(
           webview.NavigationDelegate(
             onPageStarted: (String url) {
-              setState(() {
-                _isLoading = true;
-                _hasError = false;
-              });
+              if (mounted) {
+                setState(() {
+                  _isLoading = true;
+                  _hasError = false;
+                });
+              }
             },
             onPageFinished: (String url) {
-              setState(() {
-                _isLoading = false;
-              });
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                });
+              }
             },
             onWebResourceError: (webview.WebResourceError error) {
-              setState(() {
-                _hasError = true;
-                _isLoading = false;
-              });
+              if (mounted) {
+                setState(() {
+                  _hasError = true;
+                  _isLoading = false;
+                });
+              }
             },
           ),
         )
@@ -76,29 +86,37 @@ class _PlatformWebViewState extends State<PlatformWebView> {
       await _windowsController.loadUrl(widget.url);
       
       _windowsController.loadingState.listen((state) {
-        setState(() {
-          _isLoading = state == windows.LoadingState.loading;
-        });
+        if (mounted) {
+          setState(() {
+            _isLoading = state == windows.LoadingState.loading;
+          });
+        }
       });
 
       _windowsController.url.listen((url) {
         // Handle URL changes if needed
       });
 
-      setState(() {
-        _hasError = false;
-      });
+      if (mounted) {
+        setState(() {
+          _hasError = false;
+        });
+      }
     } catch (e) {
       print('Error initializing Windows WebView: $e');
-      setState(() {
-        _hasError = true;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required by AutomaticKeepAliveClientMixin
+    
     return Container(
       width: widget.width ?? double.infinity,
       height: widget.height ?? double.infinity,

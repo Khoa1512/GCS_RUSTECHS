@@ -112,8 +112,12 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   // Reset to default position when disconnected
   void _resetToDefaultPosition() {
     setState(() {
-      _currentLatitude = widget.droneLatitude ?? 10.7302; // Default: Trường ĐH Tôn Đức Thắng
-      _currentLongitude = widget.droneLongitude ?? 106.6988; // Default: Trường ĐH Tôn Đức Thắng
+      // Only reset position if FC is completely disconnected
+      // Don't reset if FC is connected but just missing GPS
+      if (!_telemetryService.isConnected) {
+        _currentLatitude = widget.droneLatitude ?? 10.7302; // Default: Trường ĐH Tôn Đức Thắng
+        _currentLongitude = widget.droneLongitude ?? 106.6988; // Default: Trường ĐH Tôn Đức Thắng
+      }
       _currentAltitude = 0.0;
       _currentYaw = 0.0;
     });
@@ -200,23 +204,9 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
             _currentAltitude = newAlt;
             needsMapUpdate = true;
           }
-        } else {
-          // Try to get GPS data directly from telemetry service
-          double directLat = _telemetryService.gpsLatitude;
-          double directLon = _telemetryService.gpsLongitude;
-          
-          if (directLat != 0.0 && directLon != 0.0) {
-            double latDiff = (_currentLatitude - directLat).abs();
-            double lonDiff = (_currentLongitude - directLon).abs();
-            
-            if (latDiff > 0.000005 || lonDiff > 0.000005) {
-              _currentLatitude = directLat;
-              _currentLongitude = directLon;
-              _currentAltitude = _telemetryService.gpsAltitude;
-              needsMapUpdate = true;
-            }
-          }
         }
+        // Note: Don't update GPS coordinates when no valid fix
+        // Keep last known good position or default position
 
         // Apply updates
         if (needsRotationUpdate) {

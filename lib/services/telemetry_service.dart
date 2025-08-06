@@ -563,12 +563,20 @@ class TelemetryService {
   int get gpsFixValue => _getGpsFixValue(_api.gpsFixType).toInt();
 
   /// Check if GPS has a valid fix
-  bool get hasValidGpsFix =>
-      _api.gpsFixType != 'No GPS' && _api.gpsFixType != 'No Fix';
+  bool get hasValidGpsFix {
+    // Only accept valid GPS fixes that can provide accurate position
+    return _api.gpsFixType == '2D Fix' || 
+           _api.gpsFixType == '3D Fix' || 
+           _api.gpsFixType == 'DGPS' || 
+           _api.gpsFixType == 'RTK Float' || 
+           _api.gpsFixType == 'RTK Fixed' ||
+           _api.gpsFixType == 'Static' ||
+           _api.gpsFixType == 'PPP';
+  }
 
   /// Get GPS accuracy in human readable format
   String get gpsAccuracyString {
-    if (!hasValidGpsFix) return 'No GPS';
+    if (!hasValidGpsFix) return '${_api.gpsFixType}'; // Show actual fix type for debugging
     return '±${_api.gpsHorizontalAccuracy.toStringAsFixed(1)}m';
   }
 

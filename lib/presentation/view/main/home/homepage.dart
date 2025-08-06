@@ -99,7 +99,7 @@ class _HomepageState extends State<Homepage> {
   Widget _buildMapOrCameraView() {
     return Stack(
       children: [
-        // Main view (Map or Camera)
+        // Main view (Map or Camera) - using IndexedStack to preserve state
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
@@ -113,14 +113,20 @@ class _HomepageState extends State<Homepage> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: _isMapView
-                ? DroneMapWidget(
-                    droneLatitude: 10.732789,
-                    droneLongitude: 106.699230,
-                    droneAltitude: 100,
-                    droneHeading: 0,
-                  )
-                : CameraMainView(),
+            child: IndexedStack(
+              index: _isMapView ? 0 : 1,
+              children: [
+                // Map view (index 0)
+                DroneMapWidget(
+                  droneLatitude: 10.732789,
+                  droneLongitude: 106.699230,
+                  droneAltitude: 100,
+                  droneHeading: 0,
+                ),
+                // Camera view (index 1)
+                CameraMainView(),
+              ],
+            ),
           ),
         ),
         // Toggle button overlay

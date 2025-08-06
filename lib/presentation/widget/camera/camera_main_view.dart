@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:skylink/presentation/widget/camera/camera_webview.dart';
+import 'package:skylink/presentation/widget/camera/platform_webview.dart';
 import 'package:skylink/presentation/widget/camera/camera_stream_settings.dart';
 
 class CameraMainView extends StatefulWidget {
@@ -54,8 +54,8 @@ class _CameraMainViewState extends State<CameraMainView> {
             Positioned.fill(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: CameraWebView(
-                  streamUrl: cameraStreamUrl,
+                child: PlatformWebView(
+                  url: cameraStreamUrl,
                   width: double.infinity,
                   height: double.infinity,
                 ),

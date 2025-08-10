@@ -7,7 +7,14 @@ import 'package:flutter/material.dart';
 class TelemetryService {
   static final TelemetryService _instance = TelemetryService._internal();
   factory TelemetryService() => _instance;
-  TelemetryService._internal();
+
+  bool _hasReceivedData = false;
+  final _dataReceiveController = StreamController<bool>.broadcast();
+
+  TelemetryService._internal() {
+    // Khởi tạo service
+    initialize();
+  }
 
   final DroneMAVLinkAPI _api = DroneMAVLinkAPI();
   StreamSubscription? _apiSubscription;
@@ -25,46 +32,107 @@ class TelemetryService {
   Stream<Map<String, double>> get telemetryStream =>
       _telemetryController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
+  Stream<bool> get dataReceiveStream => _dataReceiveController.stream;
   bool get isConnected => _isConnected;
+  bool get hasReceivedData => _hasReceivedData;
   Map<String, double> get currentTelemetry => Map.from(_currentTelemetry);
+
+  /// Set connection state and notify listeners
+  void setConnected(bool connected) {
+    _isConnected = connected;
+    _connectionController.add(connected);
+  }
 
   // Expose MAVLink API for accessing other event types (like statusText)
   DroneMAVLinkAPI get mavlinkAPI => _api;
 
   /// Initialize the service
   void initialize() {
+    // Hủy subscription cũ nếu có
+    _apiSubscription?.cancel();
     _setupApiListener();
   }
 
   /// Connect to drone via specified port
   Future<bool> connect(String port, {int baudRate = 115200}) async {
+    // print('TelemetryService: Attempting to connect to $port at $baudRate baud');
+
     try {
+      // Check if port is available
+      final availablePorts = getAvailablePorts();
+      if (!availablePorts.contains(port)) {
+        // print('TelemetryService: Port $port is not available');
+        return false;
+      }
+
+      // print('TelemetryService: Calling API connect');
       bool success = await _api.connect(port, baudRate: baudRate);
+
       if (success) {
-        _isConnected = true;
-        _connectionController.add(true);
+        print('TelemetryService: Port connected, waiting for data...');
+        _hasReceivedData = false;
+
+        // Setup API listener mới
+        _apiSubscription?.cancel();
+        _setupApiListener();
+
+        // Thông báo trạng thái - chưa set connected
+        _connectionController.add(false);
+        _dataReceiveController.add(false);
+
         // Request all data streams for real-time telemetry
         _api.requestAllDataStreams();
+      } else {
+        // print('TelemetryService: Connection failed');
       }
+
       return success;
     } catch (e) {
-      print('TelemetryService connect error: $e');
+      // print('TelemetryService: Connect error: $e');
+      _isConnected = false;
+      _connectionController.add(false);
       return false;
     }
   }
 
   /// Disconnect from drone
   void disconnect() {
-    _api.disconnect();
-    _isConnected = false;
-    _connectionController.add(false);
-    _currentTelemetry.clear();
-    _telemetryController.add(_currentTelemetry);
+    // print('TelemetryService: Disconnecting');
+    try {
+      // Hủy subscription
+      _apiSubscription?.cancel();
+
+      // Disconnect từ API
+      _api.disconnect();
+
+      // Reset tất cả trạng thái
+      _isConnected = false;
+      _hasReceivedData = false;
+
+      // Thông báo cho các listener
+      _connectionController.add(false);
+      _dataReceiveController.add(false);
+
+      // Xóa dữ liệu telemetry
+      _currentTelemetry.clear();
+      _telemetryController.add(_currentTelemetry);
+
+      // print('TelemetryService: Disconnected successfully');
+    } catch (e) {
+      // print('TelemetryService: Error during disconnect: $e');
+      // Đảm bảo các trạng thái vẫn được reset ngay cả khi có lỗi
+      _isConnected = false;
+      _hasReceivedData = false;
+      _connectionController.add(false);
+      _dataReceiveController.add(false);
+    }
   }
 
   /// Get available serial ports
   List<String> getAvailablePorts() {
-    return _api.getAvailablePorts();
+    final ports = _api.getAvailablePorts();
+    // print('TelemetryService: Available ports: $ports');
+    return ports;
   }
 
   /// Setup listener for MAVLink API events
@@ -154,6 +222,16 @@ class TelemetryService {
 
   /// Update current telemetry data based on API state
   void _updateTelemetryData() {
+    // Kiểm tra xem đã nhận được data thực tế chưa
+    if (!_hasReceivedData &&
+        (_api.gpsLatitude != 0 ||
+            _api.gpsLongitude != 0 ||
+            _api.batteryPercent > 0)) {
+      // print('TelemetryService: First data received!');
+      _hasReceivedData = true;
+      _dataReceiveController.add(true);
+    }
+
     _currentTelemetry = {
       // Attitude
       'roll': _api.roll,
@@ -565,26 +643,33 @@ class TelemetryService {
   /// Check if GPS has a valid fix
   bool get hasValidGpsFix {
     // Only accept valid GPS fixes that can provide accurate position
-    return _api.gpsFixType == '2D Fix' || 
-           _api.gpsFixType == '3D Fix' || 
-           _api.gpsFixType == 'DGPS' || 
-           _api.gpsFixType == 'RTK Float' || 
-           _api.gpsFixType == 'RTK Fixed' ||
-           _api.gpsFixType == 'Static' ||
-           _api.gpsFixType == 'PPP';
+    return _api.gpsFixType == '2D Fix' ||
+        _api.gpsFixType == '3D Fix' ||
+        _api.gpsFixType == 'DGPS' ||
+        _api.gpsFixType == 'RTK Float' ||
+        _api.gpsFixType == 'RTK Fixed' ||
+        _api.gpsFixType == 'Static' ||
+        _api.gpsFixType == 'PPP';
   }
 
   /// Get GPS accuracy in human readable format
   String get gpsAccuracyString {
-    if (!hasValidGpsFix) return '${_api.gpsFixType}'; // Show actual fix type for debugging
+    if (!hasValidGpsFix)
+      return _api.gpsFixType; // Show actual fix type for debugging
     return '±${_api.gpsHorizontalAccuracy.toStringAsFixed(1)}m';
   }
 
   /// Dispose service and cleanup resources
   void dispose() {
+    // Hủy tất cả subscription và timer
     _apiSubscription?.cancel();
+
+    // Dispose API
     _api.dispose();
+
+    // Đóng tất cả stream controller
     _telemetryController.close();
     _connectionController.close();
+    _dataReceiveController.close();
   }
 }

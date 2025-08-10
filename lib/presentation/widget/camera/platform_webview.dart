@@ -25,10 +25,10 @@ class _PlatformWebViewState extends State<PlatformWebView>
     with AutomaticKeepAliveClientMixin {
   bool _isLoading = true;
   bool _hasError = false;
-  
+
   // For webview_flutter (macOS)
   webview.WebViewController? _webViewController;
-  
+
   // For webview_windows (Windows)
   final windows.WebviewController _windowsController = windows.WebviewController();
 
@@ -84,7 +84,7 @@ class _PlatformWebViewState extends State<PlatformWebView>
     try {
       await _windowsController.initialize();
       await _windowsController.loadUrl(widget.url);
-      
+
       _windowsController.loadingState.listen((state) {
         if (mounted) {
           setState(() {
@@ -116,7 +116,7 @@ class _PlatformWebViewState extends State<PlatformWebView>
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required by AutomaticKeepAliveClientMixin
-    
+
     return Container(
       width: widget.width ?? double.infinity,
       height: widget.height ?? double.infinity,

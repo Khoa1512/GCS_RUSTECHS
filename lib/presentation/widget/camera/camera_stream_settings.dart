@@ -20,10 +20,7 @@ class _CameraStreamSettingsState extends State<CameraStreamSettings> {
   late TextEditingController _urlController;
   final List<String> _commonUrls = [
     "https://mr2v2r37jzqd.connect.remote.it/",
-    "https://www.youtube.com/watch?v=Wrj-2zuhE-Q&list=RDWrj-2zuhE-Q&start_radio=1",
-    "http://localhost:8080/video",
-    "rtmp://example.com/live/stream",
-    "https://example.com/camera/feed",
+    "https://szx3j7twuwon.connect.remote.it/",
   ];
 
   @override
@@ -103,7 +100,7 @@ class _CameraStreamSettingsState extends State<CameraStreamSettings> {
               width: double.infinity,
               padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.blue.shade200),
               ),
@@ -128,7 +125,8 @@ class _CameraStreamSettingsState extends State<CameraStreamSettings> {
                     widget.currentUrl,
                     style: TextStyle(
                       fontSize: isSmallScreen ? 10 : 12,
-                      color: Colors.grey[700],
+                      color: Colors.grey.shade800,
+                      fontWeight: FontWeight.w500,
                     ),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 2,
@@ -149,11 +147,27 @@ class _CameraStreamSettingsState extends State<CameraStreamSettings> {
             SizedBox(height: isSmallScreen ? 6 : 8),
             TextField(
               controller: _urlController,
+              style: TextStyle(
+                fontSize: isSmallScreen ? 14 : 16,
+                color: Colors.black87,
+                fontWeight: FontWeight.w500,
+              ),
               decoration: InputDecoration(
                 hintText: 'Enter camera stream URL...',
-                prefixIcon: const Icon(Icons.link),
+                hintStyle: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: isSmallScreen ? 14 : 16,
+                ),
+                prefixIcon: Icon(Icons.link, color: Colors.blue.shade600),
+                filled: true,
+                fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -161,7 +175,7 @@ class _CameraStreamSettingsState extends State<CameraStreamSettings> {
                 ),
                 contentPadding: EdgeInsets.symmetric(
                   horizontal: isSmallScreen ? 12 : 16,
-                  vertical: isSmallScreen ? 8 : 12,
+                  vertical: isSmallScreen ? 12 : 16,
                 ),
               ),
             ),

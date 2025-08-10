@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:skylink/services/telemetry_service.dart';
 import 'package:skylink/core/constant/app_color.dart';
+import 'dart:async';
 
 class ConnectionDialog {
   static Future<void> show(BuildContext context) async {
@@ -24,20 +25,24 @@ class _ConnectionDialogWidget extends StatefulWidget {
 
 class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
   final TelemetryService _telemetryService = TelemetryService();
-
   List<String> _availablePorts = [];
   String? _selectedPort;
+  String? _connectedPort;
   int _baudRate = 115200;
   bool _isConnecting = false;
   bool _isConnected = false;
+  bool _isWaitingForData = false;
+  Timer? _progressTimer;
+  double _progressValue = 0.0;
+  StreamSubscription? _dataSubscription;
 
   final List<int> _baudRates = [9600, 57600, 115200, 230400, 460800, 921600];
 
   @override
   void initState() {
     super.initState();
-    _loadAvailablePorts();
     _isConnected = _telemetryService.isConnected;
+    _loadAvailablePorts();
   }
 
   void _loadAvailablePorts() {
@@ -50,53 +55,135 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
   }
 
   Future<void> _connect() async {
-    if (_selectedPort == null) return;
+    if (_selectedPort == null) {
+      return;
+    }
 
     setState(() {
       _isConnecting = true;
     });
 
     try {
+      // Check if port is still available before connecting
+      final availablePorts = _telemetryService.getAvailablePorts();
+      if (!availablePorts.contains(_selectedPort)) {
+        throw Exception('Port no longer available');
+      }
+
       bool success = await _telemetryService.connect(
         _selectedPort!,
         baudRate: _baudRate,
       );
 
-      if (mounted) {
+      setState(() {
+        _isConnecting = false;
+        _isConnected = success;
+        if (success) {
+          _connectedPort = _selectedPort;
+        } else {
+          // print('Connection failed to $_selectedPort');
+        }
+      });
+
+      if (success) {
         setState(() {
           _isConnecting = false;
-          _isConnected = success;
+          // Chưa set _isConnected = true ngay, đợi progress bar chạy hết
         });
-
-        if (success) {
-          _showSnackBar(
-            'Successfully connected to $_selectedPort',
-            isError: false,
-          );
-          // Close dialog after successful connection
-          Future.delayed(Duration(milliseconds: 500), () {
-            if (mounted) Navigator.of(context).pop();
-          });
-        } else {
-          _showSnackBar('Failed to connect to $_selectedPort', isError: true);
-        }
+        _showSnackBar('Port connected, waiting for data...', isError: false);
+        _startProgressBar();
+      } else {
+        setState(() {
+          _isConnecting = false;
+          _isConnected = false;
+        });
+        _showSnackBar('Failed to connect to $_selectedPort', isError: true);
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isConnecting = false;
+          _isConnected = false;
         });
         _showSnackBar('Connection error: $e', isError: true);
       }
     }
   }
 
-  void _disconnect() {
+  Future<void> _disconnect() async {
     _telemetryService.disconnect();
+
+    if (mounted) {
+      setState(() {
+        _isConnected = false;
+        _isConnecting = false;
+        _connectedPort = null;
+      });
+
+      _showSnackBar('Disconnected', isError: false);
+      Navigator.of(context).pop();
+    }
+  }
+
+  void _startProgressBar() {
+    // Hủy timer và subscription cũ nếu có
+    _progressTimer?.cancel();
+    _dataSubscription?.cancel();
+
+    bool hasReceivedData = false;
+
+    // Reset và bắt đầu chờ data
     setState(() {
-      _isConnected = false;
+      _isWaitingForData = true;
+      _progressValue = 0.0;
     });
-    _showSnackBar('Disconnected', isError: false);
+
+    // Bắt đầu timer để cập nhật thanh tiến trình
+    // Tăng 0.2% mỗi 100ms -> full sau 5s
+    _progressTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
+      if (mounted) {
+        setState(() {
+          _progressValue += 0.02; // 1/50 để full sau 5s
+          if (_progressValue > 1.0) _progressValue = 1.0;
+
+          // Nếu đã chạy hết thanh tiến trình
+          if (_progressValue >= 1.0) {
+            _progressTimer?.cancel();
+            _dataSubscription?.cancel();
+
+            if (hasReceivedData) {
+              setState(() {
+                _isWaitingForData = false;
+                _isConnected = true;
+              });
+              // Set connected trong TelemetryService
+              _telemetryService.setConnected(true);
+              Navigator.of(context).pop();
+            } else {
+              _disconnect();
+              _showSnackBar(
+                'Connection timeout: No data received',
+                isError: true,
+              );
+            }
+          }
+        });
+      }
+    });
+
+    // Lắng nghe data stream
+    _dataSubscription = _telemetryService.dataReceiveStream.listen((hasData) {
+      if (hasData) {
+        hasReceivedData = true;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _progressTimer?.cancel();
+    _dataSubscription?.cancel();
+    super.dispose();
   }
 
   void _showSnackBar(String message, {required bool isError}) {
@@ -132,31 +219,75 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_isWaitingForData) ...[
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  children: [
+                    LinearProgressIndicator(
+                      value: _progressValue,
+                      backgroundColor: Colors.grey[300],
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Waiting for data...',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 16),
+            ],
+
             // Connection Status
             Container(
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
-                color: _isConnected
-                    ? Colors.green.withValues(alpha: 0.2)
-                    : Colors.red.withValues(alpha: 0.2),
+                color: _isWaitingForData
+                    ? Colors.orange.withOpacity(0.2)
+                    : _isConnected
+                    ? Colors.green.withOpacity(0.2)
+                    : Colors.red.withOpacity(0.2),
                 border: Border.all(
-                  color: _isConnected ? Colors.green : Colors.red,
+                  color: _isWaitingForData
+                      ? Colors.orange
+                      : _isConnected
+                      ? Colors.green
+                      : Colors.red,
                   width: 1,
                 ),
               ),
               child: Row(
                 children: [
                   Icon(
-                    _isConnected ? Icons.check_circle : Icons.error,
-                    color: _isConnected ? Colors.green : Colors.red,
+                    _isWaitingForData
+                        ? Icons.hourglass_empty
+                        : _isConnected
+                        ? Icons.check_circle
+                        : Icons.error,
+                    color: _isWaitingForData
+                        ? Colors.orange
+                        : _isConnected
+                        ? Colors.green
+                        : Colors.red,
                     size: 20,
                   ),
                   SizedBox(width: 8),
                   Text(
-                    _isConnected ? 'Connected' : 'Disconnected',
+                    _isWaitingForData
+                        ? 'Connecting...'
+                        : _isConnected
+                        ? 'Connected'
+                        : 'Disconnected',
                     style: TextStyle(
-                      color: _isConnected ? Colors.green : Colors.red,
+                      color: _isWaitingForData
+                          ? Colors.orange
+                          : _isConnected
+                          ? Colors.green
+                          : Colors.red,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -270,12 +401,30 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
 
         if (_isConnected)
           ElevatedButton(
-            onPressed: _disconnect,
+            onPressed: () async {
+              await _disconnect();
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
             child: Text('Disconnect'),
+          )
+        else if (_isWaitingForData)
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LinearProgressIndicator(
+                value: _progressValue,
+                backgroundColor: Colors.grey[300],
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Waiting for data...',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ],
           )
         else
           ElevatedButton(

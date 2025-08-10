@@ -4,6 +4,15 @@ import 'package:latlong2/latlong.dart';
 import 'package:skylink/core/constant/map_type.dart';
 import 'package:skylink/services/telemetry_service.dart';
 import 'dart:async';
+import 'dart:math';
+
+// Class to store trail points with timestamp
+class TrailPoint {
+  final LatLng position;
+  final DateTime timestamp;
+
+  TrailPoint(this.position, this.timestamp);
+}
 
 class DroneMapWidget extends StatefulWidget {
   final double? droneLatitude;
@@ -41,6 +50,11 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   double _currentLongitude = 106.6988; // Default: Trường ĐH Tôn Đức Thắng
   double _currentAltitude = 0.0;
 
+  // Flight trail tracking
+  final List<TrailPoint> _flightTrail = [];
+  static const int _maxTrailPoints =
+      50; // Maximum number of trail points to keep
+
   @override
   void initState() {
     super.initState();
@@ -54,9 +68,11 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 
     // Initialize current position from widget or default
     _currentYaw = widget.droneHeading ?? 0.0;
-        // Set default position
-    _currentLatitude = widget.droneLatitude ?? 10.7302; // Default: Trường ĐH Tôn Đức Thắng
-    _currentLongitude = widget.droneLongitude ?? 106.6988; // Default: Trường ĐH Tôn Đức Thắng
+    // Set default position
+    _currentLatitude =
+        widget.droneLatitude ?? 10.7302; // Default: Trường ĐH Tôn Đức Thắng
+    _currentLongitude =
+        widget.droneLongitude ?? 106.6988; // Default: Trường ĐH Tôn Đức Thắng
     _currentAltitude = widget.droneAltitude ?? 0.0;
 
     // Pulse animation for drone indicator
@@ -74,23 +90,21 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       duration: Duration(milliseconds: 500),
       vsync: this,
     );
-    
+
     // Initialize rotation animation first
-    _rotationAnimation = Tween<double>(
-      begin: 0,
-      end: _currentYaw * (3.14159 / 180),
-    ).animate(
-      CurvedAnimation(parent: _rotationController, curve: Curves.easeInOut),
-    );
-    
+    _rotationAnimation =
+        Tween<double>(begin: 0, end: _currentYaw * (3.14159 / 180)).animate(
+          CurvedAnimation(parent: _rotationController, curve: Curves.easeInOut),
+        );
+
     _rotationController.forward();
 
     // Listen to telemetry stream for real-time yaw updates
     _listenToTelemetryStream();
-    
+
     // Listen to connection state changes
     _listenToConnectionState();
-    
+
     // Force initial GPS position update
     _forceUpdateGpsPosition();
   }
@@ -110,18 +124,46 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   }
 
   // Reset to default position when disconnected
+  // Add new point to flight trail
+  void _addTrailPoint(LatLng position) {
+    setState(() {
+      DateTime now = DateTime.now();
+      _flightTrail.add(TrailPoint(position, now));
+      _cleanupOldTrailPoints();
+    });
+  }
+
+  // Remove oldest points if exceeding maximum
+  void _cleanupOldTrailPoints() {
+    while (_flightTrail.length > _maxTrailPoints) {
+      _flightTrail.removeAt(0); // Remove oldest point
+    }
+  }
+
+  // Get trail points as LatLng list for polyline
+  List<LatLng> _getTrailPoints() {
+    if (_flightTrail.isEmpty) {
+      return [LatLng(_currentLatitude, _currentLongitude)];
+    }
+    return _flightTrail.map((point) => point.position).toList();
+  }
+
   void _resetToDefaultPosition() {
     setState(() {
       // Only reset position if FC is completely disconnected
       // Don't reset if FC is connected but just missing GPS
       if (!_telemetryService.isConnected) {
-        _currentLatitude = widget.droneLatitude ?? 10.7302; // Default: Trường ĐH Tôn Đức Thắng
-        _currentLongitude = widget.droneLongitude ?? 106.6988; // Default: Trường ĐH Tôn Đức Thắng
+        _currentLatitude =
+            widget.droneLatitude ?? 10.7302; // Default: Trường ĐH Tôn Đức Thắng
+        _currentLongitude =
+            widget.droneLongitude ??
+            106.6988; // Default: Trường ĐH Tôn Đức Thắng
       }
       _currentAltitude = 0.0;
       _currentYaw = 0.0;
+      _flightTrail.clear(); // Clear trail when connection lost
     });
-    
+
     // Also move map to default position
     _updateMapPosition();
   }
@@ -159,7 +201,9 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 
   void _listenToConnectionState() {
     // Listen to connection state changes to reset GPS position when disconnected
-    _connectionSubscription = _telemetryService.connectionStream.listen((isConnected) {
+    _connectionSubscription = _telemetryService.connectionStream.listen((
+      isConnected,
+    ) {
       if (mounted) {
         if (!isConnected) {
           // Reset to default position when disconnected
@@ -197,12 +241,15 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
           // Check if position changed significantly (approximately 0.5 meters)
           double latDiff = (_currentLatitude - newLat).abs();
           double lonDiff = (_currentLongitude - newLon).abs();
-          
+
           if (latDiff > 0.000005 || lonDiff > 0.000005) {
             _currentLatitude = newLat;
             _currentLongitude = newLon;
             _currentAltitude = newAlt;
             needsMapUpdate = true;
+
+            // Add new point to flight trail
+            _addTrailPoint(LatLng(newLat, newLon));
           }
         }
         // Note: Don't update GPS coordinates when no valid fix
@@ -223,14 +270,15 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     if (_rotationController.isAnimating) {
       _rotationController.stop();
     }
-    
-    _rotationAnimation = Tween<double>(
-      begin: _rotationAnimation.value,
-      end: _currentYaw * (3.14159 / 180), // Convert degrees to radians
-    ).animate(
-      CurvedAnimation(parent: _rotationController, curve: Curves.easeInOut),
-    );
-    
+
+    _rotationAnimation =
+        Tween<double>(
+          begin: _rotationAnimation.value,
+          end: _currentYaw * (3.14159 / 180), // Convert degrees to radians
+        ).animate(
+          CurvedAnimation(parent: _rotationController, curve: Curves.easeInOut),
+        );
+
     _rotationController.reset();
     _rotationController.forward();
   }
@@ -305,6 +353,112 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
           },
         ),
 
+        // Flight trail polyline
+        PolylineLayer(
+          polylines:
+              _telemetryService.isConnected && _telemetryService.hasValidGpsFix
+              ? <Polyline>[
+                  Polyline(
+                    points: _getTrailPoints(),
+                    strokeWidth: 4.0,
+                    strokeCap: StrokeCap.round,
+                    color: Colors.blue.withOpacity(0.8),
+                    gradientColors: [
+                      Colors.blue.withOpacity(
+                        0.2,
+                      ), // Start with very transparent
+                      Colors.blue.withOpacity(0.4),
+                      Colors.blue.withOpacity(0.6),
+                      Colors.blue.withOpacity(0.8),
+                      Colors.blue.withOpacity(1.0), // End with solid color
+                    ],
+                  ),
+                ]
+              : <Polyline>[],
+        ),
+
+        // Drone heading line - show direction line
+        StreamBuilder<Map<String, double>>(
+          stream: _telemetryService.telemetryStream,
+          builder: (context, snapshot) {
+            // Only show heading line if we have valid GPS connection AND valid GPS fix
+            bool shouldShowLine = false;
+            List<LatLng> linePoints = [];
+
+            if (_telemetryService.isConnected &&
+                _telemetryService.hasValidGpsFix) {
+              return AnimatedBuilder(
+                animation: _rotationAnimation,
+                builder: (context, child) {
+                  // Get current zoom for calculations
+                  double currentZoom = _mapController.camera.zoom;
+
+                  // Adaptive line distance based on zoom level
+                  double baseDistance = 50.0; // base meters
+                  double distance =
+                      baseDistance * (18.0 / currentZoom).clamp(0.5, 2.0);
+
+                  // Use the current rotation animation value instead of _currentYaw
+                  double currentAngle = _rotationAnimation.value;
+
+                  // Calculate the nose position of the marker
+                  double metersPerPixel =
+                      156543.03392 *
+                      cos(_currentLatitude * 3.14159 / 180) /
+                      pow(2, currentZoom);
+                  double markerRadiusInMeters = 20 * metersPerPixel;
+
+                  // Start point - from the nose of the marker (edge in rotation direction)
+                  double startLatOffset =
+                      (markerRadiusInMeters * cos(currentAngle)) / 111320;
+                  double startLngOffset =
+                      (markerRadiusInMeters * sin(currentAngle)) /
+                      (111320 * cos(_currentLatitude * 3.14159 / 180));
+
+                  // End point - full distance from the nose
+                  double endLatOffset = (distance * cos(currentAngle)) / 111320;
+                  double endLngOffset =
+                      (distance * sin(currentAngle)) /
+                      (111320 * cos(_currentLatitude * 3.14159 / 180));
+
+                  LatLng startPoint = LatLng(
+                    _currentLatitude + startLatOffset,
+                    _currentLongitude + startLngOffset,
+                  );
+                  LatLng endPoint = LatLng(
+                    _currentLatitude + endLatOffset,
+                    _currentLongitude + endLngOffset,
+                  );
+
+                  linePoints = [startPoint, endPoint];
+                  shouldShowLine = true;
+
+                  return PolylineLayer(
+                    polylines: shouldShowLine
+                        ? <Polyline>[
+                            // Shadow line for better visibility
+                            Polyline(
+                              points: linePoints,
+                              strokeWidth: 5.0,
+                              color: Colors.black.withOpacity(0.3),
+                            ),
+                            // Main red line
+                            Polyline(
+                              points: linePoints,
+                              strokeWidth: 3.0,
+                              color: Colors.red,
+                            ),
+                          ]
+                        : <Polyline>[],
+                  );
+                },
+              );
+            }
+
+            return PolylineLayer(polylines: <Polyline>[]);
+          },
+        ),
+
         // Drone marker - use GPS position with StreamBuilder for real-time updates
         StreamBuilder<Map<String, double>>(
           stream: _telemetryService.telemetryStream,
@@ -312,24 +466,27 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
             // Only show marker if we have valid GPS connection AND valid GPS fix
             bool shouldShowMarker = false;
             LatLng? markerPosition;
-            
-            if (_telemetryService.isConnected && _telemetryService.hasValidGpsFix) {
+
+            if (_telemetryService.isConnected &&
+                _telemetryService.hasValidGpsFix) {
               // Connected with valid GPS - show marker at GPS position
               markerPosition = LatLng(_currentLatitude, _currentLongitude);
               shouldShowMarker = true;
             }
             // If not connected OR no GPS fix - don't show marker at all
-            
+
             return MarkerLayer(
-              markers: shouldShowMarker && markerPosition != null ? [
-                Marker(
-                  point: markerPosition,
-                  width: 40,
-                  height: 40,
-                  alignment: Alignment.center,
-                  child: _buildDroneMarker(),
-                ),
-              ] : [], // Empty list = no markers
+              markers: shouldShowMarker && markerPosition != null
+                  ? [
+                      Marker(
+                        point: markerPosition,
+                        width: 40,
+                        height: 40,
+                        alignment: Alignment.center,
+                        child: _buildDroneMarker(),
+                      ),
+                    ]
+                  : [], // Empty list = no markers
             );
           },
         ),
@@ -339,10 +496,10 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 
   Widget _buildDroneMarker() {
     // Determine drone marker color based on GPS status
-    Color droneColor = _telemetryService.hasValidGpsFix 
-      ? _getGpsStatusColor() 
-      : Colors.grey;
-    
+    Color droneColor = _telemetryService.hasValidGpsFix
+        ? _getGpsStatusColor()
+        : Colors.grey;
+
     return AnimatedBuilder(
       animation: Listenable.merge([_pulseAnimation, _rotationAnimation]),
       builder: (context, child) {
@@ -359,10 +516,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
-                      colors: [
-                        droneColor,
-                        droneColor.withValues(alpha: 0.8),
-                      ],
+                      colors: [droneColor, droneColor.withValues(alpha: 0.8)],
                     ),
                     boxShadow: [
                       BoxShadow(
@@ -380,20 +534,20 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                   child: Icon(Icons.flight, size: 20, color: Colors.white),
                 ),
                 // GPS status indicator
-                if (_telemetryService.hasValidGpsFix)
-                  Positioned(
-                    right: -2,
-                    top: -2,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _getGpsStatusColor(),
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                    ),
-                  ),
+                // if (_telemetryService.hasValidGpsFix)
+                //   Positioned(
+                //     right: -2,
+                //     top: -2,
+                //     child: Container(
+                //       width: 12,
+                //       height: 12,
+                //       decoration: BoxDecoration(
+                //         shape: BoxShape.circle,
+                //         color: _getGpsStatusColor(),
+                //         border: Border.all(color: Colors.white, width: 2),
+                //       ),
+                //     ),
+                //   ),
               ],
             ),
           ),
@@ -427,16 +581,19 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
         stream: _telemetryService.telemetryStream,
         builder: (context, snapshot) {
           final hasGps = _telemetryService.hasValidGpsFix;
-          final satellites = _telemetryService.currentTelemetry['satellites']?.toInt() ?? 0;
+          final satellites =
+              _telemetryService.currentTelemetry['satellites']?.toInt() ?? 0;
           final gpsAccuracy = _telemetryService.gpsAccuracyString;
-          
+
           return Container(
             padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               color: Colors.black.withValues(alpha: 0.7),
               border: Border.all(
-                color: hasGps ? _getGpsStatusColor().withValues(alpha: 0.3) : Colors.red.withValues(alpha: 0.3),
+                color: hasGps
+                    ? _getGpsStatusColor().withValues(alpha: 0.3)
+                    : Colors.red.withValues(alpha: 0.3),
                 width: 1,
               ),
             ),
@@ -470,7 +627,8 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                         color: hasGps ? _getGpsStatusColor() : Colors.red,
                         boxShadow: [
                           BoxShadow(
-                            color: (hasGps ? _getGpsStatusColor() : Colors.red).withValues(alpha: 0.5),
+                            color: (hasGps ? _getGpsStatusColor() : Colors.red)
+                                .withValues(alpha: 0.5),
                             blurRadius: 4,
                             offset: Offset(0, 0),
                           ),
@@ -513,10 +671,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                       ),
                       child: Text(
                         'Debug GPS',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 8,
-                        ),
+                        style: TextStyle(color: Colors.white, fontSize: 8),
                       ),
                     ),
                   ),

@@ -155,14 +155,26 @@ class DroneMAVLinkAPI {
 
   /// Get a list of available serial ports
   List<String> getAvailablePorts() {
-    return SerialPort.availablePorts;
+    final ports = SerialPort.availablePorts;
+    print('DroneMAVLinkAPI: Available ports: $ports');
+    return ports;
   }
 
   /// Connect to the specified serial port
   ///
   /// Returns true if connection was successful, false otherwise
   Future<bool> connect(String port, {int? baudRate}) async {
+    print('DroneMAVLinkAPI: Attempting to connect to $port');
+
+    // Check if port exists
+    if (!SerialPort.availablePorts.contains(port)) {
+      print('DroneMAVLinkAPI: Port $port not found');
+      return false;
+    }
+
+    // Disconnect if already connected
     if (_isConnected) {
+      print('DroneMAVLinkAPI: Already connected, disconnecting first');
       disconnect();
     }
 
@@ -172,9 +184,12 @@ class DroneMAVLinkAPI {
     }
 
     try {
+      print('DroneMAVLinkAPI: Creating SerialPort instance');
       _serialPort = SerialPort(_selectedPort);
 
+      print('DroneMAVLinkAPI: Opening port');
       if (_serialPort!.openReadWrite()) {
+        print('DroneMAVLinkAPI: Configuring port');
         _serialPort!.config.baudRate = _baudRate;
         _serialPort!.config.bits = 8;
         _serialPort!.config.stopBits = 1;
@@ -182,6 +197,8 @@ class DroneMAVLinkAPI {
         _serialPort!.config.setFlowControl(SerialPortFlowControl.none);
 
         _isConnected = true;
+        print('DroneMAVLinkAPI: Port opened successfully');
+
         _eventController.add(
           MAVLinkEvent(
             MAVLinkEventType.connectionStateChanged,
@@ -190,16 +207,21 @@ class DroneMAVLinkAPI {
         );
 
         // Read data at high frequency to catch all packets
+        print('DroneMAVLinkAPI: Starting read timer');
         _timer = Timer.periodic(const Duration(milliseconds: 10), (_) {
           _readData();
         });
 
         // Add small delay to ensure stable connection before requesting data
+        print('DroneMAVLinkAPI: Waiting for connection to stabilize');
         await Future.delayed(const Duration(milliseconds: 500));
+
+        print('DroneMAVLinkAPI: Requesting data streams');
         requestAllDataStreams();
 
         return true;
       } else {
+        print('DroneMAVLinkAPI: Failed to open port');
         _eventController.add(
           MAVLinkEvent(
             MAVLinkEventType.connectionStateChanged,
@@ -209,6 +231,7 @@ class DroneMAVLinkAPI {
         return false;
       }
     } catch (e) {
+      print('DroneMAVLinkAPI: Connection error: $e');
       _eventController.add(
         MAVLinkEvent(
           MAVLinkEventType.connectionStateChanged,
@@ -221,37 +244,55 @@ class DroneMAVLinkAPI {
 
   /// Disconnect from the current serial port
   void disconnect() {
-    _timer?.cancel();
-    _subscription?.cancel();
-    _serialPort?.close();
+    print('DroneMAVLinkAPI: Disconnecting');
+    try {
+      _timer?.cancel();
+      print('DroneMAVLinkAPI: Timer cancelled');
 
-    _isConnected = false;
-    
-    // Reset all telemetry data to default values
-    _resetTelemetryData();
-    
-    // Send GPS reset event to update UI immediately
-    _eventController.add(MAVLinkEvent(
-      MAVLinkEventType.gpsInfo,
-      {
-        'fixType': _gpsFixType,
-        'satellites': _satellites,
-        'lat': _gpsLatitude,
-        'lon': _gpsLongitude,
-        'alt': _gpsAltitude,
-        'eph': _gpsHorizontalAccuracy,
-        'epv': _gpsVerticalAccuracy,
-        'vel': _gpsSpeed,
-        'cog': _gpsCourse
+      _subscription?.cancel();
+      print('DroneMAVLinkAPI: Subscription cancelled');
+
+      if (_serialPort != null) {
+        if (_serialPort!.isOpen) {
+          print('DroneMAVLinkAPI: Closing serial port');
+          _serialPort!.close();
+        }
+        print('DroneMAVLinkAPI: Serial port closed');
       }
-    ));
-    
-    _eventController.add(
-      MAVLinkEvent(
-        MAVLinkEventType.connectionStateChanged,
-        MAVLinkConnectionState.disconnected,
-      ),
-    );
+
+      _isConnected = false;
+      print('DroneMAVLinkAPI: Connection state updated');
+
+      // Reset all telemetry data to default values
+      _resetTelemetryData();
+      print('DroneMAVLinkAPI: Telemetry data reset');
+
+      // Send GPS reset event to update UI immediately
+      _eventController.add(
+        MAVLinkEvent(MAVLinkEventType.gpsInfo, {
+          'fixType': _gpsFixType,
+          'satellites': _satellites,
+          'lat': _gpsLatitude,
+          'lon': _gpsLongitude,
+          'alt': _gpsAltitude,
+          'eph': _gpsHorizontalAccuracy,
+          'epv': _gpsVerticalAccuracy,
+          'vel': _gpsSpeed,
+          'cog': _gpsCourse,
+        }),
+      );
+      print('DroneMAVLinkAPI: GPS reset event sent');
+
+      _eventController.add(
+        MAVLinkEvent(
+          MAVLinkEventType.connectionStateChanged,
+          MAVLinkConnectionState.disconnected,
+        ),
+      );
+      print('DroneMAVLinkAPI: Disconnect event sent');
+    } catch (e) {
+      print('DroneMAVLinkAPI: Error during disconnect: $e');
+    }
   }
 
   /// Reset all telemetry data to default values
@@ -291,7 +332,7 @@ class DroneMAVLinkAPI {
     _homePosition.clear();
     _ekfStatus = 'Unknown';
     _parameters.clear();
-    
+
     // Reset flight mode debounce
     _pendingMode = 'Unknown';
     _modeChangeTime = null;
@@ -304,17 +345,28 @@ class DroneMAVLinkAPI {
     if (_serialPort == null || !_isConnected) return;
 
     try {
-      // Try to read available bytes from the serial port
-      if (_serialPort!.isOpen) {
-        final Uint8List data = _serialPort!.read(4096);
+      // Check if port still exists and is open
+      if (!SerialPort.availablePorts.contains(_selectedPort)) {
+        print('Port $_selectedPort no longer available');
+        disconnect();
+        return;
+      }
 
-        if (data.isNotEmpty) {
-          // Feed data to the MAVLink parser
-          _parser.parse(data);
-        }
+      if (!_serialPort!.isOpen) {
+        print('Port $_selectedPort is no longer open');
+        disconnect();
+        return;
+      }
+
+      // Try to read available bytes from the serial port
+      final Uint8List data = _serialPort!.read(4096);
+      if (data.isNotEmpty) {
+        // Feed data to the MAVLink parser
+        _parser.parse(data);
       }
     } catch (e) {
-      // Handle errors silently - if there are persistent errors, connection will be dropped
+      print('Error reading from port $_selectedPort: $e');
+      disconnect();
     }
   }
 
@@ -364,8 +416,11 @@ class DroneMAVLinkAPI {
   /// Process heartbeat message
   void _processHeartbeat(Heartbeat heartbeat) {
     // Decode new flight mode
-    String newMode = _decodeFlightMode(heartbeat.baseMode, heartbeat.customMode);
-    
+    String newMode = _decodeFlightMode(
+      heartbeat.baseMode,
+      heartbeat.customMode,
+    );
+
     // Update armed status immediately (no debounce needed for armed status)
     _isArmed = (heartbeat.baseMode & 0x80) != 0;
 
@@ -374,10 +429,10 @@ class DroneMAVLinkAPI {
       // New mode detected, start debounce timer
       _pendingMode = newMode;
       _modeChangeTime = DateTime.now();
-      
+
       // Cancel existing timer if any
       _modeDebounceTimer?.cancel();
-      
+
       // Start new debounce timer
       _modeDebounceTimer = Timer(_modeDebounceDelay, () {
         // After debounce delay, check if mode is still the same
@@ -385,12 +440,14 @@ class DroneMAVLinkAPI {
           // Mode has been stable for the debounce period, update it
           String oldMode = _currentMode;
           _currentMode = _pendingMode;
-          
+
           // Only send event if mode actually changed
           if (oldMode != _currentMode) {
-            print('Flight mode changed: $oldMode -> $_currentMode (after ${_modeDebounceDelay.inMilliseconds}ms debounce)');
+            print(
+              'Flight mode changed: $oldMode -> $_currentMode (after ${_modeDebounceDelay.inMilliseconds}ms debounce)',
+            );
           }
-          
+
           // Send event with updated mode
           _sendHeartbeatEvent(heartbeat);
         }
@@ -1008,10 +1065,12 @@ class DroneMAVLinkAPI {
     } else {
       mode = 'UNKNOWN MODE ($customMode)';
     }
-    
+
     // Debug: Log mode decoding
-    print('Decoded flight mode: baseMode=0x${baseMode.toRadixString(16)}, customMode=$customMode -> $mode');
-    
+    print(
+      'Decoded flight mode: baseMode=0x${baseMode.toRadixString(16)}, customMode=$customMode -> $mode',
+    );
+
     return mode;
   }
 

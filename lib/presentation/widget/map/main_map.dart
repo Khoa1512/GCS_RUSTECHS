@@ -30,7 +30,7 @@ class _MainMapState extends State<MainMap> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      widget.mapController.move(const LatLng(10.8231, 106.6297), 16);
+      widget.mapController.move(const LatLng(10.7302, 106.6988), 16);
     });
   }
 

@@ -156,7 +156,6 @@ class DroneMAVLinkAPI {
   /// Get a list of available serial ports
   List<String> getAvailablePorts() {
     final ports = SerialPort.availablePorts;
-    print('DroneMAVLinkAPI: Available ports: $ports');
     return ports;
   }
 
@@ -164,17 +163,8 @@ class DroneMAVLinkAPI {
   ///
   /// Returns true if connection was successful, false otherwise
   Future<bool> connect(String port, {int? baudRate}) async {
-    print('DroneMAVLinkAPI: Attempting to connect to $port');
-
-    // Check if port exists
-    if (!SerialPort.availablePorts.contains(port)) {
-      print('DroneMAVLinkAPI: Port $port not found');
-      return false;
-    }
-
     // Disconnect if already connected
     if (_isConnected) {
-      print('DroneMAVLinkAPI: Already connected, disconnecting first');
       disconnect();
     }
 
@@ -184,12 +174,9 @@ class DroneMAVLinkAPI {
     }
 
     try {
-      print('DroneMAVLinkAPI: Creating SerialPort instance');
       _serialPort = SerialPort(_selectedPort);
 
-      print('DroneMAVLinkAPI: Opening port');
       if (_serialPort!.openReadWrite()) {
-        print('DroneMAVLinkAPI: Configuring port');
         _serialPort!.config.baudRate = _baudRate;
         _serialPort!.config.bits = 8;
         _serialPort!.config.stopBits = 1;
@@ -197,8 +184,6 @@ class DroneMAVLinkAPI {
         _serialPort!.config.setFlowControl(SerialPortFlowControl.none);
 
         _isConnected = true;
-        print('DroneMAVLinkAPI: Port opened successfully');
-
         _eventController.add(
           MAVLinkEvent(
             MAVLinkEventType.connectionStateChanged,
@@ -207,21 +192,17 @@ class DroneMAVLinkAPI {
         );
 
         // Read data at high frequency to catch all packets
-        print('DroneMAVLinkAPI: Starting read timer');
         _timer = Timer.periodic(const Duration(milliseconds: 10), (_) {
           _readData();
         });
 
         // Add small delay to ensure stable connection before requesting data
-        print('DroneMAVLinkAPI: Waiting for connection to stabilize');
         await Future.delayed(const Duration(milliseconds: 500));
 
-        print('DroneMAVLinkAPI: Requesting data streams');
         requestAllDataStreams();
 
         return true;
       } else {
-        print('DroneMAVLinkAPI: Failed to open port');
         _eventController.add(
           MAVLinkEvent(
             MAVLinkEventType.connectionStateChanged,
@@ -231,7 +212,6 @@ class DroneMAVLinkAPI {
         return false;
       }
     } catch (e) {
-      print('DroneMAVLinkAPI: Connection error: $e');
       _eventController.add(
         MAVLinkEvent(
           MAVLinkEventType.connectionStateChanged,
@@ -244,28 +224,24 @@ class DroneMAVLinkAPI {
 
   /// Disconnect from the current serial port
   void disconnect() {
-    print('DroneMAVLinkAPI: Disconnecting');
     try {
       _timer?.cancel();
-      print('DroneMAVLinkAPI: Timer cancelled');
+      // print('DroneMAVLinkAPI: Timer cancelled');
 
       _subscription?.cancel();
-      print('DroneMAVLinkAPI: Subscription cancelled');
+      // print('DroneMAVLinkAPI: Subscription cancelled');
 
       if (_serialPort != null) {
         if (_serialPort!.isOpen) {
-          print('DroneMAVLinkAPI: Closing serial port');
+          // print('DroneMAVLinkAPI: Closing serial port');
           _serialPort!.close();
         }
-        print('DroneMAVLinkAPI: Serial port closed');
       }
 
       _isConnected = false;
-      print('DroneMAVLinkAPI: Connection state updated');
 
       // Reset all telemetry data to default values
       _resetTelemetryData();
-      print('DroneMAVLinkAPI: Telemetry data reset');
 
       // Send GPS reset event to update UI immediately
       _eventController.add(
@@ -281,7 +257,6 @@ class DroneMAVLinkAPI {
           'cog': _gpsCourse,
         }),
       );
-      print('DroneMAVLinkAPI: GPS reset event sent');
 
       _eventController.add(
         MAVLinkEvent(
@@ -289,7 +264,6 @@ class DroneMAVLinkAPI {
           MAVLinkConnectionState.disconnected,
         ),
       );
-      print('DroneMAVLinkAPI: Disconnect event sent');
     } catch (e) {
       print('DroneMAVLinkAPI: Error during disconnect: $e');
     }
@@ -347,13 +321,11 @@ class DroneMAVLinkAPI {
     try {
       // Check if port still exists and is open
       if (!SerialPort.availablePorts.contains(_selectedPort)) {
-        print('Port $_selectedPort no longer available');
         disconnect();
         return;
       }
 
       if (!_serialPort!.isOpen) {
-        print('Port $_selectedPort is no longer open');
         disconnect();
         return;
       }

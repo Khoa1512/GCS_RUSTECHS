@@ -654,8 +654,9 @@ class TelemetryService {
 
   /// Get GPS accuracy in human readable format
   String get gpsAccuracyString {
-    if (!hasValidGpsFix)
+    if (!hasValidGpsFix) {
       return _api.gpsFixType; // Show actual fix type for debugging
+    }
     return '±${_api.gpsHorizontalAccuracy.toStringAsFixed(1)}m';
   }
 

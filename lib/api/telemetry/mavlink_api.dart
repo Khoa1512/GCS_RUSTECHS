@@ -165,6 +165,7 @@ class DroneMAVLinkAPI {
   Future<bool> connect(String port, {int? baudRate}) async {
     // Disconnect if already connected
     if (_isConnected) {
+      print('DroneMAVLinkAPI: Already connected, disconnecting first');
       disconnect();
     }
 
@@ -174,9 +175,12 @@ class DroneMAVLinkAPI {
     }
 
     try {
+      print('DroneMAVLinkAPI: Creating SerialPort instance');
       _serialPort = SerialPort(_selectedPort);
 
+      print('DroneMAVLinkAPI: Opening port');
       if (_serialPort!.openReadWrite()) {
+        print('DroneMAVLinkAPI: Configuring port');
         _serialPort!.config.baudRate = _baudRate;
         _serialPort!.config.bits = 8;
         _serialPort!.config.stopBits = 1;
@@ -184,6 +188,8 @@ class DroneMAVLinkAPI {
         _serialPort!.config.setFlowControl(SerialPortFlowControl.none);
 
         _isConnected = true;
+        print('DroneMAVLinkAPI: Port opened successfully');
+
         _eventController.add(
           MAVLinkEvent(
             MAVLinkEventType.connectionStateChanged,
@@ -192,17 +198,20 @@ class DroneMAVLinkAPI {
         );
 
         // Read data at high frequency to catch all packets
+        print('DroneMAVLinkAPI: Starting read timer');
         _timer = Timer.periodic(const Duration(milliseconds: 10), (_) {
           _readData();
         });
 
         // Add small delay to ensure stable connection before requesting data
+        print('DroneMAVLinkAPI: Waiting for connection to stabilize');
         await Future.delayed(const Duration(milliseconds: 500));
 
         requestAllDataStreams();
 
         return true;
       } else {
+        print('DroneMAVLinkAPI: Failed to open port');
         _eventController.add(
           MAVLinkEvent(
             MAVLinkEventType.connectionStateChanged,
@@ -212,6 +221,7 @@ class DroneMAVLinkAPI {
         return false;
       }
     } catch (e) {
+      print('DroneMAVLinkAPI: Connection error: $e');
       _eventController.add(
         MAVLinkEvent(
           MAVLinkEventType.connectionStateChanged,

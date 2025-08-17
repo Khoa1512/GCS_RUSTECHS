@@ -1,9 +1,94 @@
-stages: [test]
+image: cirrusci/flutter:stable
 
-test_macos_runner:
+stages:
+  - test
+  - build
+  - release
+
+variables:
+  # Điều chỉnh cho phù hợp với project của bạn
+  FLUTTER_VERSION: "3.19.0"
+
+# Cache các dependencies để tối ưu thời gian build
+cache:
+  paths:
+    - .pub-cache/
+
+before_script:
+  - flutter pub get
+
+# Chạy test trước khi build
+test:
   stage: test
-  tags: [macos]        # đúng tag của runner bạn vừa đăng ký
   script:
-    - echo "Runner is working on macOS ✅"
-    - flutter --version
-    - flutter doctor -v
+    - flutter test
+  only:
+    - main
+    - develop
+    - merge_requests
+
+# Build cho Windows
+build_windows:
+  stage: build
+  script:
+    - flutter config --enable-windows-desktop
+    - flutter build windows --release
+  artifacts:
+    paths:
+      - build/windows/runner/Release/
+    expire_in: 1 week
+  only:
+    - main
+    - tags
+  tags:
+    - windows
+
+# Build cho macOS
+build_macos:
+  stage: build
+  script:
+    - flutter config --enable-macos-desktop
+    - flutter build macos --release
+  artifacts:
+    paths:
+      - build/macos/Build/Products/Release/*.app
+    expire_in: 1 week
+  only:
+    - main
+    - tags
+  tags:
+    - macos
+
+# Build cho Linux
+build_linux:
+  stage: build
+  script:
+    - flutter config --enable-linux-desktop
+    - flutter build linux --release
+  artifacts:
+    paths:
+      - build/linux/x64/release/bundle/
+    expire_in: 1 week
+  only:
+    - main
+    - tags
+  tags:
+    - linux
+
+# Tạo release khi có tag
+release:
+  stage: release
+  script:
+    - echo "Creating release for version $CI_COMMIT_TAG"
+    # Tạo các file zip cho từng nền tảng
+    - apt-get update && apt-get install -y zip
+    - mkdir -p releases
+    - if [ -d "build/windows/runner/Release" ]; then cd build/windows/runner/Release && zip -r ../../../../releases/vtol_windows_$CI_COMMIT_TAG.zip . && cd -; fi
+    - if [ -d "build/macos/Build/Products/Release" ]; then cd build/macos/Build/Products/Release && zip -r ../../../../../releases/vtol_macos_$CI_COMMIT_TAG.zip *.app && cd -; fi
+    - if [ -d "build/linux/x64/release/bundle" ]; then cd build/linux/x64/release/bundle && zip -r ../../../../../releases/vtol_linux_$CI_COMMIT_TAG.zip . && cd -; fi
+  artifacts:
+    paths:
+      - releases/*.zip
+    expire_in: never
+  only:
+    - tags

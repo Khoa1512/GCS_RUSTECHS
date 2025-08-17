@@ -1,0 +1,9 @@
+stages: [test]
+
+test_macos_runner:
+  stage: test
+  tags: [macos]        # đúng tag của runner bạn vừa đăng ký
+  script:
+    - echo "Runner is working on macOS ✅"
+    - flutter --version
+    - flutter doctor -v

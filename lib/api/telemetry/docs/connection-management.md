@@ -21,52 +21,33 @@ enum MAVLinkConnectionState {
 
 ### 1. Port Discovery
 
-#### `List<String> getAvailablePorts()`
-
-Lấy danh sách tất cả các cổng serial khả dụng trên hệ thống.
-
-```dart
-final api = DroneMAVLinkAPI();
-List<String> ports = api.getAvailablePorts();
-
-print('Available ports:');
-for (String port in ports) {
-  print('  - $port');
-}
-```
-
-**Returns:**
-- `List<String>`: Danh sách tên cổng serial (e.g., ["COM1", "COM3", "/dev/ttyUSB0"])
+Hệ thống Flutter có thể liệt kê cổng qua thư viện flutter_libserialport nếu bạn cần tự triển khai. API hiện tại không cung cấp wrapper `getAvailablePorts()`.
 
 ### 2. Connection Establishment
 
-#### `Future<bool> connect(String port, {int? baudRate})`
+#### `Future<void> connect(String port, {int? baudRate})`
 
 Khởi tạo kết nối tới drone qua cổng serial được chỉ định.
 
 ```dart
-bool success = await api.connect('COM3', baudRate: 115200);
-if (success) {
-  print('Connected successfully');
-} else {
-  print('Connection failed');
-}
+await api.connect('COM3', baudRate: 115200);
 ```
 
 **Parameters:**
+
 - `port`: Tên cổng serial (required)
 - `baudRate`: Tốc độ baud (optional, default: 115200)
 
 **Returns:**
-- `Future<bool>`: true nếu kết nối thành công, false nếu thất bại
+
+- `Future<void>`
 
 **Connection Process:**
-1. Validate port availability
-2. Configure serial port settings
-3. Open serial connection
-4. Start data reading timer
-5. Request data streams from drone
-6. Emit connection state change event
+
+1. Configure serial port settings (baud, bits, parity, stop bits)
+2. Open serial connection
+3. Start reading stream and feed parser
+4. Emit connection state change event
 
 ### 3. Connection Termination
 
@@ -80,34 +61,16 @@ print('Disconnected from drone');
 ```
 
 **Process:**
-1. Cancel data reading timer
+
+1. Cancel data reader subscription
 2. Close serial port
-3. Cancel subscriptions
-4. Reset connection state
-5. Emit disconnection event
+3. Emit disconnection event
 
 ## Connection Configuration
 
 ### Serial Port Settings
 
-Khi kết nối, API tự động cấu hình các thông số serial:
-
-```dart
-_serialPort!.config.baudRate = _baudRate;     // Tốc độ baud
-_serialPort!.config.bits = 8;                // 8 data bits
-_serialPort!.config.stopBits = 1;            // 1 stop bit
-_serialPort!.config.parity = SerialPortParity.none;  // No parity
-_serialPort!.config.setFlowControl(SerialPortFlowControl.none);  // No flow control
-```
-
-### Data Reading Configuration
-
-```dart
-// High-frequency data reading (every 10ms)
-_timer = Timer.periodic(const Duration(milliseconds: 10), (_) {
-  _readData();
-});
-```
+Khi kết nối, API cấu hình serial như sau (tự động): 115200 (mặc định), 8N1.
 
 ## Connection Monitoring
 
@@ -155,6 +118,7 @@ print('Current status: $status');
 ### Common Connection Errors
 
 1. **Port Not Available**
+
 ```dart
 Future<bool> connectWithValidation(String port) async {
   List<String> availablePorts = api.getAvailablePorts();
@@ -169,7 +133,8 @@ Future<bool> connectWithValidation(String port) async {
 }
 ```
 
-2. **Port Already in Use**
+1. **Port Already in Use**
+
 ```dart
 Future<bool> connectWithRetry(String port, {int maxRetries = 3}) async {
   for (int i = 0; i < maxRetries; i++) {
@@ -185,7 +150,8 @@ Future<bool> connectWithRetry(String port, {int maxRetries = 3}) async {
 }
 ```
 
-3. **Connection Timeout**
+1. **Connection Timeout**
+
 ```dart
 Future<bool> connectWithTimeout(String port, {Duration timeout = const Duration(seconds: 10)}) async {
   Completer<bool> completer = Completer<bool>();

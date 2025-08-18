@@ -1,16 +1,22 @@
-# MAVLink API Documentation
+# MAVLink API (Modular) Documentation
 
-`DroneMAVLinkAPI` là một lớp API chính để giao tiếp với drone thông qua giao thức MAVLink qua kết nối serial. API này cung cấp một interface đơn giản để kết nối, nhận dữ liệu telemetry, và điều khiển drone.
+<!-- markdownlint-disable MD051 -->
+
+`DroneMAVLinkAPI` là API chính để giao tiếp MAVLink qua serial. Kể từ bản này, API đã được refactor theo kiến trúc module:
+
+- Barrel export: `mavlink_api.dart` tiếp tục export các module bên trong để tương thích import cũ.
+- Sự kiện tách theo EventType, mỗi loại có handler riêng trong `mavlink/handlers/*`.
+- Core routing/serial/parse nằm ở `mavlink/mavlink_core.dart`.
 
 ## 📋 Mục lục
 
-1. [Cấu trúc API](#cấu-trúc-api)
-2. [Event System](#event-system)
-3. [Connection Management](#connection-management)
-4. [Data Streams](#data-streams)
-5. [Parameter Management](#parameter-management)
-6. [Command Sending](#command-sending)
-7. [Vehicle State](#vehicle-state)
+1. [Cấu trúc API](#cau-truc-api)
+2. [Event System](#event-system-modular)
+3. [Connection Management](#connection-management-mavlink_coredart)
+4. [Data Streams](#data-streams-mavlink_coredart)
+5. [Parameter Management](#parameter-management-mavlink_coredart--handlersparams_handlerdart)
+6. [Command Sending](#command-sending-mavlink_coredart)
+7. [Vehicle State](#vehicle-state-exposed-via-events-stateful-props-optional)
 8. [Usage Examples](#usage-examples)
 9. [UI Example & Testing](#ui-example--testing)
 10. [Error Handling](#error-handling)
@@ -24,7 +30,7 @@ import 'package:vtol_fe/api/telemetry/mavlink_api.dart';
 final api = DroneMAVLinkAPI();
 
 // Kết nối
-bool success = await api.connect('COM3', baudRate: 115200);
+await api.connect('COM3', baudRate: 115200);
 
 // Lắng nghe events
 api.eventStream.listen((event) {
@@ -46,7 +52,7 @@ api.dispose();
 
 ### Class Hierarchy
 
-```
+```text
 DroneMAVLinkAPI
 ├── Connection Management
 ├── Event System
@@ -56,15 +62,15 @@ DroneMAVLinkAPI
 └── Vehicle State
 ```
 
-### Core Components
+### Core Components (Modules)
 
-#### 1. MAVLink Event System
+#### 1. MAVLink Event System (mavlink/events.dart)
 
 - **MAVLinkEventType**: Enum định nghĩa các loại sự kiện
 - **MAVLinkEvent**: Class đại diện cho một sự kiện MAVLink
-- **Stream<MAVLinkEvent>**: Stream để lắng nghe các sự kiện
+- **`Stream<MAVLinkEvent>`**: Stream để lắng nghe các sự kiện
 
-#### 2. Connection State Management
+#### 2. Connection State Management (mavlink/mavlink_core.dart)
 
 - **MAVLinkConnectionState**: Enum trạng thái kết nối
 - **Serial Port Management**: Quản lý kết nối serial
@@ -72,9 +78,9 @@ DroneMAVLinkAPI
 
 ---
 
-## 🎯 Event System
+## 🎯 Event System (modular)
 
-### Event Types
+### Event Types (mavlink/events.dart)
 
 ```dart
 enum MAVLinkEventType {
@@ -91,7 +97,7 @@ enum MAVLinkEventType {
 }
 ```
 
-### Event Data Structure
+### Event Data Structure (mapped in handlers)
 
 Mỗi event chứa:
 
@@ -129,7 +135,7 @@ api.eventStream
 
 ---
 
-## 🔌 Connection Management
+## 🔌 Connection Management (mavlink_core.dart)
 
 ### Available Methods
 
@@ -183,7 +189,7 @@ enum MAVLinkConnectionState {
 
 ---
 
-## 📡 Data Streams
+## 📡 Data Streams (mavlink_core.dart)
 
 ### Stream Types
 
@@ -204,7 +210,7 @@ api.requestAllDataStreams();
 
 ---
 
-## ⚙️ Parameter Management
+## ⚙️ Parameter Management (mavlink_core.dart + handlers/params_handler.dart)
 
 ### Reading Parameters
 
@@ -261,7 +267,7 @@ double? armingCheck = api.parameters['ARMING_CHECK'];
 
 ---
 
-## 🎮 Command Sending
+## 🎮 Command Sending (mavlink_core.dart)
 
 ### Arm/Disarm Commands
 
@@ -291,7 +297,7 @@ api.setFlightMode(2); // STABILIZE mode
 
 ---
 
-## 📊 Vehicle State
+## 📊 Vehicle State (exposed via events; stateful props optional)
 
 ### Real-time State Properties
 
@@ -736,6 +742,7 @@ print('Available ports: ${api.getAvailablePorts()}');
 Tài liệu được chia thành các module riêng biệt để dễ quản lý và tham khảo:
 
 ### Core Modules
+
 - **[Event System](./docs/event-system.md)** - Hệ thống sự kiện và data structures
 - **[Connection Management](./docs/connection-management.md)** - Quản lý kết nối serial
 - **[Parameter Management](./docs/parameter-management.md)** - Đọc/ghi parameters
@@ -743,6 +750,7 @@ Tài liệu được chia thành các module riêng biệt để dễ quản lý
 - **[Vehicle State](./docs/vehicle-state.md)** - Quản lý trạng thái drone
 
 ### Quick Reference
+
 - **Event Types**: 10+ loại sự kiện khác nhau
 - **Connection States**: 4 trạng thái kết nối
 - **Commands**: Arm/disarm, flight modes, parameters

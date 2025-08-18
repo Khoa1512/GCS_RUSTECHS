@@ -21,9 +21,10 @@ api.sendArmCommand(true);
 // Disarm the drone
 api.sendArmCommand(false);
 
-// Check current armed status
-bool isArmed = api.isArmed;
-print('Drone is ${isArmed ? 'armed' : 'disarmed'}');
+// Xác nhận qua heartbeat events
+api.eventStream
+  .where((e) => e.type == MAVLinkEventType.heartbeat)
+  .listen((e) => print('Armed: ${e.data['armed']}'));
 ```
 
 **Parameters:**
@@ -46,9 +47,10 @@ api.setFlightMode(9);  // AUTO
 api.setFlightMode(10); // RTL (Return to Launch)
 api.setFlightMode(11); // LOITER
 
-// Check current flight mode
-String currentMode = api.currentMode;
-print('Current mode: $currentMode');
+// Xác nhận mode qua heartbeat events
+api.eventStream
+  .where((e) => e.type == MAVLinkEventType.heartbeat)
+  .listen((e) => print('Mode: ${e.data['mode']}'));
 ```
 
 **Parameters:**
@@ -180,17 +182,9 @@ class FlightModeManager {
     if (!api.isConnected) return false;
 
     switch (mode) {
-      case ArduPilotFlightModes.AUTO:
-        // AUTO mode requires mission loaded and GPS fix
-        return api.gpsFixType.contains('3D') && api.totalWaypoints > 0;
-
-      case ArduPilotFlightModes.RTL:
-        // RTL requires GPS fix and home position set
-        return api.gpsFixType.contains('3D') && api.homePosition.isNotEmpty;
-
+      // Ví dụ: yêu cầu GPS fix để chuyển một số mode, tự lấy điều kiện từ UI/state của bạn
       case ArduPilotFlightModes.LOITER:
-        // LOITER requires GPS fix
-        return api.gpsFixType.contains('3D');
+        return true;
 
       default:
         return true;
@@ -304,25 +298,9 @@ class ArmDisarmManager {
     }
 
     // Check GPS fix
-    if (!api.gpsFixType.contains('3D')) {
-      return ArmingCheckResult(false, 'GPS fix required (current: ${api.gpsFixType})');
-    }
-
-    // Check satellite count
-    if (api.satellites < 6) {
-      return ArmingCheckResult(false, 'Insufficient satellites (${api.satellites}/6)');
-    }
-
-    // Check battery level
-    if (api.batteryPercent < 20) {
-      return ArmingCheckResult(false, 'Low battery (${api.batteryPercent}%)');
-    }
-
-    // Check flight mode
-    String mode = api.currentMode;
-    if (mode == 'INITIALIZING' || mode == 'Unknown') {
-      return ArmingCheckResult(false, 'Invalid flight mode: $mode');
-    }
+  // TODO: Lấy các điều kiện từ state tổng hợp của bạn (xem docs/vehicle-state.md)
+  // Ví dụ: GPS fix, số vệ tinh, pin, flight mode hiện tại...
+  // Ở mức API hiện tại, xác nhận qua các events heartbeat/gps/battery.
 
     return ArmingCheckResult(true, 'Pre-arm checks passed');
   }

@@ -19,6 +19,8 @@ enum MAVLinkEventType {
   vfrHud,                  // Dữ liệu VFR HUD (tốc độ, độ cao)
   parameterReceived,       // Một tham số đã được nhận
   allParametersReceived,   // Tất cả tham số đã được nhận
+  sysStatus,               // Trạng thái hệ thống (raw SysStatus message)
+  commandAck,              // Phản hồi cho lệnh (raw CommandAck message)
   connectionStateChanged,  // Thay đổi trạng thái kết nối
 }
 ```
@@ -90,12 +92,11 @@ enum MAVLinkEventType {
 ```dart
 {
   'batteryPercent': int,       // Phần trăm pin còn lại
-  'voltageBattery': double,    // Điện áp pin (volts)
-  'currentBattery': double,    // Dòng điện (amps)
-  'cpuLoad': double,           // CPU load (%)
-  'commDropRate': int,         // Communication drop rate
-  'errorsComm': int,           // Communication errors
-  'sensorHealth': int          // Sensor health flags
+  'voltageBattery': double,    // Điện áp pin (V)
+  'currentBattery': double,    // Dòng điện (A)
+  'temperature': double,       // Nhiệt độ pin (°C)
+  'function': int,             // Chức năng pin (theo MAVLink)
+  'type': int                  // Loại pin (theo MAVLink)
 }
 ```
 
@@ -145,6 +146,36 @@ MAVLinkConnectionState enum:
 - connected
 - connecting
 - error
+
+### 10. SysStatus Event
+
+- Dữ liệu: đối tượng `SysStatus` (raw) từ dialect MAVLink Common.
+- Sử dụng khi cần thông tin trạng thái hệ thống chi tiết ở mức thấp.
+
+Ví dụ lắng nghe:
+
+```dart
+api.eventStream
+  .where((e) => e.type == MAVLinkEventType.sysStatus)
+  .listen((e) {
+    final SysStatus msg = e.data; // import từ package:dart_mavlink/dialects/common.dart
+    print('SysStatus received');
+  });
+```
+
+### 11. CommandAck Event
+
+- Dữ liệu: đối tượng `CommandAck` (raw) phản hồi cho các lệnh như `CommandLong`, `SetMode`...
+- Dùng để xác nhận lệnh đã được chấp nhận/thực thi bởi autopilot.
+
+```dart
+api.eventStream
+  .where((e) => e.type == MAVLinkEventType.commandAck)
+  .listen((e) {
+    final CommandAck ack = e.data;
+    print('ACK for command ${ack.command}, result=${ack.result}');
+  });
+```
 ```
 
 ## Usage Examples

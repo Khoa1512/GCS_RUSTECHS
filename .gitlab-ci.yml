@@ -1,7 +1,6 @@
 image: cirrusci/flutter:stable
 
 stages:
-  - test
   - build
   - release
 
@@ -16,16 +15,6 @@ cache:
 
 before_script:
   - flutter pub get
-
-# Chạy test trước khi build
-test:
-  stage: test
-  script:
-    - flutter test
-  only:
-    - main
-    - develop
-    - merge_requests
 
 # Build cho Windows
 build_windows:

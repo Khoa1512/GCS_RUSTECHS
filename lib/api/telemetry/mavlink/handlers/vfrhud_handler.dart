@@ -1,0 +1,18 @@
+import 'package:dart_mavlink/dialects/common.dart';
+import '../events.dart';
+
+class VfrHudHandler {
+  final void Function(MAVLinkEvent) emit;
+  VfrHudHandler(this.emit);
+
+  void handle(VfrHud msg) {
+    emit(MAVLinkEvent(MAVLinkEventType.vfrHud, {
+      'airspeed': msg.airspeed,
+      'groundspeed': msg.groundspeed,
+      'heading': msg.heading,
+      'throttle': msg.throttle,
+      'alt': msg.alt,
+      'climb': msg.climb,
+    }));
+  }
+}

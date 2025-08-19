@@ -9,86 +9,92 @@ Vehicle State Management module cung cấp khả năng theo dõi và truy cập 
 ### 1. Connection State
 
 ```dart
-// Connection status
+// Connection status (tiện lợi)
 bool isConnected = api.isConnected;
 
-// Connection state enum
-enum MAVLinkConnectionState {
-  disconnected,
-  connecting, 
-  connected,
-  error
-}
+// Hoặc lắng nghe thay đổi:
+api.eventStream
+  .where((e) => e.type == MAVLinkEventType.connectionStateChanged)
+  .listen((e) => print('State: ${e.data}'));
 ```
 
 ### 2. Flight Status
 
+Sử dụng events để lấy mode/armed và các thông tin khác; nếu cần getter đồng bộ, hãy xây service cache.
+
 ```dart
-// Current flight mode
-String currentMode = api.currentMode;  // e.g., "STABILIZE", "AUTO", "RTL"
+String mode = 'Unknown';
+bool armed = false;
 
-// Armed status
-bool isArmed = api.isArmed;
-
-// Mission status
-int currentWaypoint = api.currentWaypoint;  // Current waypoint index
-int totalWaypoints = api.totalWaypoints;    // Total mission waypoints
-
-// Home position
-Map<String, double> homePosition = api.homePosition;
-// Contains: 'lat', 'lon', 'alt'
+final sub = api.eventStream
+  .where((e) => e.type == MAVLinkEventType.heartbeat)
+  .listen((e) {
+    mode = e.data['mode'];
+    armed = e.data['armed'];
+  });
 ```
 
 ### 3. Attitude Data
 
 ```dart
-// Euler angles in degrees
-double roll = api.roll;     // Roll angle (-180 to +180)
-double pitch = api.pitch;   // Pitch angle (-90 to +90) 
-double yaw = api.yaw;       // Yaw angle (0 to 360)
+double roll = 0, pitch = 0, yaw = 0;
+api.eventStream
+  .where((e) => e.type == MAVLinkEventType.attitude)
+  .listen((e) {
+    roll = (e.data['roll'] as num).toDouble();
+    pitch = (e.data['pitch'] as num).toDouble();
+    yaw = (e.data['yaw'] as num).toDouble();
+  });
 ```
 
 ### 4. Speed Data
 
 ```dart
-// Speed in m/s
-double airSpeed = api.airSpeed;       // Airspeed from pitot tube
-double groundSpeed = api.groundSpeed; // GPS ground speed
+double groundSpeed = 0;
+api.eventStream
+  .where((e) => e.type == MAVLinkEventType.vfrHud)
+  .listen((e) => groundSpeed = (e.data['groundspeed'] as num).toDouble());
 ```
 
 ### 5. Altitude Data
 
 ```dart
-// Altitude in meters
-double altMSL = api.altitudeMSL;           // Above mean sea level
-double altRelative = api.altitudeRelative; // Relative to home/takeoff point
+double altMSL = 0, altRelative = 0;
+api.eventStream
+  .where((e) => e.type == MAVLinkEventType.position)
+  .listen((e) {
+    altMSL = (e.data['altMSL'] as num?)?.toDouble() ?? 0;
+    altRelative = (e.data['altRelative'] as num?)?.toDouble() ?? 0;
+  });
 ```
 
 ### 6. GPS Data
 
 ```dart
-// GPS fix quality
-String gpsFixType = api.gpsFixType;  // "No GPS", "2D Fix", "3D Fix", "RTK Fixed"
-
-// Satellite count
-int satellites = api.satellites;     // Number of visible satellites
+String gpsFixType = 'No GPS';
+int satellites = 0;
+api.eventStream
+  .where((e) => e.type == MAVLinkEventType.gpsInfo)
+  .listen((e) {
+    gpsFixType = e.data['fixType'];
+    satellites = e.data['satellites'];
+  });
 ```
 
 ### 7. Battery Data
 
 ```dart
-// Battery percentage
-int batteryPercent = api.batteryPercent;  // 0-100%
+int batteryPercent = 0;
+api.eventStream
+  .where((e) => e.type == MAVLinkEventType.batteryStatus)
+  .listen((e) => batteryPercent = e.data['batteryPercent'] as int);
 ```
 
-### 8. System Status
+### 8. Parameters
 
 ```dart
-// EKF (Extended Kalman Filter) status
-String ekfStatus = api.ekfStatus;    // EKF health information
-
-// Parameters
-Map<String, double> parameters = api.parameters;  // All vehicle parameters
+// Parameters (Map cache trong API)
+final Map<String, double> parameters = api.parameters;
 ```
 
 ## State Monitoring Classes

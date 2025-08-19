@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:flutter_libserialport/flutter_libserialport.dart';
 import 'package:skylink/api/telemetry/mavlink_api.dart';
 
 void main() {
@@ -86,7 +87,7 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
 
   void _refreshPorts() {
     setState(() {
-      _availablePorts = _api.getAvailablePorts();
+  _availablePorts = SerialPort.availablePorts;
       if (_availablePorts.isNotEmpty && _selectedPort.isEmpty) {
         _selectedPort = _availablePorts.first;
       }
@@ -152,6 +153,14 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
           double paramValue = event.data['value'] ?? 0.0;
           _parameters[paramName] = paramValue;
           break;
+        case MAVLinkEventType.sysStatus:
+          // Could display load/sensors/voltage from SysStatus if needed
+          break;
+        case MAVLinkEventType.commandAck:
+          String cmd = event.data['command']?.toString() ?? 'CMD';
+          String result = event.data['result']?.toString() ?? 'ACK';
+          _addStatusMessage('Command ACK: $cmd -> $result');
+          break;
       }
     });
   }
@@ -170,10 +179,11 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
     }
 
     _addStatusMessage('Connecting to $_selectedPort...');
-    bool success = await _api.connect(_selectedPort, baudRate: 115200);
+    await _api.connect(_selectedPort, baudRate: 115200);
 
-    if (success) {
+    if (_api.isConnected) {
       _addStatusMessage('Connected successfully');
+      _api.requestAllDataStreams();
       // Request parameters after connection
       Future.delayed(Duration(seconds: 2), () {
         _api.requestAllParameters();

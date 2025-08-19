@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:flutter_libserialport/flutter_libserialport.dart';
 import 'package:skylink/api/telemetry/mavlink_api.dart';
 
 /// Simple MAVLink API Demo
@@ -102,7 +103,7 @@ class _MAVLinkSimpleTestState extends State<MAVLinkSimpleTest> {
 
   void _refreshPorts() {
     setState(() {
-      _availablePorts = _api.getAvailablePorts();
+  _availablePorts = SerialPort.availablePorts;
       if (_availablePorts.isNotEmpty && _selectedPort.isEmpty) {
         _selectedPort = _availablePorts.first;
       }
@@ -121,8 +122,8 @@ class _MAVLinkSimpleTestState extends State<MAVLinkSimpleTest> {
       _lastMessage = 'Connecting to $_selectedPort...';
     });
 
-    // Force 9600 baud only since Python test confirmed it works
-    List<int> baudRates = [9600]; // Only test the known working baud rate
+  // Try common baud rates (adjust as needed)
+  List<int> baudRates = [115200, 57600, 38400, 9600];
     bool connected = false;
 
     for (int baudRate in baudRates) {
@@ -130,13 +131,15 @@ class _MAVLinkSimpleTestState extends State<MAVLinkSimpleTest> {
         _lastMessage = 'Trying $_selectedPort at $baudRate baud...';
       });
 
-      bool success = await _api.connect(_selectedPort, baudRate: baudRate);
+      await _api.connect(_selectedPort, baudRate: baudRate);
 
-      if (success) {
+      if (_api.isConnected) {
         setState(() {
           _isConnected = true;
           _lastMessage = 'Connected to $_selectedPort at $baudRate baud!';
         });
+        // Request standard data streams
+        _api.requestAllDataStreams();
         connected = true;
         break;
       } else {

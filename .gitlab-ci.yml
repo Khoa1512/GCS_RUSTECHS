@@ -41,6 +41,7 @@ build_macos:
     - flutter doctor
     - flutter pub get
   script:
+    - flutter create . --platforms=macos
     - flutter config --enable-macos-desktop
     - flutter build macos --release
   artifacts:

@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter_libserialport/flutter_libserialport.dart';
 import 'package:skylink/api/telemetry/mavlink_api.dart';
 import 'package:skylink/data/telemetry_data.dart';
-import 'package:flutter/material.dart';
 
 /// Service for managing telemetry data from MAVLink API
 class TelemetryService {
@@ -27,6 +28,9 @@ class TelemetryService {
   // Current telemetry data
   Map<String, double> _currentTelemetry = {};
   bool _isConnected = false;
+  String _currentMode = 'Unknown';
+  bool _armed = false;
+  String _lastGpsFixType = 'No GPS';
 
   // Public getters
   Stream<Map<String, double>> get telemetryStream =>
@@ -61,14 +65,14 @@ class TelemetryService {
       // Check if port is available
       final availablePorts = getAvailablePorts();
       if (!availablePorts.contains(port)) {
-        // print('TelemetryService: Port $port is not available');
         return false;
       }
 
       // print('TelemetryService: Calling API connect');
-      bool success = await _api.connect(port, baudRate: baudRate);
+  await _api.connect(port, baudRate: baudRate);
 
-      if (success) {
+  final success = _api.isConnected;
+  if (success) {
         print('TelemetryService: Port connected, waiting for data...');
         _hasReceivedData = false;
 
@@ -81,7 +85,7 @@ class TelemetryService {
         _dataReceiveController.add(false);
 
         // Request all data streams for real-time telemetry
-        _api.requestAllDataStreams();
+  _api.requestAllDataStreams();
       } else {
         // print('TelemetryService: Connection failed');
       }
@@ -130,8 +134,8 @@ class TelemetryService {
 
   /// Get available serial ports
   List<String> getAvailablePorts() {
-    final ports = _api.getAvailablePorts();
-    // print('TelemetryService: Available ports: $ports');
+    // Query serial ports directly; API no longer exposes this helper
+    final ports = SerialPort.availablePorts;
     return ports;
   }
 
@@ -142,21 +146,98 @@ class TelemetryService {
         case MAVLinkEventType.connectionStateChanged:
           _handleConnectionStateChange(event.data);
           break;
+        case MAVLinkEventType.heartbeat:
+          if (event.data is Map) {
+            final m = (event.data as Map);
+            _currentMode = (m['mode'] as String?) ?? _currentMode;
+            _armed = (m['armed'] as bool?) ?? _armed;
+            _currentTelemetry['armed'] = _armed ? 1.0 : 0.0;
+            // Optional: expose mode for UI
+            // Store as double? keep in map as not used in numeric charts
+          }
+          _emitTelemetry();
+          break;
         case MAVLinkEventType.attitude:
-          _updateAttitudeData();
+          if (event.data is Map) {
+            final m = (event.data as Map);
+            _currentTelemetry['roll'] = (m['roll'] as num?)?.toDouble() ?? (_currentTelemetry['roll'] ?? 0.0);
+            _currentTelemetry['pitch'] = (m['pitch'] as num?)?.toDouble() ?? (_currentTelemetry['pitch'] ?? 0.0);
+            _currentTelemetry['yaw'] = (m['yaw'] as num?)?.toDouble() ?? (_currentTelemetry['yaw'] ?? 0.0);
+            // Default compass heading to yaw when GPS course not available
+            _currentTelemetry['compass_heading'] = _currentTelemetry['gps_course'] != null && (_currentTelemetry['gps_course'] ?? 0) != 0
+                ? _currentTelemetry['gps_course']!
+                : _currentTelemetry['yaw'] ?? 0.0;
+          }
+          _emitTelemetry();
           break;
         case MAVLinkEventType.vfrHud:
-          _updateVfrHudData();
+          if (event.data is Map) {
+            final m = (event.data as Map);
+            _currentTelemetry['airspeed'] = (m['airspeed'] as num?)?.toDouble() ?? (_currentTelemetry['airspeed'] ?? 0.0);
+            _currentTelemetry['groundspeed'] = (m['groundspeed'] as num?)?.toDouble() ?? (_currentTelemetry['groundspeed'] ?? 0.0);
+            // vfrhud.alt can serve as MSL if GLOBAL_POSITION not yet arrived
+            final alt = (m['alt'] as num?)?.toDouble();
+            if (alt != null) {
+              _currentTelemetry['altitude_msl'] = alt;
+            }
+          }
+          _emitTelemetry();
+          break;
+        case MAVLinkEventType.position:
+          if (event.data is Map) {
+            final m = (event.data as Map);
+            _currentTelemetry['gps_latitude'] = (m['lat'] as num?)?.toDouble() ?? (_currentTelemetry['gps_latitude'] ?? 0.0);
+            _currentTelemetry['gps_longitude'] = (m['lon'] as num?)?.toDouble() ?? (_currentTelemetry['gps_longitude'] ?? 0.0);
+            _currentTelemetry['altitude_msl'] = (m['altMSL'] as num?)?.toDouble() ?? (_currentTelemetry['altitude_msl'] ?? 0.0);
+            _currentTelemetry['altitude_rel'] = (m['altRelative'] as num?)?.toDouble() ?? (_currentTelemetry['altitude_rel'] ?? 0.0);
+            _currentTelemetry['groundspeed'] = (m['groundSpeed'] as num?)?.toDouble() ?? (_currentTelemetry['groundspeed'] ?? 0.0);
+            final heading = (m['heading'] as num?)?.toDouble();
+            if (heading != null && heading > 0) {
+              _currentTelemetry['compass_heading'] = heading;
+            }
+          }
+          _emitTelemetry();
           break;
         case MAVLinkEventType.gpsInfo:
-          _updateGpsData();
+          if (event.data is Map) {
+            final m = (event.data as Map);
+            final fixType = (m['fixType'] as String?) ?? 'No GPS';
+            _currentTelemetry['satellites'] = ((m['satellites'] as num?)?.toDouble() ?? 0.0);
+            _currentTelemetry['gps_fix'] = _getGpsFixValue(fixType);
+            // also store the string fix type for UI when needed
+            // store separately in a special bucket using a sentinel negative value is messy; keep outside map for strings
+            // However, some UI expects 'gps_fix_type' string
+            // We can't store string in Map<String,double>, so expose via getter only
+
+            _currentTelemetry['gps_latitude'] = (m['lat'] as num?)?.toDouble() ?? (_currentTelemetry['gps_latitude'] ?? 0.0);
+            _currentTelemetry['gps_longitude'] = (m['lon'] as num?)?.toDouble() ?? (_currentTelemetry['gps_longitude'] ?? 0.0);
+            _currentTelemetry['gps_altitude'] = (m['alt'] as num?)?.toDouble() ?? (_currentTelemetry['gps_altitude'] ?? 0.0);
+            _currentTelemetry['gps_speed'] = (m['vel'] as num?)?.toDouble() ?? (_currentTelemetry['gps_speed'] ?? 0.0);
+            _currentTelemetry['gps_course'] = (m['cog'] as num?)?.toDouble() ?? (_currentTelemetry['gps_course'] ?? 0.0);
+            _currentTelemetry['gps_horizontal_accuracy'] = (m['eph'] as num?)?.toDouble() ?? (_currentTelemetry['gps_horizontal_accuracy'] ?? 0.0);
+            _currentTelemetry['gps_vertical_accuracy'] = (m['epv'] as num?)?.toDouble() ?? (_currentTelemetry['gps_vertical_accuracy'] ?? 0.0);
+
+            // Prefer GPS course for compass when valid
+            if ((_currentTelemetry['gps_course'] ?? 0.0) != 0.0) {
+              _currentTelemetry['compass_heading'] = _currentTelemetry['gps_course']!;
+            }
+            // Cache last fix type string in a field for getters
+            _lastGpsFixType = fixType;
+          }
+          _emitTelemetry();
           break;
         case MAVLinkEventType.batteryStatus:
-          _updateBatteryData();
+          if (event.data is Map) {
+            final m = (event.data as Map);
+            final bp = (m['batteryPercent'] as num?)?.toDouble();
+            if (bp != null) {
+              _currentTelemetry['battery'] = bp;
+            }
+          }
+          _emitTelemetry();
           break;
         default:
-          // Update all data on any telemetry event
-          _updateTelemetryData();
+          // no-op for other events
           break;
       }
     });
@@ -176,99 +257,18 @@ class TelemetryService {
     }
   }
 
-  /// Update attitude data (roll, pitch, yaw)
-  void _updateAttitudeData() {
-    _currentTelemetry.addAll({
-      'roll': _api.roll,
-      'pitch': _api.pitch,
-      'yaw': _api.yaw,
-      'compass_heading': _api.yaw, // Use yaw as compass heading for now
-    });
-    _telemetryController.add(_currentTelemetry);
-  }
-
-  /// Update VFR HUD data (speed, altitude)
-  void _updateVfrHudData() {
-    _currentTelemetry.addAll({
-      'airspeed': _api.airSpeed,
-      'groundspeed': _api.groundSpeed,
-      'altitude_msl': _api.altitudeMSL,
-      'altitude_rel': _api.altitudeRelative,
-    });
-    _telemetryController.add(_currentTelemetry);
-  }
-
-  /// Update GPS data
-  void _updateGpsData() {
-    _currentTelemetry.addAll({
-      'satellites': _api.satellites.toDouble(),
-      'gps_fix': _getGpsFixValue(_api.gpsFixType),
-      'gps_latitude': _api.gpsLatitude,
-      'gps_longitude': _api.gpsLongitude,
-      'gps_altitude': _api.gpsAltitude,
-      'gps_speed': _api.gpsSpeed,
-      'gps_course': _api.gpsCourse,
-      'gps_horizontal_accuracy': _api.gpsHorizontalAccuracy,
-      'gps_vertical_accuracy': _api.gpsVerticalAccuracy,
-    });
-    _telemetryController.add(_currentTelemetry);
-  }
-
-  /// Update battery data
-  void _updateBatteryData() {
-    _currentTelemetry['battery'] = _api.batteryPercent.toDouble();
-    _telemetryController.add(_currentTelemetry);
-  }
-
-  /// Update current telemetry data based on API state
-  void _updateTelemetryData() {
-    // Kiểm tra xem đã nhận được data thực tế chưa
-    if (!_hasReceivedData &&
-        (_api.gpsLatitude != 0 ||
-            _api.gpsLongitude != 0 ||
-            _api.batteryPercent > 0)) {
-      // print('TelemetryService: First data received!');
-      _hasReceivedData = true;
-      _dataReceiveController.add(true);
+  /// Emit current telemetry map and mark data received when first meaningful data arrives
+  void _emitTelemetry() {
+    if (!_hasReceivedData) {
+      final hasPosition = ((_currentTelemetry['gps_latitude'] ?? 0.0) != 0.0) ||
+          ((_currentTelemetry['gps_longitude'] ?? 0.0) != 0.0);
+      final hasBattery = (_currentTelemetry['battery'] ?? 0.0) > 0.0;
+      if (hasPosition || hasBattery) {
+        _hasReceivedData = true;
+        _dataReceiveController.add(true);
+      }
     }
-
-    _currentTelemetry = {
-      // Attitude
-      'roll': _api.roll,
-      'pitch': _api.pitch,
-      'yaw': _api.yaw,
-
-      // Heading/Compass - use GPS course when available, otherwise yaw
-      'compass_heading': _api.gpsCourse != 0.0 ? _api.gpsCourse : _api.yaw,
-
-      // Speed
-      'airspeed': _api.airSpeed,
-      'groundspeed': _api.groundSpeed,
-
-      // Altitude
-      'altitude_msl': _api.altitudeMSL,
-      'altitude_rel': _api.altitudeRelative,
-
-      // GPS Position
-      'gps_latitude': _api.gpsLatitude,
-      'gps_longitude': _api.gpsLongitude,
-      'gps_altitude': _api.gpsAltitude,
-      'gps_speed': _api.gpsSpeed,
-      'gps_course': _api.gpsCourse,
-
-      // GPS Quality
-      'satellites': _api.satellites.toDouble(),
-      'gps_fix': _getGpsFixValue(_api.gpsFixType),
-      'gps_horizontal_accuracy': _api.gpsHorizontalAccuracy,
-      'gps_vertical_accuracy': _api.gpsVerticalAccuracy,
-
-      // Battery
-      'battery': _api.batteryPercent.toDouble(),
-
-      // System status
-      'armed': _api.isArmed ? 1.0 : 0.0,
-    };
-    _telemetryController.add(_currentTelemetry);
+    _telemetryController.add(Map.from(_currentTelemetry));
   }
 
   /// Convert GPS fix type string to numeric value
@@ -584,7 +584,7 @@ class TelemetryService {
       ),
       TelemetryData(
         label: 'GPS Fix Type',
-        value: _currentTelemetry['gps_fix_type']?.toString() ?? 'No GPS',
+  value: gpsFixType,
         unit: '',
         color: Colors.lightGreen,
       ),
@@ -624,40 +624,40 @@ class TelemetryService {
   }
 
   /// Get current flight mode
-  String get currentMode => _api.currentMode;
+  String get currentMode => _currentMode;
 
   /// Check if drone is armed
-  bool get isArmed => _api.isArmed;
+  bool get isArmed => _armed;
 
   /// Get GPS related data
-  double get gpsLatitude => _api.gpsLatitude;
-  double get gpsLongitude => _api.gpsLongitude;
-  double get gpsAltitude => _api.gpsAltitude;
-  double get gpsSpeed => _api.gpsSpeed;
-  double get gpsCourse => _api.gpsCourse;
-  double get gpsHorizontalAccuracy => _api.gpsHorizontalAccuracy;
-  double get gpsVerticalAccuracy => _api.gpsVerticalAccuracy;
-  String get gpsFixType => _api.gpsFixType;
-  int get gpsFixValue => _getGpsFixValue(_api.gpsFixType).toInt();
+  double get gpsLatitude => _currentTelemetry['gps_latitude'] ?? 0.0;
+  double get gpsLongitude => _currentTelemetry['gps_longitude'] ?? 0.0;
+  double get gpsAltitude => _currentTelemetry['gps_altitude'] ?? 0.0;
+  double get gpsSpeed => _currentTelemetry['gps_speed'] ?? 0.0;
+  double get gpsCourse => _currentTelemetry['gps_course'] ?? 0.0;
+  double get gpsHorizontalAccuracy => _currentTelemetry['gps_horizontal_accuracy'] ?? 0.0;
+  double get gpsVerticalAccuracy => _currentTelemetry['gps_vertical_accuracy'] ?? 0.0;
+  String get gpsFixType => _lastGpsFixType;
+  int get gpsFixValue => _getGpsFixValue(_lastGpsFixType).toInt();
 
   /// Check if GPS has a valid fix
   bool get hasValidGpsFix {
     // Only accept valid GPS fixes that can provide accurate position
-    return _api.gpsFixType == '2D Fix' ||
-        _api.gpsFixType == '3D Fix' ||
-        _api.gpsFixType == 'DGPS' ||
-        _api.gpsFixType == 'RTK Float' ||
-        _api.gpsFixType == 'RTK Fixed' ||
-        _api.gpsFixType == 'Static' ||
-        _api.gpsFixType == 'PPP';
+  return _lastGpsFixType == '2D Fix' ||
+    _lastGpsFixType == '3D Fix' ||
+    _lastGpsFixType == 'DGPS' ||
+    _lastGpsFixType == 'RTK Float' ||
+    _lastGpsFixType == 'RTK Fixed' ||
+    _lastGpsFixType == 'Static' ||
+    _lastGpsFixType == 'PPP';
   }
 
   /// Get GPS accuracy in human readable format
   String get gpsAccuracyString {
     if (!hasValidGpsFix) {
-      return _api.gpsFixType; // Show actual fix type for debugging
+      return _lastGpsFixType; // Show actual fix type for debugging
     }
-    return '±${_api.gpsHorizontalAccuracy.toStringAsFixed(1)}m';
+    return '±${gpsHorizontalAccuracy.toStringAsFixed(1)}m';
   }
 
   /// Dispose service and cleanup resources

@@ -5,10 +5,8 @@ stages:
   - release
 
 variables:
-  # Điều chỉnh cho phù hợp với project của bạn
   FLUTTER_VERSION: "3.19.0"
 
-# Cache các dependencies để tối ưu thời gian build
 cache:
   paths:
     - .pub-cache/
@@ -35,6 +33,13 @@ build_windows:
 # Build cho macOS
 build_macos:
   stage: build
+  before_script:
+    # Cài đặt Flutter
+    - brew install flutter
+    - export PATH="$PATH:$HOME/flutter/bin"
+    # Kiểm tra và cấu hình Flutter
+    - flutter doctor
+    - flutter pub get
   script:
     - flutter config --enable-macos-desktop
     - flutter build macos --release
@@ -69,7 +74,6 @@ release:
   stage: release
   script:
     - echo "Creating release for version $CI_COMMIT_TAG"
-    # Tạo các file zip cho từng nền tảng
     - apt-get update && apt-get install -y zip
     - mkdir -p releases
     - if [ -d "build/windows/runner/Release" ]; then cd build/windows/runner/Release && zip -r ../../../../releases/vtol_windows_$CI_COMMIT_TAG.zip . && cd -; fi

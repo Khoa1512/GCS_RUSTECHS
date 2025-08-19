@@ -178,17 +178,8 @@ class FlightModeManager {
   }
 
   bool canSwitchToMode(int mode) {
-    // Check if it's safe to switch to the requested mode
-    if (!api.isConnected) return false;
-
-    switch (mode) {
-      // Ví dụ: yêu cầu GPS fix để chuyển một số mode, tự lấy điều kiện từ UI/state của bạn
-      case ArduPilotFlightModes.LOITER:
-        return true;
-
-      default:
-        return true;
-    }
+    // Example: rely on UI/service state for richer checks; here only connection check
+    return api.isConnected;
   }
 }
 ```
@@ -288,14 +279,12 @@ class ArmDisarmManager {
 
   Future<ArmingCheckResult> performPreArmChecks() async {
     // Check connection
-    if (!api.isConnected) {
+  if (!api.isConnected) {
       return ArmingCheckResult(false, 'Not connected to drone');
     }
 
     // Check if already armed
-    if (api.isArmed) {
-      return ArmingCheckResult(false, 'Drone is already armed');
-    }
+  // Use cached state from your TelemetryService if available to avoid direct API getters here
 
     // Check GPS fix
   // TODO: Lấy các điều kiện từ state tổng hợp của bạn (xem docs/vehicle-state.md)
@@ -556,8 +545,9 @@ class BasicCommandExample {
   final DroneMAVLinkAPI api = DroneMAVLinkAPI();
 
   Future<void> demonstrateBasicCommands() async {
-    // Connect to drone
-    await api.connect('COM3');
+  // Connect to drone
+  await api.connect('COM3');
+  if (!api.isConnected) return;
 
     // Set stabilize mode
     api.setFlightMode(ArduPilotFlightModes.STABILIZE);
@@ -567,10 +557,7 @@ class BasicCommandExample {
     api.sendArmCommand(true);
     await Future.delayed(Duration(seconds: 2));
 
-    // Check if armed
-    if (api.isArmed) {
-      print('Drone is armed and ready');
-    }
+  // Confirm via heartbeat events instead of direct getter
 
     // Change to auto mode
     api.setFlightMode(ArduPilotFlightModes.AUTO);
@@ -598,7 +585,8 @@ class AdvancedCommandExample {
   }
 
   Future<void> performSafeArming() async {
-    await api.connect('COM3');
+  await api.connect('COM3');
+  if (!api.isConnected) return;
 
     // Perform safe arming with checks
     bool armed = await armManager.armWithPrecheck();

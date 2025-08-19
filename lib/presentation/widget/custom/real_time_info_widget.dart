@@ -105,12 +105,13 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   void _initializeStateTracking() {
-    final api = _telemetryService.mavlinkAPI;
-    _lastFlightMode = api.currentMode;
-    _lastArmedStatus = api.isArmed;
-    _lastGpsFixType = api.gpsFixType;
-    _lastSatelliteCount = api.satellites;
-    _lastBatteryPercent = api.batteryPercent;
+  _lastFlightMode = _telemetryService.currentMode;
+  _lastArmedStatus = _telemetryService.isArmed;
+  _lastGpsFixType = _telemetryService.gpsFixType;
+  _lastSatelliteCount =
+    _telemetryService.currentTelemetry['satellites']?.toInt() ?? -1;
+  _lastBatteryPercent =
+    _telemetryService.currentTelemetry['battery']?.toInt() ?? -1;
   }
 
   void _handleDisconnection() {
@@ -181,6 +182,12 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
       case MAVLinkEventType.parameterReceived:
         // These are for telemetry display, NOT status messages
         break;
+      case MAVLinkEventType.sysStatus:
+        // Not producing user-facing messages here
+        break;
+      case MAVLinkEventType.commandAck:
+        // Could add command feedback later
+        break;
     }
   }
 
@@ -200,9 +207,8 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   void _handleSystemHeartbeat(MAVLinkEvent event) {
-    final api = _telemetryService.mavlinkAPI;
-    final currentMode = api.currentMode;
-    final isArmed = api.isArmed;
+  final currentMode = _telemetryService.currentMode;
+  final isArmed = _telemetryService.isArmed;
 
     // First connection establishment
     if (!_connectionEstablished) {
@@ -271,9 +277,9 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   void _handleGpsStatusChanges(MAVLinkEvent event) {
-    final api = _telemetryService.mavlinkAPI;
-    final fixType = api.gpsFixType;
-    final satellites = api.satellites;
+  final fixType = _telemetryService.gpsFixType;
+  final satellites =
+    _telemetryService.currentTelemetry['satellites']?.toInt() ?? 0;
 
     // GPS Fix Type changes
     if (_lastGpsFixType != null && _lastGpsFixType != fixType) {
@@ -324,7 +330,8 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   void _handleBatteryWarnings(MAVLinkEvent event) {
-    final battery = _telemetryService.mavlinkAPI.batteryPercent;
+  final battery =
+    _telemetryService.currentTelemetry['battery']?.toInt() ?? 0;
 
     // Battery threshold warnings
     if (_lastBatteryPercent != -1) {

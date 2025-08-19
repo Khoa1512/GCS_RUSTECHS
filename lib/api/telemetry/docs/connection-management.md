@@ -21,52 +21,43 @@ enum MAVLinkConnectionState {
 
 ### 1. Port Discovery
 
-#### `List<String> getAvailablePorts()`
-
-Lấy danh sách tất cả các cổng serial khả dụng trên hệ thống.
+Sử dụng thư viện flutter_libserialport để liệt kê cổng. API không cung cấp `getAvailablePorts()`.
 
 ```dart
-final api = DroneMAVLinkAPI();
-List<String> ports = api.getAvailablePorts();
+import 'package:flutter_libserialport/flutter_libserialport.dart';
 
-print('Available ports:');
-for (String port in ports) {
-  print('  - $port');
-}
+final ports = SerialPort.availablePorts;
+print('Available ports: $ports');
 ```
-
-**Returns:**
-- `List<String>`: Danh sách tên cổng serial (e.g., ["COM1", "COM3", "/dev/ttyUSB0"])
 
 ### 2. Connection Establishment
 
-#### `Future<bool> connect(String port, {int? baudRate})`
+#### `Future<void> connect(String port, {int? baudRate})`
 
 Khởi tạo kết nối tới drone qua cổng serial được chỉ định.
 
 ```dart
-bool success = await api.connect('COM3', baudRate: 115200);
-if (success) {
-  print('Connected successfully');
-} else {
-  print('Connection failed');
+await api.connect('COM3', baudRate: 115200);
+if (!api.isConnected) {
+  print('Failed to connect');
 }
 ```
 
 **Parameters:**
+
 - `port`: Tên cổng serial (required)
 - `baudRate`: Tốc độ baud (optional, default: 115200)
 
 **Returns:**
-- `Future<bool>`: true nếu kết nối thành công, false nếu thất bại
+
+- `Future<void>`
 
 **Connection Process:**
-1. Validate port availability
-2. Configure serial port settings
-3. Open serial connection
-4. Start data reading timer
-5. Request data streams from drone
-6. Emit connection state change event
+
+1. Configure serial port settings (baud, bits, parity, stop bits)
+2. Open serial connection
+3. Start reading stream and feed parser
+4. Emit connection state change event
 
 ### 3. Connection Termination
 
@@ -80,34 +71,16 @@ print('Disconnected from drone');
 ```
 
 **Process:**
-1. Cancel data reading timer
+
+1. Cancel data reader subscription
 2. Close serial port
-3. Cancel subscriptions
-4. Reset connection state
-5. Emit disconnection event
+3. Emit disconnection event
 
 ## Connection Configuration
 
 ### Serial Port Settings
 
-Khi kết nối, API tự động cấu hình các thông số serial:
-
-```dart
-_serialPort!.config.baudRate = _baudRate;     // Tốc độ baud
-_serialPort!.config.bits = 8;                // 8 data bits
-_serialPort!.config.stopBits = 1;            // 1 stop bit
-_serialPort!.config.parity = SerialPortParity.none;  // No parity
-_serialPort!.config.setFlowControl(SerialPortFlowControl.none);  // No flow control
-```
-
-### Data Reading Configuration
-
-```dart
-// High-frequency data reading (every 10ms)
-_timer = Timer.periodic(const Duration(milliseconds: 10), (_) {
-  _readData();
-});
-```
+Khi kết nối, API cấu hình serial như sau (tự động): 115200 (mặc định), 8N1.
 
 ## Connection Monitoring
 
@@ -155,56 +128,54 @@ print('Current status: $status');
 ### Common Connection Errors
 
 1. **Port Not Available**
+
 ```dart
 Future<bool> connectWithValidation(String port) async {
-  List<String> availablePorts = api.getAvailablePorts();
-  
+  final availablePorts = SerialPort.availablePorts;
   if (!availablePorts.contains(port)) {
     print('Error: Port $port is not available');
     print('Available ports: $availablePorts');
     return false;
   }
-  
-  return await api.connect(port);
+  await api.connect(port);
+  return api.isConnected;
 }
 ```
 
-2. **Port Already in Use**
+1. **Port Already in Use**
+
 ```dart
 Future<bool> connectWithRetry(String port, {int maxRetries = 3}) async {
   for (int i = 0; i < maxRetries; i++) {
-    bool success = await api.connect(port);
-    if (success) return true;
-    
+    await api.connect(port);
+    if (api.isConnected) return true;
     print('Connection attempt ${i + 1} failed, retrying...');
     await Future.delayed(Duration(seconds: 2));
   }
-  
   print('Failed to connect after $maxRetries attempts');
   return false;
 }
 ```
 
-3. **Connection Timeout**
+1. **Connection Timeout**
+
 ```dart
 Future<bool> connectWithTimeout(String port, {Duration timeout = const Duration(seconds: 10)}) async {
-  Completer<bool> completer = Completer<bool>();
-  
-  // Start connection
-  api.connect(port).then((success) {
+  final completer = Completer<bool>();
+
+  api.connect(port).then((_) {
     if (!completer.isCompleted) {
-      completer.complete(success);
+      completer.complete(api.isConnected);
     }
   });
-  
-  // Set timeout
+
   Timer(timeout, () {
     if (!completer.isCompleted) {
       api.disconnect();
       completer.complete(false);
     }
   });
-  
+
   return completer.future;
 }
 ```
@@ -243,7 +214,8 @@ class AutoReconnectManager {
   Future<bool> connect(String port) async {
     _lastPort = port;
     _reconnectAttempts = 0;
-    return await api.connect(port);
+    await api.connect(port);
+    return api.isConnected;
   }
   
   void _startReconnection() {
@@ -257,8 +229,8 @@ class AutoReconnectManager {
       _reconnectAttempts++;
       print('Reconnection attempt $_reconnectAttempts/$maxReconnectAttempts');
       
-      bool success = await api.connect(_lastPort!);
-      if (!success) {
+  await api.connect(_lastPort!);
+  if (!api.isConnected) {
         _startReconnection();
       }
     });
@@ -339,14 +311,14 @@ class MultiPortConnectionManager {
   }
   
   Future<bool> connectToAnyAvailable() async {
-    List<String> availablePorts = api.getAvailablePorts();
+    final availablePorts = SerialPort.availablePorts;
     
     // Try preferred ports first
     for (String port in _preferredPorts) {
       if (availablePorts.contains(port)) {
         print('Trying preferred port: $port');
-        bool success = await api.connect(port);
-        if (success) {
+  await api.connect(port);
+  if (api.isConnected) {
           print('Connected to preferred port: $port');
           return true;
         }
@@ -354,11 +326,11 @@ class MultiPortConnectionManager {
     }
     
     // Try any other available ports
-    for (String port in availablePorts) {
+  for (String port in availablePorts) {
       if (!_preferredPorts.contains(port)) {
         print('Trying port: $port');
-        bool success = await api.connect(port);
-        if (success) {
+    await api.connect(port);
+    if (api.isConnected) {
           print('Connected to port: $port');
           return true;
         }
@@ -370,14 +342,14 @@ class MultiPortConnectionManager {
   }
   
   Future<List<String>> scanForDroneConnections() async {
-    List<String> droneConnections = [];
-    List<String> availablePorts = api.getAvailablePorts();
+  List<String> droneConnections = [];
+  final availablePorts = SerialPort.availablePorts;
     
     for (String port in availablePorts) {
       print('Scanning port: $port');
       
-      bool connected = await api.connect(port);
-      if (connected) {
+  await api.connect(port);
+  if (api.isConnected) {
         // Wait for heartbeat to confirm it's a drone
         bool isHeartbeatReceived = await _waitForHeartbeat();
         
@@ -428,8 +400,8 @@ class SimpleConnectionExample {
   final DroneMAVLinkAPI api = DroneMAVLinkAPI();
   
   Future<void> connectToDrone() async {
-    // Get available ports
-    List<String> ports = api.getAvailablePorts();
+  // Get available ports via flutter_libserialport
+  final ports = SerialPort.availablePorts;
     if (ports.isEmpty) {
       print('No serial ports available');
       return;
@@ -439,8 +411,8 @@ class SimpleConnectionExample {
     String port = ports.first;
     print('Connecting to $port...');
     
-    bool success = await api.connect(port, baudRate: 115200);
-    if (success) {
+  await api.connect(port, baudRate: 115200);
+  if (api.isConnected) {
       print('Connected successfully');
     } else {
       print('Connection failed');
@@ -498,14 +470,13 @@ class AdvancedConnectionExample {
 
 ```dart
 Future<bool> safeConnect(String port) async {
-  List<String> availablePorts = api.getAvailablePorts();
-  
+  final availablePorts = SerialPort.availablePorts;
   if (!availablePorts.contains(port)) {
     print('Port $port is not available');
     return false;
   }
-  
-  return await api.connect(port);
+  await api.connect(port);
+  return api.isConnected;
 }
 ```
 
@@ -547,10 +518,12 @@ void dispose() {
 ```dart
 Future<bool> connectWithTimeout(String port, 
     {Duration timeout = const Duration(seconds: 10)}) async {
-  
-  return await Future.any([
-    api.connect(port),
-    Future.delayed(timeout, () => false)
+  bool done = false;
+  api.connect(port).then((_) => done = true);
+  await Future.any([
+    Future.doWhile(() async { await Future.delayed(Duration(milliseconds: 50)); return !done; }),
+    Future.delayed(timeout)
   ]);
+  return api.isConnected;
 }
 ```

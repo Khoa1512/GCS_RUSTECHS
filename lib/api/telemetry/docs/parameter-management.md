@@ -576,7 +576,8 @@ class BasicParameterExample {
   
   Future<void> demonstrateParameterOperations() async {
     // Connect to drone first
-    await api.connect('COM3');
+  await api.connect('COM3');
+  if (!api.isConnected) return;
     
     // Request all parameters
     api.requestAllParameters();
@@ -626,7 +627,8 @@ class AdvancedParameterExample {
   
   Future<void> performParameterMaintenance() async {
     // Connect and get parameters
-    await api.connect('COM3');
+  await api.connect('COM3');
+  if (!api.isConnected) return;
     api.requestAllParameters();
     
     // Wait for parameters

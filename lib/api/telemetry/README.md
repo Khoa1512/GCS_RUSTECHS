@@ -1,16 +1,22 @@
-# MAVLink API Documentation
+# MAVLink API (Modular) Documentation
 
-`DroneMAVLinkAPI` là một lớp API chính để giao tiếp với drone thông qua giao thức MAVLink qua kết nối serial. API này cung cấp một interface đơn giản để kết nối, nhận dữ liệu telemetry, và điều khiển drone.
+<!-- markdownlint-disable MD051 -->
+
+`DroneMAVLinkAPI` là API chính để giao tiếp MAVLink qua serial. Kể từ bản này, API đã được refactor theo kiến trúc module:
+
+- Barrel export: `mavlink_api.dart` tiếp tục export các module bên trong để tương thích import cũ.
+- Sự kiện tách theo EventType, mỗi loại có handler riêng trong `mavlink/handlers/*`.
+- Core routing/serial/parse nằm ở `mavlink/mavlink_core.dart`.
 
 ## 📋 Mục lục
 
-1. [Cấu trúc API](#cấu-trúc-api)
-2. [Event System](#event-system)
-3. [Connection Management](#connection-management)
-4. [Data Streams](#data-streams)
-5. [Parameter Management](#parameter-management)
-6. [Command Sending](#command-sending)
-7. [Vehicle State](#vehicle-state)
+1. [Cấu trúc API](#cau-truc-api)
+2. [Event System](#event-system-modular)
+3. [Connection Management](#connection-management-mavlink_coredart)
+4. [Data Streams](#data-streams-mavlink_coredart)
+5. [Parameter Management](#parameter-management-mavlink_coredart--handlersparams_handlerdart)
+6. [Command Sending](#command-sending-mavlink_coredart)
+7. [Vehicle State](#vehicle-state-exposed-via-events-stateful-props-optional)
 8. [Usage Examples](#usage-examples)
 9. [UI Example & Testing](#ui-example--testing)
 10. [Error Handling](#error-handling)
@@ -19,15 +25,30 @@
 
 ```dart
 import 'package:vtol_fe/api/telemetry/mavlink_api.dart';
+import 'package:flutter_libserialport/flutter_libserialport.dart';
 
 // Tạo instance API
 final api = DroneMAVLinkAPI();
 
-// Kết nối
-bool success = await api.connect('COM3', baudRate: 115200);
+// Liệt kê cổng serial (API không cung cấp getAvailablePorts)
+final ports = SerialPort.availablePorts;
+print('Available ports: $ports');
+
+// Kết nối (trả về Future<void>)
+await api.connect('COM3', baudRate: 115200);
+
+// Xác nhận trạng thái kết nối
+if (!api.isConnected) {
+  print('Failed to connect');
+  return;
+}
+
+// (Tùy chọn) yêu cầu các data streams/parameters sau khi kết nối
+api.requestAllDataStreams();
+api.requestAllParameters();
 
 // Lắng nghe events
-api.eventStream.listen((event) {
+final sub = api.eventStream.listen((event) {
   switch (event.type) {
     case MAVLinkEventType.attitude:
       print('Roll: ${event.data['roll']}°');
@@ -35,10 +56,13 @@ api.eventStream.listen((event) {
     case MAVLinkEventType.gpsInfo:
       print('GPS: ${event.data['fixType']}, Sats: ${event.data['satellites']}');
       break;
+    default:
+      break;
   }
 });
 
 // Dọn dẹp
+sub.cancel();
 api.dispose();
 ```
 
@@ -46,7 +70,7 @@ api.dispose();
 
 ### Class Hierarchy
 
-```
+```text
 DroneMAVLinkAPI
 ├── Connection Management
 ├── Event System
@@ -56,15 +80,15 @@ DroneMAVLinkAPI
 └── Vehicle State
 ```
 
-### Core Components
+### Core Components (Modules)
 
-#### 1. MAVLink Event System
+#### 1. MAVLink Event System (mavlink/events.dart)
 
 - **MAVLinkEventType**: Enum định nghĩa các loại sự kiện
 - **MAVLinkEvent**: Class đại diện cho một sự kiện MAVLink
-- **Stream<MAVLinkEvent>**: Stream để lắng nghe các sự kiện
+- **`Stream<MAVLinkEvent>`**: Stream để lắng nghe các sự kiện
 
-#### 2. Connection State Management
+#### 2. Connection State Management (mavlink/mavlink_core.dart)
 
 - **MAVLinkConnectionState**: Enum trạng thái kết nối
 - **Serial Port Management**: Quản lý kết nối serial
@@ -72,26 +96,28 @@ DroneMAVLinkAPI
 
 ---
 
-## 🎯 Event System
+## 🎯 Event System (modular)
 
-### Event Types
+### Event Types (mavlink/events.dart)
 
 ```dart
 enum MAVLinkEventType {
-  heartbeat,           // Heartbeat từ drone
-  attitude,            // Dữ liệu góc nghiêng (roll, pitch, yaw)
-  position,            // Vị trí GPS và altitude
-  statusText,          // Tin nhắn trạng thái từ drone
-  batteryStatus,       // Thông tin pin
-  gpsInfo,            // Thông tin GPS chi tiết
-  vfrHud,             // Dữ liệu VFR HUD (tốc độ, độ cao)
-  parameterReceived,   // Tham số nhận được
-  allParametersReceived, // Tất cả tham số đã nhận
+  heartbeat,              // Heartbeat từ drone
+  attitude,               // Dữ liệu góc nghiêng (roll, pitch, yaw)
+  position,               // Vị trí GPS và altitude
+  statusText,             // Tin nhắn trạng thái từ drone
+  batteryStatus,          // Thông tin pin
+  gpsInfo,                // Thông tin GPS chi tiết
+  vfrHud,                 // Dữ liệu VFR HUD (tốc độ, độ cao)
+  parameterReceived,      // Tham số nhận được
+  allParametersReceived,  // Tất cả tham số đã nhận
+  sysStatus,              // SysStatus (raw)
+  commandAck,             // Command ACK (raw)
   connectionStateChanged, // Thay đổi trạng thái kết nối
 }
 ```
 
-### Event Data Structure
+### Event Data Structure (mapped in handlers)
 
 Mỗi event chứa:
 
@@ -129,33 +155,17 @@ api.eventStream
 
 ---
 
-## 🔌 Connection Management
+## 🔌 Connection Management (mavlink_core.dart)
 
 ### Available Methods
 
-#### `List<String> getAvailablePorts()`
+#### `Future<void> connect(String port, {int? baudRate})`
 
-Lấy danh sách các cổng serial khả dụng.
-
-```dart
-List<String> ports = api.getAvailablePorts();
-print('Available ports: $ports');
-```
-
-#### `Future<bool> connect(String port, {int? baudRate})`
-
-Kết nối tới cổng serial được chỉ định.
-
-**Parameters:**
-
-- `port`: Tên cổng serial (VD: "COM3", "/dev/ttyUSB0")
-- `baudRate`: Tốc độ baud (mặc định: 115200)
-
-**Returns:** `true` nếu kết nối thành công, `false` nếu thất bại.
+Kết nối tới cổng serial được chỉ định. Sau khi `await`, hãy kiểm tra `api.isConnected` hoặc lắng nghe event `connectionStateChanged` để xác nhận.
 
 ```dart
-bool connected = await api.connect('COM3', baudRate: 57600);
-if (connected) {
+await api.connect('COM3', baudRate: 57600);
+if (api.isConnected) {
   print('Connected successfully');
 } else {
   print('Connection failed');
@@ -183,11 +193,11 @@ enum MAVLinkConnectionState {
 
 ---
 
-## 📡 Data Streams
+## 📡 Data Streams (mavlink_core.dart)
 
 ### Stream Types
 
-API tự động yêu cầu các luồng dữ liệu sau khi kết nối:
+Có thể yêu cầu các luồng dữ liệu tiêu chuẩn sau khi kết nối:
 
 - **MAV_DATA_STREAM_ALL**: Tất cả dữ liệu (4Hz)
 - **MAV_DATA_STREAM_EXTRA1**: Dữ liệu attitude (10Hz)
@@ -195,7 +205,7 @@ API tự động yêu cầu các luồng dữ liệu sau khi kết nối:
 - **MAV_DATA_STREAM_POSITION**: Dữ liệu vị trí (3Hz)
 - **MAV_DATA_STREAM_EXTENDED_STATUS**: Trạng thái mở rộng (2Hz)
 
-### Manual Stream Request
+### Stream Request
 
 ```dart
 // Yêu cầu tất cả luồng dữ liệu
@@ -204,7 +214,7 @@ api.requestAllDataStreams();
 
 ---
 
-## ⚙️ Parameter Management
+## ⚙️ Parameter Management (mavlink_core.dart + handlers/params_handler.dart)
 
 ### Reading Parameters
 
@@ -261,7 +271,7 @@ double? armingCheck = api.parameters['ARMING_CHECK'];
 
 ---
 
-## 🎮 Command Sending
+## 🎮 Command Sending (mavlink_core.dart)
 
 ### Arm/Disarm Commands
 
@@ -291,72 +301,44 @@ api.setFlightMode(2); // STABILIZE mode
 
 ---
 
-## 📊 Vehicle State
+## 📊 Vehicle State (consume via events)
 
-### Real-time State Properties
+Thay vì gọi các getter đồng bộ, hãy lắng nghe `eventStream` và (tuỳ chọn) xây dựng một service để cache trạng thái.
 
-API cung cấp các thuộc tính chỉ đọc để truy cập trạng thái hiện tại:
-
-#### Connection State
+Ví dụ service tối giản cache dữ liệu:
 
 ```dart
-bool isConnected = api.isConnected;
-```
+class TelemetryCache {
+  final DroneMAVLinkAPI api;
+  final Map<String, double> data = {};
+  String mode = 'Unknown';
+  bool armed = false;
+  late final StreamSubscription sub;
 
-#### Flight Status
+  TelemetryCache(this.api) {
+    sub = api.eventStream.listen((e) {
+      switch (e.type) {
+        case MAVLinkEventType.heartbeat:
+          mode = e.data['mode'];
+          armed = e.data['armed'];
+          break;
+        case MAVLinkEventType.attitude:
+          data['roll'] = (e.data['roll'] as num?)?.toDouble() ?? 0;
+          data['pitch'] = (e.data['pitch'] as num?)?.toDouble() ?? 0;
+          data['yaw'] = (e.data['yaw'] as num?)?.toDouble() ?? 0;
+          break;
+        case MAVLinkEventType.vfrHud:
+          data['groundspeed'] = (e.data['groundspeed'] as num?)?.toDouble() ?? 0;
+          data['alt'] = (e.data['alt'] as num?)?.toDouble() ?? 0;
+          break;
+        default:
+          break;
+      }
+    });
+  }
 
-```dart
-String currentMode = api.currentMode;      // Flight mode hiện tại
-bool isArmed = api.isArmed;               // Trạng thái arm
-```
-
-#### Attitude Data
-
-```dart
-double roll = api.roll;        // Góc roll (độ)
-double pitch = api.pitch;      // Góc pitch (độ)  
-double yaw = api.yaw;          // Góc yaw (độ)
-```
-
-#### Speed Data
-
-```dart
-double airSpeed = api.airSpeed;       // Tốc độ không khí (m/s)
-double groundSpeed = api.groundSpeed; // Tốc độ mặt đất (m/s)
-```
-
-#### Altitude Data
-
-```dart
-double altMSL = api.altitudeMSL;           // Độ cao so với mực nước biển
-double altRelative = api.altitudeRelative; // Độ cao tương đối
-```
-
-#### GPS Data
-
-```dart
-String gpsFixType = api.gpsFixType; // Loại GPS fix
-int satellites = api.satellites;    // Số vệ tinh
-```
-
-#### Battery Data
-
-```dart
-int batteryPercent = api.batteryPercent; // Phần trăm pin
-```
-
-#### Mission Data
-
-```dart
-int currentWaypoint = api.currentWaypoint; // Waypoint hiện tại
-int totalWaypoints = api.totalWaypoints;   // Tổng số waypoint
-```
-
-#### System Status
-
-```dart
-Map<String, double> homePosition = api.homePosition; // Vị trí home
-String ekfStatus = api.ekfStatus;                    // Trạng thái EKF
+  void dispose() => sub.cancel();
+}
 ```
 
 ---
@@ -429,8 +411,8 @@ class DroneController {
   }
 
   Future<void> connectToDrone(String port) async {
-    bool connected = await api.connect(port);
-    if (!connected) {
+    await api.connect(port);
+    if (!api.isConnected) {
       print('Failed to connect to drone');
     }
   }
@@ -558,8 +540,8 @@ api.eventStream
 
 void _retryConnection() async {
   await Future.delayed(Duration(seconds: 5));
-  bool reconnected = await api.connect(_lastPort);
-  if (!reconnected) {
+  await api.connect(_lastPort);
+  if (!api.isConnected) {
     // Retry again or notify user
   }
 }
@@ -685,7 +667,7 @@ api.eventStream.listen((event) {
 
 // Kiểm tra trạng thái kết nối
 print('Connected: ${api.isConnected}');
-print('Available ports: ${api.getAvailablePorts()}');
+print('Available ports: ${SerialPort.availablePorts}');
 ```
 
 ---
@@ -698,8 +680,7 @@ print('Available ports: ${api.getAvailablePorts()}');
 
 ### Connection Methods
 
-- `getAvailablePorts()`: Lấy danh sách cổng
-- `connect(String port, {int? baudRate})`: Kết nối
+- `connect(String port, {int? baudRate})`: Kết nối (trả về `Future<void>`)
 - `disconnect()`: Ngắt kết nối
 
 ### Data Stream Methods
@@ -717,15 +698,9 @@ print('Available ports: ${api.getAvailablePorts()}');
 - `sendArmCommand(bool arm)`: Arm/disarm
 - `setFlightMode(int mode)`: Thay đổi flight mode
 
-### State Properties
+### State Access
 
-- `isConnected`, `currentMode`, `isArmed`
-- `roll`, `pitch`, `yaw`
-- `airSpeed`, `groundSpeed`
-- `altitudeMSL`, `altitudeRelative`
-- `gpsFixType`, `satellites`
-- `batteryPercent`
-- `parameters`
+- Trạng thái nên được lấy từ `eventStream` (xem các module docs). `isConnected` là thuộc tính tiện lợi; các dữ liệu còn lại nhận qua events hoặc service cache.
 
 ### Cleanup
 
@@ -736,6 +711,7 @@ print('Available ports: ${api.getAvailablePorts()}');
 Tài liệu được chia thành các module riêng biệt để dễ quản lý và tham khảo:
 
 ### Core Modules
+
 - **[Event System](./docs/event-system.md)** - Hệ thống sự kiện và data structures
 - **[Connection Management](./docs/connection-management.md)** - Quản lý kết nối serial
 - **[Parameter Management](./docs/parameter-management.md)** - Đọc/ghi parameters
@@ -743,6 +719,7 @@ Tài liệu được chia thành các module riêng biệt để dễ quản lý
 - **[Vehicle State](./docs/vehicle-state.md)** - Quản lý trạng thái drone
 
 ### Quick Reference
+
 - **Event Types**: 10+ loại sự kiện khác nhau
 - **Connection States**: 4 trạng thái kết nối
 - **Commands**: Arm/disarm, flight modes, parameters

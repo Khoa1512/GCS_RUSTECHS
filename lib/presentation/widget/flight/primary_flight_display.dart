@@ -310,7 +310,7 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                 builder: (context, snapshot) {
                   final telemetryData = snapshot.data ?? {};
                   final isArmed = (telemetryData['armed'] ?? 0.0) > 0.5;
-                  final flightMode = _telemetryService.mavlinkAPI.currentMode;
+                  final flightMode = _telemetryService.currentMode;
 
                   return Container(
                     padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),

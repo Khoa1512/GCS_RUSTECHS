@@ -22,6 +22,19 @@ enum MAVLinkEventType {
   sysStatus,               // Trạng thái hệ thống (raw SysStatus message)
   commandAck,              // Phản hồi cho lệnh (raw CommandAck message)
   connectionStateChanged,  // Thay đổi trạng thái kết nối
+  // Mission-related events
+  missionCount,
+  missionItem,
+  missionDownloadProgress,
+  missionDownloadComplete,
+  missionUploadProgress,
+  missionUploadComplete,
+  missionCurrent,
+  missionItemReached,
+  missionAck,
+  missionCleared,
+  // Home position (EKF origin)
+  homePosition,
 }
 ```
 
@@ -142,10 +155,13 @@ Map<String, double>            // Map of all parameters
 
 ```dart
 MAVLinkConnectionState enum:
+
+```text
 - disconnected
 - connected
 - connecting
 - error
+```
 
 ### 10. SysStatus Event
 
@@ -175,7 +191,6 @@ api.eventStream
     final CommandAck ack = e.data;
     print('ACK for command ${ack.command}, result=${ack.result}');
   });
-```
 ```
 
 ## Usage Examples

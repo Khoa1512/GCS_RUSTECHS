@@ -161,6 +161,9 @@ class _MAVLinkDashboardState extends State<MAVLinkDashboard> {
           String result = event.data['result']?.toString() ?? 'ACK';
           _addStatusMessage('Command ACK: $cmd -> $result');
           break;
+        default:
+          // Other events (e.g., mission protocol) are not handled in this demo UI
+          break;
       }
     });
   }

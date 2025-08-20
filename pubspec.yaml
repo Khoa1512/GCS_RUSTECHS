@@ -90,7 +90,7 @@ flutter:
     - assets/images/natGeoMap.jpeg
     - assets/images/oceanBaseMap.jpeg
     - assets/images/topoMap.jpeg
-    - assets/videos/
+    # - assets/videos/
     - assets/thumbnails/
   #   - images/a_dot_ham.jpeg
 

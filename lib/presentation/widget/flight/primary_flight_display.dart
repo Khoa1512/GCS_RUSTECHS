@@ -640,7 +640,7 @@ class AttitudeIndicatorPainter extends CustomPainter {
     canvas.rotate(roll * math.pi / 180);
 
     // Calculate horizon line position based on pitch
-    final horizonOffset = -(pitch / 90) * radius * 2;
+    final horizonOffset = (pitch / 90) * radius * 2;
 
     // Sky gradient
     final skyGradient = LinearGradient(

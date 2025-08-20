@@ -48,9 +48,11 @@ build_macos:
     - brew install flutter || true   # nếu đã có sẽ skip
     - export PATH="$PATH:$HOME/flutter/bin"
     - flutter --version
-    - flutter config --enable-macos-desktop
+    - flutter doctor
     - flutter pub get
   script:
+    - flutter create . --platforms=macos
+    - flutter config --enable-macos-desktop
     - flutter build macos --release
   artifacts:
     paths:
@@ -59,7 +61,6 @@ build_macos:
   only:
     - main
     - tags
-
 # ---------------- Linux ----------------
 build_linux:
   stage: build

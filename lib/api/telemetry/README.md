@@ -343,6 +343,91 @@ class TelemetryCache {
 
 ---
 
+## 🧭 Mission Protocol (quick start)
+
+DroneMAVLinkAPI hỗ trợ MAVLink Mission Protocol đầy đủ (download, upload, clear, set-current) và tương thích cả MISSION_ITEM_INT lẫn legacy MISSION_ITEM.
+
+### API chính
+
+- Download danh sách mission (sequential):
+  - `requestMissionList()` để nhận `missionCount`
+  - Sau đó gọi tuần tự `requestMissionItem(seq)` cho từng `seq = 0..count-1`
+- Upload mission:
+  - Chuẩn bị `List<PlanMissionItem>` (xem MissionPlan)
+  - Gọi `startMissionUpload(items)`; autopilot sẽ yêu cầu từng item và API tự trả lời
+- Khác:
+  - `clearMission()` xóa toàn bộ mission trên vehicle
+  - `setCurrentMissionItem(seq)` đặt current waypoint
+  - `requestHomePosition()` yêu cầu EKF Home (HOME_POSITION/GPS_GLOBAL_ORIGIN)
+
+### Sự kiện liên quan (eventStream)
+
+- `missionCount` (int): tổng số items
+- `missionItem` (PlanMissionItem): item nhận được (INT hoặc legacy)
+- `missionDownloadProgress` ({received,total}) và `missionDownloadComplete`
+- `missionUploadProgress` ({sent,total}) và `missionUploadComplete`
+- `missionCurrent` ({seq,total,missionMode}) và `missionItemReached` (seq)
+- `missionAck` (type) và `missionCleared`
+- `homePosition` ({lat,lon,alt,source})
+
+### Ví dụ: Download mission hiện tại (sequential)
+
+```dart
+final api = DroneMAVLinkAPI();
+int _total = 0;
+int _next = 0;
+final List<PlanMissionItem> items = [];
+
+final sub = api.eventStream.listen((e) {
+  switch (e.type) {
+    case MAVLinkEventType.missionCount:
+      _total = e.data as int;
+      items.clear();
+      _next = 0;
+      if (_total > 0) api.requestMissionItem(_next++);
+      break;
+    case MAVLinkEventType.missionItem:
+      final it = e.data as PlanMissionItem;
+      while (items.length <= it.seq) {
+        items.add(PlanMissionItem(seq: items.length, command: 0, frame: 0));
+      }
+      items[it.seq] = it;
+      if (_next < _total) api.requestMissionItem(_next++);
+      break;
+    case MAVLinkEventType.missionDownloadComplete:
+      print('Downloaded ${items.length} items');
+      break;
+    default:
+      break;
+  }
+});
+
+api.requestMissionList();
+```
+
+### Ví dụ: Upload mission từ QGC .plan hoặc QGC WPL 110
+
+```dart
+import 'package:vtol_fe/api/telemetry/mavlink_api.dart';
+
+Future<void> uploadFromText(DroneMAVLinkAPI api, String text) async {
+  MissionPlan plan;
+  if (text.trim().startsWith('{')) {
+    plan = MissionPlan.fromQgcPlanJson(text);
+  } else {
+    plan = MissionPlan.fromArduPilotWaypoints(text);
+  }
+  api.startMissionUpload(plan.items);
+}
+```
+
+#### Ghi chú
+
+- Xuất .plan sẽ tự suy luận `plannedHomePosition` từ item đầu nếu là toạ độ toàn cục hợp lệ.
+- Khi autopilot yêu cầu legacy MISSION_ITEM, API sẽ tự động phản hồi dạng float để tương thích.
+
+---
+
 ## 💡 Usage Examples
 
 ### Complete Connection Example
@@ -717,6 +802,8 @@ Tài liệu được chia thành các module riêng biệt để dễ quản lý
 - **[Parameter Management](./docs/parameter-management.md)** - Đọc/ghi parameters
 - **[Command Interface](./docs/command-interface.md)** - Gửi lệnh điều khiển
 - **[Vehicle State](./docs/vehicle-state.md)** - Quản lý trạng thái drone
+- **[Mission Protocol](./docs/mission-protocol.md)** - Quy trình download/upload/clear/current và các sự kiện liên quan
+- **[Mission File Formats](./docs/mission-file-formats.md)** - QGC .plan và QGC WPL 110 (import/export, mapping trường)
 
 ### Quick Reference
 

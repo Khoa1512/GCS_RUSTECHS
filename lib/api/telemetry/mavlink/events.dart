@@ -12,6 +12,19 @@ enum MAVLinkEventType {
   sysStatus,
   commandAck,
   connectionStateChanged,
+  // Mission protocol events
+  missionCount,
+  missionItem,
+  missionCurrent,
+  missionItemReached,
+  missionAck,
+  missionUploadProgress,
+  missionUploadComplete,
+  missionDownloadProgress,
+  missionDownloadComplete,
+  missionCleared,
+  // Home position
+  homePosition,
 }
 
 /// Connection state of the MAVLink connection

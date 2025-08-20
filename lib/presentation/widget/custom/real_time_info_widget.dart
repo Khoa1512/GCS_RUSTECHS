@@ -188,6 +188,22 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
       case MAVLinkEventType.commandAck:
         // Could add command feedback later
         break;
+      // ========================================
+      // MISSION EVENTS (ignored here for status panel)
+      // ========================================
+      case MAVLinkEventType.missionCount:
+      case MAVLinkEventType.missionItem:
+      case MAVLinkEventType.missionCurrent:
+      case MAVLinkEventType.missionItemReached:
+      case MAVLinkEventType.missionAck:
+      case MAVLinkEventType.missionUploadProgress:
+      case MAVLinkEventType.missionUploadComplete:
+      case MAVLinkEventType.missionDownloadProgress:
+      case MAVLinkEventType.missionDownloadComplete:
+      case MAVLinkEventType.missionCleared:
+      case MAVLinkEventType.homePosition:
+        // Not surfaced in this widget; handled by mission UI/flows
+        break;
     }
   }
 

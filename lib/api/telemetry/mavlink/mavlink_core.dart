@@ -15,6 +15,8 @@ import 'handlers/vfrhud_handler.dart';
 import 'handlers/params_handler.dart';
 import 'handlers/sys_status_handler.dart';
 import 'handlers/command_ack_handler.dart';
+import 'handlers/mission_handler.dart';
+import 'mission/mission_models.dart' as mission_model;
 
 /// Main API class for Drone MAVLink communications, split by event handlers
 class DroneMAVLinkAPI {
@@ -43,6 +45,7 @@ class DroneMAVLinkAPI {
 	late final ParamsHandler _paramsHandler;
 	late final SysStatusHandler _sysStatusHandler;
 	late final CommandAckHandler _commandAckHandler;
+	late final MissionHandler _missionHandler;
 
 	// Sequence number and identity
 	int _sequence = 0;
@@ -74,6 +77,7 @@ class DroneMAVLinkAPI {
 		_paramsHandler = ParamsHandler(emit, parameters);
 		_sysStatusHandler = SysStatusHandler(emit);
 		_commandAckHandler = CommandAckHandler(emit);
+	_missionHandler = MissionHandler(emit);
 
 		_setupParserStream();
 	}
@@ -112,8 +116,47 @@ class DroneMAVLinkAPI {
 				_sysStatusHandler.handle(msg);
 			} else if (msg is CommandAck) {
 				_commandAckHandler.handle(msg);
+			// Mission protocol messages
+			} else if (msg is MissionCount) {
+				_missionHandler.handleMissionCount(msg);
+			} else if (msg is MissionItemInt) {
+				_missionHandler.handleMissionItemInt(msg);
+			} else if (msg is MissionItem) {
+				_missionHandler.handleMissionItem(msg);
+			} else if (msg is MissionCurrent) {
+				_missionHandler.handleMissionCurrent(msg);
+			} else if (msg is MissionItemReached) {
+				_missionHandler.handleMissionItemReached(msg);
+			} else if (msg is MissionAck) {
+				_missionHandler.handleMissionAck(msg);
+			} else if (msg is MissionRequestInt) {
+				respondToMissionRequestInt(msg);
+					} else if (msg is MissionRequest) {
+				respondToMissionRequest(msg);
+					} else if (msg is HomePosition) {
+						// lat/lon in 1e7, alt in mm
+						final lat = msg.latitude / 1e7;
+						final lon = msg.longitude / 1e7;
+						final alt = msg.altitude / 1000.0;
+						_eventController.add(MAVLinkEvent(MAVLinkEventType.homePosition, {
+							'lat': lat,
+							'lon': lon,
+							'alt': alt,
+							'source': 'HOME_POSITION',
+						}));
+					} else if (msg is GpsGlobalOrigin) {
+						// GPS_GLOBAL_ORIGIN lat/lon in 1e7, alt in mm
+						final lat = msg.latitude / 1e7;
+						final lon = msg.longitude / 1e7;
+						final alt = msg.altitude / 1000.0;
+						_eventController.add(MAVLinkEvent(MAVLinkEventType.homePosition, {
+							'lat': lat,
+							'lon': lon,
+							'alt': alt,
+							'source': 'GPS_GLOBAL_ORIGIN',
+						}));
 			}
-		});
+    	});
 	}
 
 	Future<void> connect(String port, {int? baudRate}) async {
@@ -161,6 +204,100 @@ class DroneMAVLinkAPI {
 		_serialPort!.write(frame.serialize());
 		_sequence = (_sequence + 1) % 255;
 	}
+
+	// ====== Mission API ======
+	/// Request mission list (download start)
+	void requestMissionList() {
+		final req = MissionRequestList(
+			targetSystem: _targetSystemId,
+			targetComponent: _targetComponentId,
+			missionType: mavMissionTypeMission,
+		);
+		sendMessage(req);
+	}
+
+	/// After MissionCount is received, request each item by seq.
+	void requestMissionItem(int seq) {
+		final req = MissionRequestInt(
+			seq: seq,
+			targetSystem: _targetSystemId,
+			targetComponent: _targetComponentId,
+			missionType: mavMissionTypeMission,
+		);
+		sendMessage(req);
+	}
+
+	/// Clear all mission items on vehicle
+	void clearMission() {
+		final clr = MissionClearAll(
+			targetSystem: _targetSystemId,
+			targetComponent: _targetComponentId,
+			missionType: mavMissionTypeMission,
+		);
+		sendMessage(clr);
+		// Optimistically emit cleared event; final ACK will also arrive
+		_eventController.add(MAVLinkEvent(MAVLinkEventType.missionCleared, null));
+	}
+
+	/// Set current mission index
+	void setCurrentMissionItem(int seq) {
+		final setc = MissionSetCurrent(
+			seq: seq,
+			targetSystem: _targetSystemId,
+			targetComponent: _targetComponentId,
+		);
+		sendMessage(setc);
+	}
+
+	/// Upload a mission plan using MISSION_COUNT -> then respond to MISSION_REQUEST_INT items
+	void startMissionUpload(List<mission_model.PlanMissionItem> items) {
+		// send count first
+		_missionHandler.startUpload(items);
+		final count = MissionCount(
+			count: items.length,
+			targetSystem: _targetSystemId,
+			targetComponent: _targetComponentId,
+			missionType: mavMissionTypeMission,
+			opaqueId: 0,
+		);
+		sendMessage(count);
+	}
+
+	/// Provide next MissionItemInt when vehicle requests it (call from outside upon MissionRequestInt reception, or handled internally via routing)
+	void respondToMissionRequestInt(MissionRequestInt req) {
+		final next = _missionHandler.dequeueNextUploadItem();
+		if (next == null) return;
+		final item = _missionHandler.makeMissionItemInt(
+			_targetSystemId, _targetComponentId, next);
+		sendMessage(item);
+	}
+
+	/// Provide next MissionItem (legacy float) when vehicle requests it
+	void respondToMissionRequest(MissionRequest req) {
+		final next = _missionHandler.dequeueNextUploadItem();
+		if (next == null) return;
+		final item = _missionHandler.makeMissionItem(
+			_targetSystemId, _targetComponentId, next);
+		sendMessage(item);
+	}
+
+		/// Request the home position from the vehicle (MAV_CMD_GET_HOME_POSITION)
+		void requestHomePosition() {
+			final msg = CommandLong(
+				command: 410, // MAV_CMD_GET_HOME_POSITION
+				targetSystem: _targetSystemId,
+				targetComponent: _targetComponentId,
+				param1: 0,
+				param2: 0,
+				param3: 0,
+				param4: 0,
+				param5: 0,
+				param6: 0,
+				param7: 0,
+				confirmation: 0,
+			);
+			sendMessage(msg);
+		}
 
 	// Examples of some convenience commands
 	void requestAllStreams({int rateHz = 1}) {

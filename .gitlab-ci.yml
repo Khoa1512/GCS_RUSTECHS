@@ -18,8 +18,10 @@ before_script:
 build_windows:
   stage: build
   script:
+    - git config --global --add safe.directory "C:/Users/Rustechz/flutter"
+    - flutter --version
     - flutter config --enable-windows-desktop
-    - flutter build windows --release
+    - flutter pub get
   artifacts:
     paths:
       - build/windows/x64/runner/Release/

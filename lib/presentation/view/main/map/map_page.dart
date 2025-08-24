@@ -5,7 +5,6 @@ import 'package:latlong2/latlong.dart';
 import 'package:skylink/core/constant/map_type.dart';
 import 'package:skylink/data/models/route_point_model.dart';
 import 'package:skylink/presentation/widget/map/main_map.dart';
-import 'package:skylink/presentation/widget/map/section/mission_planning_panel.dart';
 import 'package:skylink/presentation/widget/map/section/route_point_table.dart';
 import 'package:skylink/services/telemetry_service.dart';
 import 'package:skylink/services/mission_service.dart';

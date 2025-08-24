@@ -4,6 +4,9 @@ class RoutePoint {
   final String latitude;
   final String longitude;
   final String altitude;
+  final int command; // MAV_CMD number
+  final Map<String, dynamic>?
+  commandParams; // Additional parameters for specific commands
 
   RoutePoint({
     required this.id,
@@ -11,6 +14,8 @@ class RoutePoint {
     required this.latitude,
     required this.longitude,
     required this.altitude,
+    this.command = 16, // Default to MAV_CMD_NAV_WAYPOINT
+    this.commandParams,
   });
 }
 

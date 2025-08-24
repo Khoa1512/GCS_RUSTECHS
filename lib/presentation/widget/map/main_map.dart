@@ -9,7 +9,8 @@ class MainMap extends StatefulWidget {
   final MapController mapController;
   final MapType mapType;
   final List<RoutePoint> routePoints;
-  final Function(LatLng) onTap;
+  final Function(LatLng latLng) onTap;
+  final bool isConfigValid;
 
   const MainMap({
     super.key,
@@ -17,6 +18,7 @@ class MainMap extends StatefulWidget {
     required this.mapType,
     required this.routePoints,
     required this.onTap,
+    required this.isConfigValid,
   });
 
   @override
@@ -53,8 +55,17 @@ class _MainMapState extends State<MainMap> {
           options: MapOptions(
             initialZoom: 5,
             onTap: (tapPosition, latlng) {
-              if (isRouteSelectionMode) {
+              if (isRouteSelectionMode && widget.isConfigValid) {
                 widget.onTap(latlng);
+              } else if (isRouteSelectionMode) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Please set command and altitude before adding waypoints',
+                    ),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
               }
             },
           ),

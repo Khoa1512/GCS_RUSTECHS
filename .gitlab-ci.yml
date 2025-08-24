@@ -63,14 +63,23 @@ build_macos:
     - tags
 release:
   stage: release
-  tags: [macos]
-  image: alpine:latest
+  tags: [macos]        # chạy trên runner macOS
+  dependencies:
+    - build_windows
+    - build_macos
   script:
-    - apk add --no-cache zip
     - echo "Creating release for version $CI_COMMIT_TAG"
     - mkdir -p releases
-    - if [ -d "build/windows/x64/runner/Release" ]; then cd build/windows/x64/runner/Release && zip -r ../../../../../releases/skylink_windows_$CI_COMMIT_TAG.zip . && cd -; fi
-    - if [ -d "build/macos/Build/Products/Release" ]; then cd build/macos/Build/Products/Release && zip -r ../../../../../releases/vtol_macos_$CI_COMMIT_TAG.zip *.app && cd -; fi
+    # Windows artifact
+    - if [ -d "build/windows/x64/runner/Release" ]; then \
+        cd build/windows/x64/runner/Release && \
+        zip -r ../../../../../releases/skylink_windows_$CI_COMMIT_TAG.zip . && cd -; \
+      fi
+    # macOS artifact
+    - if [ -d "build/macos/Build/Products/Release" ]; then \
+        cd build/macos/Build/Products/Release && \
+        zip -r ../../../../../releases/vtol_macos_$CI_COMMIT_TAG.zip *.app && cd -; \
+      fi
   artifacts:
     paths:
       - releases/*.zip

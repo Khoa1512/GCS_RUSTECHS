@@ -2,17 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:skylink/core/constant/map_type.dart';
+import 'package:skylink/data/models/route_point_model.dart';
 import 'package:skylink/services/telemetry_service.dart';
+import 'package:skylink/services/mission_service.dart';
 import 'dart:async';
 import 'dart:math';
-
-// Class to store trail points with timestamp
-class TrailPoint {
-  final LatLng position;
-  final DateTime timestamp;
-
-  TrailPoint(this.position, this.timestamp);
-}
 
 class DroneMapWidget extends StatefulWidget {
   final double? droneLatitude;
@@ -41,43 +35,32 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   late MapController _mapController;
   late MapType _selectedMapType;
 
-  // Telemetry service for real-time data
   final TelemetryService _telemetryService = TelemetryService();
+  final MissionService _missionService = MissionService();
   StreamSubscription? _telemetrySubscription;
   StreamSubscription? _connectionSubscription;
+  StreamSubscription? _missionSubscription;
   double _currentYaw = 0.0;
-  double _currentLatitude = 10.7302; // Default: Trường ĐH Tôn Đức Thắng
-  double _currentLongitude = 106.6988; // Default: Trường ĐH Tôn Đức Thắng
+  double _currentLatitude = 10.7302;
+  double _currentLongitude = 106.6988;
   double _currentAltitude = 0.0;
-
-  // Flight trail tracking
-  final List<TrailPoint> _flightTrail = [];
-  static const int _maxTrailPoints =
-      50; // Maximum number of trail points to keep
 
   @override
   void initState() {
     super.initState();
+    _setupControllers();
+    _setupSubscriptions();
+  }
 
-    // Initialize map controller and select Satellite Map
+  void _setupControllers() {
     _mapController = MapController();
     _selectedMapType = mapTypes.firstWhere(
       (mapType) => mapType.name == 'Satellite Map',
       orElse: () => mapTypes.first,
     );
 
-    // Initialize current position from widget or default
-    _currentYaw = widget.droneHeading ?? 0.0;
-    // Set default position
-    _currentLatitude =
-        widget.droneLatitude ?? 10.7302; // Default: Trường ĐH Tôn Đức Thắng
-    _currentLongitude =
-        widget.droneLongitude ?? 106.6988; // Default: Trường ĐH Tôn Đức Thắng
-    _currentAltitude = widget.droneAltitude ?? 0.0;
-
-    // Pulse animation for drone indicator
     _pulseController = AnimationController(
-      duration: Duration(seconds: 2),
+      duration: const Duration(seconds: 2),
       vsync: this,
     );
     _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
@@ -85,160 +68,40 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     );
     _pulseController.repeat(reverse: true);
 
-    // Rotation animation for drone heading
     _rotationController = AnimationController(
-      duration: Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
-
-    // Initialize rotation animation first
-    _rotationAnimation =
-        Tween<double>(begin: 0, end: _currentYaw * (3.14159 / 180)).animate(
+    _rotationAnimation = Tween<double>(begin: 0, end: _currentYaw * (pi / 180))
+        .animate(
           CurvedAnimation(parent: _rotationController, curve: Curves.easeInOut),
         );
-
     _rotationController.forward();
-
-    // Listen to telemetry stream for real-time yaw updates
-    _listenToTelemetryStream();
-
-    // Listen to connection state changes
-    _listenToConnectionState();
-
-    // Force initial GPS position update
-    _forceUpdateGpsPosition();
   }
 
-  void _forceUpdateGpsPosition() {
-    // Try to get GPS position immediately when widget initializes
-    if (_telemetryService.hasValidGpsFix) {
-      _currentLatitude = _telemetryService.gpsLatitude;
-      _currentLongitude = _telemetryService.gpsLongitude;
-      _currentAltitude = _telemetryService.gpsAltitude;
-    }
-  }
-
-  // Debug method to check GPS data
-  void debugGpsData() {
-    // Debug method available for manual debugging if needed
-  }
-
-  // Reset to default position when disconnected
-  // Add new point to flight trail
-  void _addTrailPoint(LatLng position) {
-    setState(() {
-      DateTime now = DateTime.now();
-      _flightTrail.add(TrailPoint(position, now));
-      _cleanupOldTrailPoints();
-    });
-  }
-
-  // Remove oldest points if exceeding maximum
-  void _cleanupOldTrailPoints() {
-    while (_flightTrail.length > _maxTrailPoints) {
-      _flightTrail.removeAt(0); // Remove oldest point
-    }
-  }
-
-  // Get trail points as LatLng list for polyline
-  List<LatLng> _getTrailPoints() {
-    if (_flightTrail.isEmpty) {
-      return [LatLng(_currentLatitude, _currentLongitude)];
-    }
-    return _flightTrail.map((point) => point.position).toList();
-  }
-
-  void _resetToDefaultPosition() {
-    setState(() {
-      // Only reset position if FC is completely disconnected
-      // Don't reset if FC is connected but just missing GPS
-      if (!_telemetryService.isConnected) {
-        _currentLatitude =
-            widget.droneLatitude ?? 10.7302; // Default: Trường ĐH Tôn Đức Thắng
-        _currentLongitude =
-            widget.droneLongitude ??
-            106.6988; // Default: Trường ĐH Tôn Đức Thắng
-      }
-      _currentAltitude = 0.0;
-      _currentYaw = 0.0;
-      _flightTrail.clear(); // Clear trail when connection lost
+  void _setupSubscriptions() {
+    _missionSubscription = _missionService.missionStream.listen((points) {
+      setState(() {});
     });
 
-    // Also move map to default position
-    _updateMapPosition();
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    _rotationController.dispose();
-    _telemetrySubscription?.cancel();
-    _connectionSubscription?.cancel();
-    super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(DroneMapWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    // Update rotation when heading changes from widget
-    if (widget.droneHeading != oldWidget.droneHeading) {
-      _currentYaw = widget.droneHeading ?? _currentYaw;
-      _updateRotationAnimation();
-    }
-
-    // Update map position when drone coordinates change
-    if ((widget.droneLatitude != oldWidget.droneLatitude ||
-            widget.droneLongitude != oldWidget.droneLongitude) &&
-        widget.droneLatitude != null &&
-        widget.droneLongitude != null) {
-      _mapController.move(
-        LatLng(widget.droneLatitude!, widget.droneLongitude!),
-        _mapController.camera.zoom,
-      );
-    }
-  }
-
-  void _listenToConnectionState() {
-    // Listen to connection state changes to reset GPS position when disconnected
-    _connectionSubscription = _telemetryService.connectionStream.listen((
-      isConnected,
-    ) {
-      if (mounted) {
-        if (!isConnected) {
-          // Reset to default position when disconnected
-          _resetToDefaultPosition();
-        }
-      }
-    });
-  }
-
-  void _listenToTelemetryStream() {
-    // Listen to telemetry stream for real-time updates
-    _telemetrySubscription = _telemetryService.telemetryStream.listen((
-      telemetryData,
-    ) {
+    _telemetrySubscription = _telemetryService.telemetryStream.listen((data) {
       if (mounted) {
         bool needsMapUpdate = false;
         bool needsRotationUpdate = false;
 
-        // Update yaw/heading
-        if (telemetryData.containsKey('yaw')) {
-          double newYaw = telemetryData['yaw'] ?? 0.0;
+        if (data.containsKey('yaw')) {
+          double newYaw = data['yaw'] ?? 0.0;
           if ((_currentYaw - newYaw).abs() > 1.0) {
-            // Only update if significant change
             _currentYaw = newYaw;
             needsRotationUpdate = true;
           }
         }
 
-        // Update GPS position if available and valid
         if (_telemetryService.hasValidGpsFix) {
-          double newLat = telemetryData['gps_latitude'] ?? _currentLatitude;
-          double newLon = telemetryData['gps_longitude'] ?? _currentLongitude;
-          double newAlt = telemetryData['gps_altitude'] ?? _currentAltitude;
+          double newLat = data['gps_latitude'] ?? _currentLatitude;
+          double newLon = data['gps_longitude'] ?? _currentLongitude;
+          double newAlt = data['gps_altitude'] ?? _currentAltitude;
 
-          // Check if position changed significantly (approximately 0.5 meters)
           double latDiff = (_currentLatitude - newLat).abs();
           double lonDiff = (_currentLongitude - newLon).abs();
 
@@ -247,21 +110,23 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
             _currentLongitude = newLon;
             _currentAltitude = newAlt;
             needsMapUpdate = true;
-
-            // Add new point to flight trail
-            _addTrailPoint(LatLng(newLat, newLon));
           }
         }
-        // Note: Don't update GPS coordinates when no valid fix
-        // Keep last known good position or default position
 
-        // Apply updates
         if (needsRotationUpdate) {
           _updateRotationAnimation();
         }
         if (needsMapUpdate) {
           _updateMapPosition();
         }
+      }
+    });
+
+    _connectionSubscription = _telemetryService.connectionStream.listen((
+      isConnected,
+    ) {
+      if (mounted && !isConnected) {
+        _resetToDefaultPosition();
       }
     });
   }
@@ -274,7 +139,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     _rotationAnimation =
         Tween<double>(
           begin: _rotationAnimation.value,
-          end: _currentYaw * (3.14159 / 180), // Convert degrees to radians
+          end: _currentYaw * (pi / 180),
         ).animate(
           CurvedAnimation(parent: _rotationController, curve: Curves.easeInOut),
         );
@@ -284,11 +149,51 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   }
 
   void _updateMapPosition() {
-    // Update map position to follow drone
     _mapController.move(
       LatLng(_currentLatitude, _currentLongitude),
       _mapController.camera.zoom,
     );
+  }
+
+  void _resetToDefaultPosition() {
+    setState(() {
+      if (!_telemetryService.isConnected) {
+        _currentLatitude = widget.droneLatitude ?? 10.7302;
+        _currentLongitude = widget.droneLongitude ?? 106.6988;
+      }
+      _currentAltitude = 0.0;
+      _currentYaw = 0.0;
+    });
+    _updateMapPosition();
+  }
+
+  List<({double x, double y, double z})> _buildDirectionArrows(
+    List<RoutePoint> points,
+  ) {
+    if (points.length < 2) return [];
+
+    final arrows = <({double x, double y, double z})>[];
+    for (var i = 0; i < points.length - 1; i++) {
+      final start = LatLng(
+        double.parse(points[i].latitude),
+        double.parse(points[i].longitude),
+      );
+      final end = LatLng(
+        double.parse(points[i + 1].latitude),
+        double.parse(points[i + 1].longitude),
+      );
+
+      final midLat = (start.latitude + end.latitude) / 2;
+      final midLng = (start.longitude + end.longitude) / 2;
+
+      final angle = atan2(
+        end.longitude - start.longitude,
+        end.latitude - start.latitude,
+      );
+
+      arrows.add((x: midLat, y: midLng, z: angle));
+    }
+    return arrows;
   }
 
   @override
@@ -296,263 +201,139 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: Stack(
+        child: FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: LatLng(_currentLatitude, _currentLongitude),
+            initialZoom: 18,
+            minZoom: 1,
+            maxZoom: 22,
+          ),
           children: [
-            // Background container to prevent white flash
-            Container(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment.center,
-                  radius: 0.8,
-                  colors: [Colors.grey.shade600, Colors.grey.shade800],
-                ),
-              ),
+            TileLayer(
+              urlTemplate: _selectedMapType.urlTemplate,
+              userAgentPackageName: "com.example.vtol_rustech",
+              maxZoom: 22,
             ),
-            _buildFlutterMap(),
-            _buildMapInfoOverlay(),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildFlutterMap() {
-    return FlutterMap(
-      mapController: _mapController,
-      options: MapOptions(
-        initialCenter: LatLng(_currentLatitude, _currentLongitude),
-        initialZoom: 18,
-        minZoom: 1,
-        maxZoom: 22,
-        interactionOptions: InteractionOptions(
-          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-        ),
-      ),
-      children: [
-        // Base map tiles (Satellite Map)
-        TileLayer(
-          urlTemplate: _selectedMapType.urlTemplate,
-          userAgentPackageName: "com.example.vtol_rustech",
-          maxZoom: 22,
-          errorTileCallback: (tile, error, stackTrace) {
-            print('Tile loading error: $error');
-          },
-        ),
-
-        // Flight trail polyline
-        PolylineLayer(
-          polylines:
-              _telemetryService.isConnected && _telemetryService.hasValidGpsFix
-              ? <Polyline>[
+            if (_missionService.hasMission) ...[
+              // Mission route line
+              PolylineLayer(
+                polylines: [
                   Polyline(
-                    points: _getTrailPoints(),
-                    strokeWidth: 4.0,
+                    points: _missionService.currentMissionPoints
+                        .map(
+                          (point) => LatLng(
+                            double.parse(point.latitude),
+                            double.parse(point.longitude),
+                          ),
+                        )
+                        .toList(),
+                    strokeWidth: 3.0,
                     strokeCap: StrokeCap.round,
-                    color: Colors.blue.withOpacity(0.8),
-                    gradientColors: [
-                      Colors.blue.withOpacity(
-                        0.2,
-                      ), // Start with very transparent
-                      Colors.blue.withOpacity(0.4),
-                      Colors.blue.withOpacity(0.6),
-                      Colors.blue.withOpacity(0.8),
-                      Colors.blue.withOpacity(1.0), // End with solid color
-                    ],
+                    color: Colors.cyanAccent.withOpacity(0.8),
                   ),
-                ]
-              : <Polyline>[],
-        ),
+                ],
+              ),
 
-        // Drone heading line - show direction line
-        StreamBuilder<Map<String, double>>(
-          stream: _telemetryService.telemetryStream,
-          builder: (context, snapshot) {
-            // Only show heading line if we have valid GPS connection AND valid GPS fix
-            bool shouldShowLine = false;
-            List<LatLng> linePoints = [];
-
-            if (_telemetryService.isConnected &&
-                _telemetryService.hasValidGpsFix) {
-              return AnimatedBuilder(
-                animation: _rotationAnimation,
-                builder: (context, child) {
-                  // Get current zoom for calculations
-                  double currentZoom = _mapController.camera.zoom;
-
-                  // Adaptive line distance based on zoom level
-                  double baseDistance = 50.0; // base meters
-                  double distance =
-                      baseDistance * (18.0 / currentZoom).clamp(0.5, 2.0);
-
-                  // Use the current rotation animation value instead of _currentYaw
-                  double currentAngle = _rotationAnimation.value;
-
-                  // Calculate the nose position of the marker
-                  double metersPerPixel =
-                      156543.03392 *
-                      cos(_currentLatitude * 3.14159 / 180) /
-                      pow(2, currentZoom);
-                  double markerRadiusInMeters = 20 * metersPerPixel;
-
-                  // Start point - from the nose of the marker (edge in rotation direction)
-                  double startLatOffset =
-                      (markerRadiusInMeters * cos(currentAngle)) / 111320;
-                  double startLngOffset =
-                      (markerRadiusInMeters * sin(currentAngle)) /
-                      (111320 * cos(_currentLatitude * 3.14159 / 180));
-
-                  // End point - full distance from the nose
-                  double endLatOffset = (distance * cos(currentAngle)) / 111320;
-                  double endLngOffset =
-                      (distance * sin(currentAngle)) /
-                      (111320 * cos(_currentLatitude * 3.14159 / 180));
-
-                  LatLng startPoint = LatLng(
-                    _currentLatitude + startLatOffset,
-                    _currentLongitude + startLngOffset,
-                  );
-                  LatLng endPoint = LatLng(
-                    _currentLatitude + endLatOffset,
-                    _currentLongitude + endLngOffset,
-                  );
-
-                  linePoints = [startPoint, endPoint];
-                  shouldShowLine = true;
-
-                  return PolylineLayer(
-                    polylines: shouldShowLine
-                        ? <Polyline>[
-                            // Shadow line for better visibility
-                            Polyline(
-                              points: linePoints,
-                              strokeWidth: 5.0,
-                              color: Colors.black.withOpacity(0.3),
-                            ),
-                            // Main red line
-                            Polyline(
-                              points: linePoints,
-                              strokeWidth: 3.0,
-                              color: Colors.red,
-                            ),
-                          ]
-                        : <Polyline>[],
-                  );
-                },
-              );
-            }
-
-            return PolylineLayer(polylines: <Polyline>[]);
-          },
-        ),
-
-        // Drone marker - use GPS position with StreamBuilder for real-time updates
-        StreamBuilder<Map<String, double>>(
-          stream: _telemetryService.telemetryStream,
-          builder: (context, snapshot) {
-            // Only show marker if we have valid GPS connection AND valid GPS fix
-            bool shouldShowMarker = false;
-            LatLng? markerPosition;
-
-            if (_telemetryService.isConnected &&
-                _telemetryService.hasValidGpsFix) {
-              // Connected with valid GPS - show marker at GPS position
-              markerPosition = LatLng(_currentLatitude, _currentLongitude);
-              shouldShowMarker = true;
-            }
-            // If not connected OR no GPS fix - don't show marker at all
-
-            return MarkerLayer(
-              markers: shouldShowMarker && markerPosition != null
-                  ? [
-                      Marker(
-                        point: markerPosition,
+              // Waypoint markers
+              MarkerLayer(
+                markers: _missionService.currentMissionPoints
+                    .asMap()
+                    .entries
+                    .map((entry) {
+                      final index = entry.key;
+                      final point = entry.value;
+                      return Marker(
+                        point: LatLng(
+                          double.parse(point.latitude),
+                          double.parse(point.longitude),
+                        ),
                         width: 40,
                         height: 40,
                         alignment: Alignment.center,
-                        child: _buildDroneMarker(),
-                      ),
-                    ]
-                  : [], // Empty list = no markers
-            );
-          },
-        ),
-      ],
-    );
-  }
+                        child: Stack(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              color: Colors.red,
+                              size: 40,
+                            ),
+                            Positioned.fill(
+                              child: Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    })
+                    .toList(),
+              ),
+            ],
 
-  Widget _buildDroneMarker() {
-    // Determine drone marker color based on GPS status
-    Color droneColor = _telemetryService.hasValidGpsFix
-        ? _getGpsStatusColor()
-        : Colors.grey;
-
-    return AnimatedBuilder(
-      animation: Listenable.merge([_pulseAnimation, _rotationAnimation]),
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _pulseAnimation.value,
-          child: Transform.rotate(
-            angle: _rotationAnimation.value,
-            child: Stack(
-              children: [
-                // Main drone marker
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [droneColor, droneColor.withValues(alpha: 0.8)],
+            if (_telemetryService.isConnected &&
+                _telemetryService.hasValidGpsFix)
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: LatLng(_currentLatitude, _currentLongitude),
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    child: AnimatedBuilder(
+                      animation: Listenable.merge([
+                        _pulseAnimation,
+                        _rotationAnimation,
+                      ]),
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: _pulseAnimation.value,
+                          child: Transform.rotate(
+                            angle: _rotationAnimation.value,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _getGpsStatusColor().withOpacity(0.8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: _getGpsStatusColor().withOpacity(
+                                      0.6,
+                                    ),
+                                    blurRadius: 15,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.flight,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: droneColor.withValues(alpha: 0.6),
-                        blurRadius: 15,
-                        offset: Offset(0, 0),
-                      ),
-                      BoxShadow(
-                        color: droneColor.withValues(alpha: 0.3),
-                        blurRadius: 25,
-                        offset: Offset(0, 0),
-                      ),
-                    ],
                   ),
-                  child: Icon(Icons.flight, size: 20, color: Colors.white),
-                ),
-                // GPS status indicator
-                // if (_telemetryService.hasValidGpsFix)
-                //   Positioned(
-                //     right: -2,
-                //     top: -2,
-                //     child: Container(
-                //       width: 12,
-                //       height: 12,
-                //       decoration: BoxDecoration(
-                //         shape: BoxShape.circle,
-                //         color: _getGpsStatusColor(),
-                //         border: Border.all(color: Colors.white, width: 2),
-                //       ),
-                //     ),
-                //   ),
-              ],
-            ),
-          ),
-        );
-      },
+                ],
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -573,114 +354,13 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     }
   }
 
-  Widget _buildMapInfoOverlay() {
-    return Positioned(
-      top: 16,
-      left: 16,
-      child: StreamBuilder<Map<String, double>>(
-        stream: _telemetryService.telemetryStream,
-        builder: (context, snapshot) {
-          final hasGps = _telemetryService.hasValidGpsFix;
-          final satellites =
-              _telemetryService.currentTelemetry['satellites']?.toInt() ?? 0;
-          final gpsAccuracy = _telemetryService.gpsAccuracyString;
-
-          return Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.black.withValues(alpha: 0.7),
-              border: Border.all(
-                color: hasGps
-                    ? _getGpsStatusColor().withValues(alpha: 0.3)
-                    : Colors.red.withValues(alpha: 0.3),
-                width: 1,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      hasGps ? Icons.gps_fixed : Icons.gps_off,
-                      size: 16,
-                      color: hasGps ? _getGpsStatusColor() : Colors.red,
-                    ),
-                    SizedBox(width: 6),
-                    Text(
-                      hasGps ? _telemetryService.gpsFixType : 'No GPS',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: hasGps ? _getGpsStatusColor() : Colors.red,
-                        boxShadow: [
-                          BoxShadow(
-                            color: (hasGps ? _getGpsStatusColor() : Colors.red)
-                                .withValues(alpha: 0.5),
-                            blurRadius: 4,
-                            offset: Offset(0, 0),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                if (hasGps) ...[
-                  SizedBox(height: 4),
-                  Text(
-                    'Sats: $satellites | $gpsAccuracy',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 10,
-                    ),
-                  ),
-                  Text(
-                    'Lat: ${_currentLatitude.toStringAsFixed(6)}',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 10,
-                    ),
-                  ),
-                  Text(
-                    'Lon: ${_currentLongitude.toStringAsFixed(6)}',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 10,
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  GestureDetector(
-                    onTap: debugGpsData,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'Debug GPS',
-                        style: TextStyle(color: Colors.white, fontSize: 8),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          );
-        },
-      ),
-    );
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    _rotationController.dispose();
+    _telemetrySubscription?.cancel();
+    _connectionSubscription?.cancel();
+    _missionSubscription?.cancel();
+    super.dispose();
   }
 }

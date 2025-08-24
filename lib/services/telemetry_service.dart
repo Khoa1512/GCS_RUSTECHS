@@ -26,7 +26,7 @@ class TelemetryService {
   final _connectionController = StreamController<bool>.broadcast();
 
   // Current telemetry data
-  Map<String, double> _currentTelemetry = {};
+  final Map<String, double> _currentTelemetry = {};
   bool _isConnected = false;
   String _currentMode = 'Unknown';
   bool _armed = false;

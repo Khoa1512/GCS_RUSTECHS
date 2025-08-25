@@ -26,6 +26,7 @@ class _MapPageState extends State<MapPage> {
   StreamSubscription? _telemetrySub; // Subscription cho GPS data
   LatLng? homePoint; // Home point từ GPS đầu tiên
   bool hasSetHomePoint = false; // Flag để chỉ set home point một lần
+  bool _isReadingMission = false; // Flag để track việc đang read mission
 
   @override
   void initState() {
@@ -60,7 +61,7 @@ class _MapPageState extends State<MapPage> {
     // Kiểm tra trạng thái GPS hiện tại
     final hasValidGps = TelemetryService().hasValidGpsFix;
     final isConnected = TelemetryService().isConnected;
-    
+
     if (!hasValidGps || !isConnected) {
       // Reset home point khi GPS mất hoặc mất kết nối
       if (homePoint != null) {
@@ -71,7 +72,7 @@ class _MapPageState extends State<MapPage> {
       }
       return;
     }
-    
+
     // Set home point khi có GPS valid
     if (!hasSetHomePoint && hasValidGps) {
       final lat = TelemetryService().gpsLatitude;
@@ -86,8 +87,78 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _setupMavlinkListener() {
-    // This is now just a placeholder - we handle all events in handleSendConfigs
+    // Setup listener for mission download events - chỉ khi user bấm Read Mission
     _mavSub?.cancel();
+    _mavSub = TelemetryService().mavlinkAPI.eventStream.listen((event) {
+      switch (event.type) {
+        case MAVLinkEventType.missionDownloadComplete:
+          // Chỉ xử lý nếu đang trong quá trình read mission từ map page
+          if (_isReadingMission) {
+            final missionItems = event.data as List<PlanMissionItem>;
+            _convertMissionToRoutePoints(missionItems);
+            _isReadingMission = false;
+            _hideProgress();
+          }
+          break;
+        default:
+          break;
+      }
+    });
+  }
+
+  void _convertMissionToRoutePoints(List<PlanMissionItem> missionItems) {
+    final newRoutePoints = <RoutePoint>[];
+
+    for (int i = 0; i < missionItems.length; i++) {
+      final item = missionItems[i];
+
+      // Skip home position (sequence 0) and non-global items
+      if (item.seq == 0 || !_isGlobalCoordinate(item.x, item.y)) continue;
+
+      newRoutePoints.add(
+        RoutePoint(
+          id: DateTime.now().millisecondsSinceEpoch.toString() + '_$i',
+          order: newRoutePoints.length + 1,
+          latitude: item.x.toString(),
+          longitude: item.y.toString(),
+          altitude: item.z.toString(),
+          command: item.command,
+        ),
+      );
+    }
+
+    setState(() {
+      routePoints = newRoutePoints;
+    });
+
+    // Cập nhật MissionService để hiển thị waypoint markers ngay lập tức
+    MissionService().updateMission(newRoutePoints);
+
+    _showSuccess('Mission downloaded: ${newRoutePoints.length} waypoints');
+  }
+
+  bool _isGlobalCoordinate(double lat, double lon) {
+    return lat.abs() <= 90 && lon.abs() <= 180 && (lat != 0.0 || lon != 0.0);
+  }
+
+  void handleReadMission() {
+    if (!TelemetryService().mavlinkAPI.isConnected) {
+      _showError('Please connect to Flight Controller first');
+      return;
+    }
+
+    // Set flag để chỉ map page xử lý response
+    _isReadingMission = true;
+    
+    // Request mission list from Flight Controller
+    TelemetryService().mavlinkAPI.requestMissionList();
+
+    _showProgress('Reading mission from Flight Controller...');
+  }
+
+  void _hideProgress() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
   }
 
   void _showProgress(String message) {
@@ -108,7 +179,7 @@ class _MapPageState extends State<MapPage> {
             Text(message),
           ],
         ),
-        duration: const Duration(milliseconds: 500),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -434,6 +505,7 @@ class _MapPageState extends State<MapPage> {
               onSearchLocation: handleSearchLocation,
               onSendConfigs: handleSendConfigs,
               onEditPoint: handleEditPoint,
+              onReadMission: handleReadMission,
             ),
           ),
         ),

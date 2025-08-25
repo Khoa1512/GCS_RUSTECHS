@@ -11,6 +11,7 @@ class MainMap extends StatefulWidget {
   final List<RoutePoint> routePoints;
   final Function(LatLng latLng) onTap;
   final bool isConfigValid;
+  final LatLng? homePoint; // Home point từ GPS
 
   const MainMap({
     super.key,
@@ -19,6 +20,7 @@ class MainMap extends StatefulWidget {
     required this.routePoints,
     required this.onTap,
     required this.isConfigValid,
+    this.homePoint,
   });
 
   @override
@@ -27,13 +29,42 @@ class MainMap extends StatefulWidget {
 
 class _MainMapState extends State<MainMap> {
   bool isRouteSelectionMode = false;
+  bool _hasZoomedToHome = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      widget.mapController.move(const LatLng(10.7302, 106.6988), 16);
+      _initializeMap();
     });
+  }
+
+  @override
+  void didUpdateWidget(MainMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Nếu có home point mới và chưa zoom thì zoom đến home point
+    if (widget.homePoint != null &&
+        oldWidget.homePoint != widget.homePoint &&
+        !_hasZoomedToHome) {
+      _zoomToHomePoint();
+    }
+  }
+
+  void _initializeMap() {
+    if (widget.homePoint != null && !_hasZoomedToHome) {
+      _zoomToHomePoint();
+    } else {
+      // Zoom mặc định đến ĐH Tôn Đức Thắng
+      widget.mapController.move(const LatLng(10.7302, 106.6988), 16);
+    }
+  }
+
+  void _zoomToHomePoint() {
+    if (widget.homePoint != null) {
+      widget.mapController.move(widget.homePoint!, 18);
+      _hasZoomedToHome = true;
+      print('Map zoomed to home point: ${widget.homePoint}');
+    }
   }
 
   @override
@@ -77,57 +108,100 @@ class _MainMapState extends State<MainMap> {
             ),
 
             // Route polyline layer
-            if (latLngPoints.length > 1)
+            if (latLngPoints.isNotEmpty)
               PolylineLayer(
                 polylines: [
-                  Polyline(
-                    points: latLngPoints,
-                    color: Colors.tealAccent,
-                    strokeWidth: 4,
-                  ),
+                  // Route từ home point đến waypoint đầu tiên (nếu có home point)
+                  if (widget.homePoint != null && latLngPoints.isNotEmpty)
+                    Polyline(
+                      points: [widget.homePoint!, latLngPoints.first],
+                      color: Colors.tealAccent,
+                      strokeWidth: 4,
+                    ),
+                  // Route giữa các waypoints
+                  if (latLngPoints.length > 1)
+                    Polyline(
+                      points: latLngPoints,
+                      color: Colors.tealAccent,
+                      strokeWidth: 4,
+                    ),
                 ],
               ),
 
-            // Route point markers with order number
+            // Route point markers với home marker
             MarkerLayer(
-              markers: latLngPoints.asMap().entries.map((entry) {
-                final index = entry.key;
-                final point = entry.value;
-
-                return Marker(
-                  point: point,
-                  width: 40,
-                  height: 40,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      const Icon(
-                        Icons.location_on,
-                        color: Colors.red,
-                        size: 40,
+              markers: [
+                // Home marker (nếu có)
+                if (widget.homePoint != null)
+                  Marker(
+                    point: widget.homePoint!,
+                    width: 40,
+                    height: 40,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 3),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
-                      Positioned(
-                        top: 8,
+                      child: const Center(
                         child: Text(
-                          '${index + 1}',
-                          style: const TextStyle(
-                            fontSize: 12,
+                          'H',
+                          style: TextStyle(
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
-                            shadows: [
-                              Shadow(
-                                offset: Offset(0, 0),
-                                blurRadius: 2,
-                                color: Colors.black,
-                              ),
-                            ],
                           ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                );
-              }).toList(),
+                // Route point markers
+                ...latLngPoints.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final point = entry.value;
+
+                  return Marker(
+                    point: point,
+                    width: 40,
+                    height: 40,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        const Icon(
+                          Icons.location_on,
+                          color: Colors.red,
+                          size: 40,
+                        ),
+                        Positioned(
+                          top: 8,
+                          child: Text(
+                            '${index + 1}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  offset: Offset(0, 0),
+                                  blurRadius: 2,
+                                  color: Colors.black,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
             ),
           ],
         ),

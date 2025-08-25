@@ -23,12 +23,36 @@ class _MapPageState extends State<MapPage> {
   List<RoutePoint> routePoints = [];
   final MapController mapController = MapController();
   StreamSubscription? _mavSub;
+  StreamSubscription? _telemetrySub; // Subscription cho GPS data
+  LatLng? homePoint; // Home point từ GPS đầu tiên
+  bool hasSetHomePoint = false; // Flag để chỉ set home point một lần
 
   @override
   void initState() {
     super.initState();
     selectedMapType = mapTypes.first;
     _setupMavlinkListener();
+    _setupGpsListener();
+  }
+
+  void _setupGpsListener() {
+    // Listen để nhận GPS đầu tiên làm home point
+    _telemetrySub = TelemetryService().telemetryStream.listen(
+      _onTelemetryUpdate,
+    );
+  }
+
+  void _onTelemetryUpdate(Map<String, double> telemetry) {
+    if (!hasSetHomePoint && TelemetryService().hasValidGpsFix) {
+      final lat = TelemetryService().gpsLatitude;
+      final lng = TelemetryService().gpsLongitude;
+      if (lat != 0.0 && lng != 0.0) {
+        setState(() {
+          homePoint = LatLng(lat, lng);
+          hasSetHomePoint = true;
+        });
+      }
+    }
   }
 
   void _setupMavlinkListener() {
@@ -99,6 +123,8 @@ class _MapPageState extends State<MapPage> {
         return 'Error: Mission operation already in progress';
       case 15:
         return 'Error: Mission system is not ready';
+      case 30:
+        return 'Warning: Mission item parameter out of range (but accepted)';
       case 128:
         return 'Error: Mission invalid';
       case 129:
@@ -110,7 +136,29 @@ class _MapPageState extends State<MapPage> {
       case 132:
         return 'Error: Mission waypoint count exceeded';
       default:
-        return 'Error code $errorCode';
+        return 'Warning code $errorCode';
+    }
+  }
+
+  // Chỉ các error code nghiêm trọng mới coi là lỗi thật
+  bool _isActualError(int errorCode) {
+    switch (errorCode) {
+      case 1: // Mission item exceeds storage space
+      case 3: // Mission operation not supported
+      case 4: // Mission error - coordinates out of range
+      case 5: // Mission item invalid
+      case 12: // Mission item count invalid
+      case 13: // Mission operation currently denied
+      case 15: // Mission system is not ready
+      case 128: // Mission invalid
+      case 129: // Mission type not supported
+      case 130: // Mission vehicle not ready
+      case 131: // Mission waypoint out of bounds
+      case 132: // Mission waypoint count exceeded
+        return true;
+      default:
+        // Tất cả các code khác (bao gồm 0, 30, v.v.) đều coi là OK
+        return false;
     }
   }
 
@@ -182,17 +230,7 @@ class _MapPageState extends State<MapPage> {
         );
       }
 
-      print('Mission Items to upload:');
-      for (var item in missionItems) {
-        print('Seq: ${item.seq}, Cmd: ${item.command}, Frame: ${item.frame}');
-        print('Lat: ${item.x}, Lng: ${item.y}, Alt: ${item.z}');
-        print(
-          'Current: ${item.current}, AutoContinue: ${item.autocontinue}\\n',
-        );
-      }
-
       // Set up event listeners first
-      bool missionCleared = false;
       bool uploadStarted = false;
       StreamSubscription? sub;
 
@@ -217,20 +255,27 @@ class _MapPageState extends State<MapPage> {
             _showSuccess('Mission plan uploaded successfully');
             MissionService().updateMission(points);
             sub?.cancel();
-            completer.complete();
+            if (!completer.isCompleted) completer.complete();
             break;
 
           case MAVLinkEventType.missionAck:
             if (!clearAckReceived) break;
 
             final errorCode = event.data as int;
-            if (errorCode == 0) {
-              // MAV_MISSION_ACCEPTED
-              _showSuccess('Mission plan accepted by Flight Controller');
-              if (!completer.isCompleted) completer.complete();
-            } else if (errorCode > 0 && !completer.isCompleted) {
+            print('Mission ACK received with error code: $errorCode');
+
+            if (_isActualError(errorCode)) {
+              // Chỉ các lỗi nghiêm trọng mới báo failed
+              final errorMessage = _getMavlinkErrorMessage(errorCode);
+              _showError('Mission failed: $errorMessage');
               sub?.cancel();
-              completer.completeError('Mission upload failed');
+              if (!completer.isCompleted) completer.completeError(errorMessage);
+            } else {
+              // Tất cả trường hợp khác đều coi là thành công
+              _showSuccess('Mission plan accepted by Flight Controller');
+              MissionService().updateMission(points);
+              sub?.cancel();
+              if (!completer.isCompleted) completer.complete();
             }
             break;
 
@@ -331,6 +376,8 @@ class _MapPageState extends State<MapPage> {
           routePoints: routePoints,
           onTap: addRoutePoint,
           isConfigValid: true,
+          homePoint:
+              homePoint, // Truyền home point để hiển thị marker H và zoom
         ),
         // Mission planning panel overlay ở góc phải
         Positioned(

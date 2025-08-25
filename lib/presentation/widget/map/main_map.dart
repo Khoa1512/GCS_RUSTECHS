@@ -42,6 +42,12 @@ class _MainMapState extends State<MainMap> {
   @override
   void didUpdateWidget(MainMap oldWidget) {
     super.didUpdateWidget(oldWidget);
+    
+    // Reset zoom flag nếu homePoint bị set về null (GPS mất)
+    if (oldWidget.homePoint != null && widget.homePoint == null) {
+      _hasZoomedToHome = false;
+    }
+    
     // Nếu có home point mới và chưa zoom thì zoom đến home point
     if (widget.homePoint != null &&
         oldWidget.homePoint != widget.homePoint &&

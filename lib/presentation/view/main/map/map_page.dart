@@ -33,6 +33,20 @@ class _MapPageState extends State<MapPage> {
     selectedMapType = mapTypes.first;
     _setupMavlinkListener();
     _setupGpsListener();
+    _setupConnectionListener();
+  }
+
+  void _setupConnectionListener() {
+    // Listen cho connection state changes
+    TelemetryService().connectionStream.listen((isConnected) {
+      if (!isConnected) {
+        // Reset home point khi mất kết nối
+        setState(() {
+          homePoint = null;
+          hasSetHomePoint = false;
+        });
+      }
+    });
   }
 
   void _setupGpsListener() {
@@ -43,7 +57,23 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _onTelemetryUpdate(Map<String, double> telemetry) {
-    if (!hasSetHomePoint && TelemetryService().hasValidGpsFix) {
+    // Kiểm tra trạng thái GPS hiện tại
+    final hasValidGps = TelemetryService().hasValidGpsFix;
+    final isConnected = TelemetryService().isConnected;
+    
+    if (!hasValidGps || !isConnected) {
+      // Reset home point khi GPS mất hoặc mất kết nối
+      if (homePoint != null) {
+        setState(() {
+          homePoint = null;
+          hasSetHomePoint = false;
+        });
+      }
+      return;
+    }
+    
+    // Set home point khi có GPS valid
+    if (!hasSetHomePoint && hasValidGps) {
       final lat = TelemetryService().gpsLatitude;
       final lng = TelemetryService().gpsLongitude;
       if (lat != 0.0 && lng != 0.0) {
@@ -362,6 +392,7 @@ class _MapPageState extends State<MapPage> {
   @override
   void dispose() {
     _mavSub?.cancel();
+    _telemetrySub?.cancel(); // Cancel GPS subscription
     super.dispose();
   }
 

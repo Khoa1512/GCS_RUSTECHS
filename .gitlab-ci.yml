@@ -33,7 +33,7 @@ build_windows:
     - flutter build windows --release
   artifacts:
     paths:
-      - skylink/
+      - build/windows/x64/runner/Release/
     expire_in: 1 week
   only:
     - main
@@ -56,7 +56,7 @@ build_macos:
     - flutter build macos --release
   artifacts:
     paths:
-      - skylink/*.app
+      - build/macos/Build/Products/Release/*.app
     expire_in: 1 week
   only:
     - main

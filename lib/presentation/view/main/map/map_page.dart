@@ -115,6 +115,20 @@ class _MapPageState extends State<MapPage> {
       // Skip home position (sequence 0) and non-global items
       if (item.seq == 0 || !_isGlobalCoordinate(item.x, item.y)) continue;
 
+      // Build commandParams from PlanMissionItem parameters
+      Map<String, dynamic>? commandParams;
+      if (item.param1 != 0 ||
+          item.param2 != 0 ||
+          item.param3 != 0 ||
+          item.param4 != 0) {
+        commandParams = {
+          'param1': item.param1,
+          'param2': item.param2,
+          'param3': item.param3,
+          'param4': item.param4,
+        };
+      }
+
       newRoutePoints.add(
         RoutePoint(
           id: '${DateTime.now().millisecondsSinceEpoch}_$i',
@@ -123,6 +137,7 @@ class _MapPageState extends State<MapPage> {
           longitude: item.y.toString(),
           altitude: item.z.toString(),
           command: item.command,
+          commandParams: commandParams,
         ),
       );
     }
@@ -463,10 +478,24 @@ class _MapPageState extends State<MapPage> {
     addRoutePoint(location);
   }
 
-  void handleEditPoint(RoutePoint point, int command, String altitude) {
+  void handleEditPoint(
+    RoutePoint point,
+    int command,
+    String altitude, [
+    Map<String, double>? params,
+  ]) {
     setState(() {
       final index = routePoints.indexWhere((p) => p.id == point.id);
       if (index != -1) {
+        // Convert params to commandParams format (param1, param2, param3, param4)
+        Map<String, dynamic>? commandParams;
+        if (params != null && params.isNotEmpty) {
+          commandParams = {};
+          for (final entry in params.entries) {
+            commandParams[entry.key] = entry.value;
+          }
+        }
+
         routePoints[index] = RoutePoint(
           id: point.id,
           order: point.order,
@@ -474,9 +503,30 @@ class _MapPageState extends State<MapPage> {
           longitude: point.longitude,
           altitude: altitude,
           command: command,
+          commandParams: commandParams ?? point.commandParams,
         );
       }
     });
+  }
+
+  void handleDeletePoint(RoutePoint point) {
+    setState(() {
+      routePoints.removeWhere((p) => p.id == point.id);
+
+      // Update order sequence for remaining points
+      for (int i = 0; i < routePoints.length; i++) {
+        routePoints[i] = routePoints[i].copyWith(order: i + 1);
+      }
+    });
+
+    // Show confirmation message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Waypoint ${point.order} deleted'),
+        backgroundColor: Colors.orange,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -488,44 +538,91 @@ class _MapPageState extends State<MapPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    return Row(
       children: [
-        // Map chiếm full màn hình
-        MainMapSimple(
-          mapController: mapController,
-          mapType: selectedMapType!,
-          routePoints: routePoints,
-          onTap: addRoutePoint,
-          onWaypointDrag: _onWaypointDrag,
-          isConfigValid: true,
-          homePoint:
-              homePoint, // Truyền home point để hiển thị marker H và zoom
-        ),
-        // Mission planning panel overlay ở góc phải
-        Positioned(
-          top: 16,
-          right: 16,
-          bottom: 16,
-          child: Container(
-            width: 600, // Độ rộng cố định cho panel
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+        // Cột trái chiếm 75% width - chứa map và mission plan
+        Expanded(
+          flex: 75,
+          child: Column(
+            children: [
+              // Map ở trên chiếm 60% chiều cao của cột trái
+              Expanded(
+                flex: 6,
+                child: MainMapSimple(
+                  mapController: mapController,
+                  mapType: selectedMapType!,
+                  routePoints: routePoints,
+                  onTap: addRoutePoint,
+                  onWaypointDrag: _onWaypointDrag,
+                  isConfigValid: true,
+                  homePoint:
+                      homePoint, // Truyền home point để hiển thị marker H và zoom
                 ),
-              ],
+              ),
+
+              // Mission planning panel ở dưới chiếm 40% chiều cao của cột trái
+              Expanded(
+                flex: 4,
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1E1E),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: RoutePointTable(
+                    routePoints: routePoints,
+                    onClearTap: handleClearRoutePoints,
+                    onSearchLocation: handleSearchLocation,
+                    onSendConfigs: handleSendConfigs,
+                    onEditPoint: handleEditPoint,
+                    onReadMission: handleReadMission,
+                    onDeletePoint: handleDeletePoint,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Cột phải chiếm 25% width - để dành cho tương lai
+        Expanded(
+          flex: 25,
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFF2A2A2A),
+              border: Border(
+                left: BorderSide(color: Colors.grey.shade800, width: 1),
+              ),
             ),
-            child: RoutePointTable(
-              routePoints: routePoints,
-              onClearTap: handleClearRoutePoints,
-              onSearchLocation: handleSearchLocation,
-              onSendConfigs: handleSendConfigs,
-              onEditPoint: handleEditPoint,
-              onReadMission: handleReadMission,
+            child: const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.construction, color: Colors.grey, size: 48),
+                  SizedBox(height: 16),
+                  Text(
+                    'Coming Soon',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'This panel will contain\nadditional features',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -117,7 +117,7 @@ class _MapPageState extends State<MapPage> {
 
       newRoutePoints.add(
         RoutePoint(
-          id: DateTime.now().millisecondsSinceEpoch.toString() + '_$i',
+          id: '${DateTime.now().millisecondsSinceEpoch}_$i',
           order: newRoutePoints.length + 1,
           latitude: item.x.toString(),
           longitude: item.y.toString(),
@@ -149,7 +149,7 @@ class _MapPageState extends State<MapPage> {
 
     // Set flag để chỉ map page xử lý response
     _isReadingMission = true;
-    
+
     // Request mission list from Flight Controller
     TelemetryService().mavlinkAPI.requestMissionList();
 
@@ -415,8 +415,15 @@ class _MapPageState extends State<MapPage> {
     setState(() {
       routePoints = [];
     });
+    
     // Clear mission in service so it's not shown in mini map
     MissionService().clearMission();
+    
+    // Clear mission on Flight Controller if connected
+    if (TelemetryService().mavlinkAPI.isConnected) {
+      TelemetryService().mavlinkAPI.clearMission();
+      _showSuccess('Mission cleared from Flight Controller');
+    }
   }
 
   void addRoutePoint(LatLng latLng) {

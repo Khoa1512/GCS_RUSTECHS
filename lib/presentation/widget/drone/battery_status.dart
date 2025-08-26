@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:skylink/core/constant/app_color.dart';
-import 'package:skylink/data/models/flight_information_model.dart';
 import 'package:skylink/presentation/widget/custom/custom_corner_border.dart';
 import 'package:skylink/services/telemetry_service.dart';
 import 'dart:async';
 
 class BatteryStatus extends StatefulWidget {
-  final FlightInformationModel flightInformation;
-  const BatteryStatus({super.key, required this.flightInformation});
+  const BatteryStatus({super.key});
 
   @override
   State<BatteryStatus> createState() => _BatteryStatusState();

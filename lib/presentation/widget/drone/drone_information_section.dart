@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:skylink/core/constant/app_image.dart';
-import 'package:skylink/data/fake_data.dart';
 import 'package:skylink/data/models/drone_information_mode.dart';
 import 'package:skylink/presentation/widget/drone/altitude_limitation.dart';
 import 'package:skylink/presentation/widget/drone/battery_status.dart';
-import 'package:skylink/presentation/widget/drone/camera_quality_setting.dart';
 import 'package:skylink/presentation/widget/drone/drone_information_item.dart';
-import 'package:skylink/presentation/widget/drone/resolution_setting.dart';
 import 'package:skylink/services/telemetry_service.dart';
 
 class DroneInformationSection extends StatefulWidget {
@@ -110,29 +107,17 @@ class _DroneInformationSectionState extends State<DroneInformationSection> {
               children: [
                 DroneInformationItem(droneInformation: droneInfo),
                 SizedBox(height: 12),
-                BatteryStatus(flightInformation: FakeData.fightInformation[0]),
+                BatteryStatus(),
                 SizedBox(height: 12),
                 AltitudeLimitation(
-                  currentAltitude: double.parse(
-                    FakeData.fightInformation[0].height,
-                  ),
+                  currentAltitude: _telemetryService.isConnected
+                      ? (_telemetryService.gpsAltitude > 10.0
+                            ? _telemetryService.gpsAltitude
+                            : 10.0)
+                      : 10.0, // Default to minimum value when disconnected
                   maxAltitude: 300.0,
                   onAltitudeChanged: (value) {
                     // Handle altitude change
-                  },
-                ),
-                SizedBox(height: 12),
-                ResolutionSetting(
-                  currentResolution: FakeData.fightInformation[0].resolution,
-                  onResolutionChanged: (value) {
-                    // Handle resolution change
-                  },
-                ),
-                SizedBox(height: 12),
-                CameraQualitySetting(
-                  currentQuality: "hdr",
-                  onQualityChanged: (value) {
-                    // Handle quality change
                   },
                 ),
               ],

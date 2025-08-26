@@ -35,7 +35,6 @@ class MainMapSimple extends StatefulWidget {
 // 1. Tap + Pan: Tap trên waypoint và kéo ngay lập tức (chuột)
 // 2. Long Press + Move: Nhấn giữ waypoint (~500ms) rồi kéo (trackpad/touch)
 class _MainMapSimpleState extends State<MainMapSimple> {
-  bool isRouteSelectionMode = false;
   bool _hasZoomedToHome = false;
   int? _draggedWaypointIndex;
   LatLng? _draggedPosition;
@@ -203,7 +202,7 @@ class _MainMapSimpleState extends State<MainMapSimple> {
                   : InteractiveFlag.all,
             ),
             onTap: (tapPosition, latlng) {
-              if (isRouteSelectionMode && widget.isConfigValid) {
+              if (widget.isConfigValid) {
                 widget.onTap(latlng);
               }
             },
@@ -399,74 +398,6 @@ class _MainMapSimpleState extends State<MainMapSimple> {
               ),
             ),
           ),
-        Positioned(
-          bottom: 20,
-          left: 20,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isRouteSelectionMode
-                      ? Colors.teal.withOpacity(0.2)
-                      : Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isRouteSelectionMode
-                        ? Colors.teal.withOpacity(0.3)
-                        : Colors.white.withOpacity(0.2),
-                    width: 1.5,
-                  ),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () {
-                      setState(() {
-                        isRouteSelectionMode = !isRouteSelectionMode;
-                      });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isRouteSelectionMode
-                                ? Icons.edit_location_alt
-                                : Icons.add_location_alt,
-                            color: isRouteSelectionMode
-                                ? Colors.teal
-                                : Colors.white.withOpacity(0.9),
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            isRouteSelectionMode
-                                ? 'Route Mode ON'
-                                : 'Choose Route',
-                            style: TextStyle(
-                              color: isRouteSelectionMode
-                                  ? Colors.teal
-                                  : Colors.white.withOpacity(0.9),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }

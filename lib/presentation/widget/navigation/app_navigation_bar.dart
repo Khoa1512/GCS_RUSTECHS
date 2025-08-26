@@ -16,6 +16,7 @@ class _AppNavigationBarState extends State<AppNavigationBar>
   final List<GlobalKey> _buttonKeys = [
     GlobalKey(),
     GlobalKey(),
+    // GlobalKey(),
     GlobalKey(),
     GlobalKey(),
     GlobalKey(),
@@ -36,9 +37,10 @@ class _AppNavigationBarState extends State<AppNavigationBar>
       final routes = [
         AppRoute.home,
         AppRoute.map,
-        AppRoute.allDrone,
+        // AppRoute.allDrone,
         AppRoute.route,
         AppRoute.file,
+        AppRoute.params,
       ];
       final newIndex = routes.indexOf(currentRoute);
 
@@ -208,20 +210,22 @@ class _AppNavigationBarState extends State<AppNavigationBar>
     final routes = [
       AppRoute.home,
       AppRoute.map,
-      AppRoute.allDrone,
+      // AppRoute.allDrone,
       AppRoute.route,
       AppRoute.file,
+      AppRoute.params,
     ];
-    final labels = ['Home', 'Map', 'All Drone', 'Route', 'File'];
+    // final labels = ['Home', 'Map', 'All Drone', 'Route', 'File', 'Params'];
+    final labels = ['Home', 'Mission', 'Route', 'File', 'Params'];
+
     final icons = [
       Icons.home,
       Icons.map,
       Icons.flight,
       Icons.route,
       Icons.file_copy,
-    ];
-
-    final buttons = <Widget>[];
+      Icons.settings,
+    ];    final buttons = <Widget>[];
 
     for (int i = 0; i < routes.length; i++) {
       buttons.add(

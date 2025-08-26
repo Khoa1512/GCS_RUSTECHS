@@ -25,7 +25,19 @@ class _AltitudeLimitationState extends State<AltitudeLimitation> {
   @override
   void initState() {
     super.initState();
-    _selectedAltitude = widget.currentAltitude;
+    _selectedAltitude = widget.currentAltitude.clamp(10.0, widget.maxAltitude);
+  }
+
+  @override
+  void didUpdateWidget(AltitudeLimitation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update selected altitude when widget updates, but keep it in valid range
+    if (oldWidget.currentAltitude != widget.currentAltitude) {
+      _selectedAltitude = widget.currentAltitude.clamp(
+        10.0,
+        widget.maxAltitude,
+      );
+    }
   }
 
   @override

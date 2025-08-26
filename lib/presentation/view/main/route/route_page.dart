@@ -74,10 +74,16 @@ class _RoutePageState extends State<RoutePage> {
             // ensure ordered insert/update
             final idx = it.seq;
             while (_items.length <= idx) {
-              _items.add(PlanMissionItem(seq: _items.length, command: 0, frame: 0));
+              _items.add(
+                PlanMissionItem(seq: _items.length, command: 0, frame: 0),
+              );
             }
             _items[idx] = it;
-            _dlReceived = _items.where((x) => x.command != 0 || x.x != 0 || x.y != 0 || x.z != 0).length;
+            _dlReceived = _items
+                .where(
+                  (x) => x.command != 0 || x.x != 0 || x.y != 0 || x.z != 0,
+                )
+                .length;
           });
           // Request next item if any remaining
           if (_nextToRequest < _dlTotal) {
@@ -126,7 +132,10 @@ class _RoutePageState extends State<RoutePage> {
         case MAVLinkEventType.homePosition:
           setState(() {
             final d = e.data as Map;
-            _home = LatLng((d['lat'] as num).toDouble(), (d['lon'] as num).toDouble());
+            _home = LatLng(
+              (d['lat'] as num).toDouble(),
+              (d['lon'] as num).toDouble(),
+            );
           });
           break;
         default:
@@ -138,7 +147,8 @@ class _RoutePageState extends State<RoutePage> {
   Future<void> _refreshPorts() async {
     setState(() {
       _ports = SerialPort.availablePorts;
-      if (_ports.isNotEmpty && (_selectedPort.isEmpty || !_ports.contains(_selectedPort))) {
+      if (_ports.isNotEmpty &&
+          (_selectedPort.isEmpty || !_ports.contains(_selectedPort))) {
         _selectedPort = _ports.first;
       }
     });
@@ -180,9 +190,9 @@ class _RoutePageState extends State<RoutePage> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Parse mission failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Parse mission failed: $e')));
       return;
     }
     setState(() {
@@ -207,13 +217,14 @@ class _RoutePageState extends State<RoutePage> {
   Future<void> _saveAsPlan() async {
     if (_items.isEmpty) return;
     final dir = await getApplicationDocumentsDirectory();
-    final path = '${dir.path}/mission_${DateTime.now().millisecondsSinceEpoch}.plan';
+    final path =
+        '${dir.path}/mission_${DateTime.now().millisecondsSinceEpoch}.plan';
     final json = MissionPlan(items: _items).toQgcPlanJson();
     await File(path).writeAsString(json);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved: $path')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Saved: $path')));
     }
   }
 
@@ -247,7 +258,10 @@ class _RoutePageState extends State<RoutePage> {
                   if (_status.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8.0),
-                      child: Text(_status, style: const TextStyle(color: Colors.white70)),
+                      child: Text(
+                        _status,
+                        style: const TextStyle(color: Colors.white70),
+                      ),
                     ),
                   Expanded(child: _buildMissionTable()),
                 ],
@@ -255,10 +269,7 @@ class _RoutePageState extends State<RoutePage> {
             ),
             const SizedBox(width: 12),
             // Right: map (fills available space)
-            Expanded(
-              flex: 3,
-              child: _buildMap(),
-            ),
+            Expanded(flex: 3, child: _buildMap()),
           ],
         ),
       ),
@@ -302,16 +313,26 @@ class _RoutePageState extends State<RoutePage> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Icon(Icons.place, color: isCurrent ? Colors.redAccent : Colors.cyanAccent, size: 28),
+                Icon(
+                  Icons.place,
+                  color: isCurrent ? Colors.redAccent : Colors.cyanAccent,
+                  size: 28,
+                ),
                 Positioned(
                   bottom: 18,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black87,
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Text('${it.seq}', style: const TextStyle(color: Colors.white, fontSize: 10)),
+                    child: Text(
+                      '${it.seq}',
+                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                    ),
                   ),
                 ),
               ],
@@ -321,7 +342,7 @@ class _RoutePageState extends State<RoutePage> {
       );
     }
 
-  return Container(
+    return Container(
       decoration: BoxDecoration(
         color: Colors.grey.shade800,
         borderRadius: BorderRadius.circular(8),
@@ -341,14 +362,19 @@ class _RoutePageState extends State<RoutePage> {
               ),
               children: [
                 TileLayer(
-                  urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  urlTemplate:
+                      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                   subdomains: const ['a', 'b', 'c'],
                   tileProvider: NetworkTileProvider(),
                 ),
                 if (points.length >= 2)
                   PolylineLayer(
                     polylines: [
-                      Polyline(points: points, color: Colors.cyanAccent, strokeWidth: 3.0),
+                      Polyline(
+                        points: points,
+                        color: Colors.cyanAccent,
+                        strokeWidth: 3.0,
+                      ),
                     ],
                   ),
                 MarkerLayer(markers: markers),
@@ -366,16 +392,18 @@ class _RoutePageState extends State<RoutePage> {
                   const SizedBox(height: 6),
                   ElevatedButton(
                     onPressed: () {
-                      final LatLng? hp = _home ?? (_items.isNotEmpty && _isGlobal(_items.first)
-                          ? LatLng(_items.first.x, _items.first.y)
-                          : null);
+                      final LatLng? hp =
+                          _home ??
+                          (_items.isNotEmpty && _isGlobal(_items.first)
+                              ? LatLng(_items.first.x, _items.first.y)
+                              : null);
                       if (hp != null) _centerOn(hp);
                     },
                     child: const Text('Center Home'),
                   ),
                 ],
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -400,8 +428,20 @@ class _RoutePageState extends State<RoutePage> {
     final center = LatLng((minLat + maxLat) / 2, (minLng + maxLng) / 2);
     _mapCenter = center;
     // Simple heuristic zoom by span
-    final span = (maxLat - minLat).abs().clamp(0.001, 180.0) + (maxLng - minLng).abs().clamp(0.001, 360.0);
-    _mapZoom = span < 0.01 ? 16 : span < 0.1 ? 14 : span < 1 ? 12 : span < 5 ? 10 : span < 20 ? 8 : 4;
+    final span =
+        (maxLat - minLat).abs().clamp(0.001, 180.0) +
+        (maxLng - minLng).abs().clamp(0.001, 360.0);
+    _mapZoom = span < 0.01
+        ? 16
+        : span < 0.1
+        ? 14
+        : span < 1
+        ? 12
+        : span < 5
+        ? 10
+        : span < 20
+        ? 8
+        : 4;
     _mapController.move(center, _mapZoom);
   }
 
@@ -412,7 +452,9 @@ class _RoutePageState extends State<RoutePage> {
   bool _isGlobal(PlanMissionItem it) {
     final lat = it.x;
     final lon = it.y;
-    return lat != 0.0 || lon != 0.0 ? (lat.abs() <= 90 && lon.abs() <= 180) : false;
+    return lat != 0.0 || lon != 0.0
+        ? (lat.abs() <= 90 && lon.abs() <= 180)
+        : false;
   }
 
   Widget _buildConnectCard() {
@@ -425,9 +467,16 @@ class _RoutePageState extends State<RoutePage> {
             Expanded(
               child: DropdownButtonFormField<String>(
                 value: _selectedPort.isEmpty ? null : _selectedPort,
-                items: _ports.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
-                onChanged: _connected ? null : (v) => setState(() => _selectedPort = v ?? ''),
-                decoration: const InputDecoration(labelText: 'Port', labelStyle: TextStyle(color: Colors.white70)),
+                items: _ports
+                    .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                    .toList(),
+                onChanged: _connected
+                    ? null
+                    : (v) => setState(() => _selectedPort = v ?? ''),
+                decoration: const InputDecoration(
+                  labelText: 'Port',
+                  labelStyle: TextStyle(color: Colors.white70),
+                ),
                 dropdownColor: Colors.grey.shade900,
                 style: const TextStyle(color: Colors.white),
               ),
@@ -439,7 +488,10 @@ class _RoutePageState extends State<RoutePage> {
                 controller: _baudCtl,
                 enabled: !_connected,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(labelText: 'Baud', labelStyle: TextStyle(color: Colors.white70)),
+                decoration: const InputDecoration(
+                  labelText: 'Baud',
+                  labelStyle: TextStyle(color: Colors.white70),
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -453,7 +505,10 @@ class _RoutePageState extends State<RoutePage> {
               child: const Text('Refresh'),
             ),
             const SizedBox(width: 12),
-            Text(_connected ? 'Connected' : 'Disconnected', style: TextStyle(color: _connected ? Colors.green : Colors.red)),
+            Text(
+              _connected ? 'Connected' : 'Disconnected',
+              style: TextStyle(color: _connected ? Colors.green : Colors.red),
+            ),
           ],
         ),
       ),
@@ -470,23 +525,44 @@ class _RoutePageState extends State<RoutePage> {
           children: [
             Row(
               children: [
-                ElevatedButton(onPressed: _connected ? _downloadMission : null, child: const Text('Download')),
+                ElevatedButton(
+                  onPressed: _connected ? _downloadMission : null,
+                  child: const Text('Download'),
+                ),
                 const SizedBox(width: 8),
-                ElevatedButton(onPressed: _connected ? _clearMission : null, child: const Text('Clear')),
+                ElevatedButton(
+                  onPressed: _connected ? _clearMission : null,
+                  child: const Text('Clear'),
+                ),
                 const SizedBox(width: 8),
-                ElevatedButton(onPressed: _connected ? _getHome : null, child: const Text('Get Home')),
+                ElevatedButton(
+                  onPressed: _connected ? _getHome : null,
+                  child: const Text('Get Home'),
+                ),
                 const SizedBox(width: 8),
-                ElevatedButton(onPressed: _items.isNotEmpty ? _saveAsPlan : null, child: const Text('Save .plan')),
+                ElevatedButton(
+                  onPressed: _items.isNotEmpty ? _saveAsPlan : null,
+                  child: const Text('Save .plan'),
+                ),
                 const SizedBox(width: 16),
                 if (_dlTotal > 0)
-                  Text('Download: $_dlReceived/$_dlTotal', style: const TextStyle(color: Colors.white70)),
+                  Text(
+                    'Download: $_dlReceived/$_dlTotal',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
                 const SizedBox(width: 16),
                 if (_ulTotal > 0)
-                  Text('Upload: $_ulSent/$_ulTotal', style: const TextStyle(color: Colors.white70)),
+                  Text(
+                    'Upload: $_ulSent/$_ulTotal',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
               ],
             ),
             const SizedBox(height: 8),
-            Text('Paste .plan JSON or QGC WPL text, then Upload', style: const TextStyle(color: Colors.white70)),
+            Text(
+              'Paste .plan JSON or QGC WPL text, then Upload',
+              style: const TextStyle(color: Colors.white70),
+            ),
             const SizedBox(height: 6),
             TextField(
               controller: _pasteCtl,
@@ -525,31 +601,56 @@ class _RoutePageState extends State<RoutePage> {
             padding: const EdgeInsets.all(12.0),
             child: Row(
               children: [
-                const Text('Mission Items', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                const Text(
+                  'Mission Items',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(width: 12),
-                if (_currentSeq != null) Text('Current: $_currentSeq', style: const TextStyle(color: Colors.white70)),
+                if (_currentSeq != null)
+                  Text(
+                    'Current: $_currentSeq',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
               ],
             ),
           ),
           const Divider(height: 1, color: Colors.black54),
           Expanded(
             child: _items.isEmpty
-                ? const Center(child: Text('No items', style: TextStyle(color: Colors.white54)))
+                ? const Center(
+                    child: Text(
+                      'No items',
+                      style: TextStyle(color: Colors.white54),
+                    ),
+                  )
                 : ListView.separated(
                     itemCount: _items.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1, color: Colors.black26),
+                    separatorBuilder: (_, __) =>
+                        const Divider(height: 1, color: Colors.black26),
                     itemBuilder: (context, index) {
                       final it = _items[index];
                       final isHomeRow = index == 0 && _isGlobal(it);
                       return ListTile(
                         dense: true,
-                        title: Text('${isHomeRow ? "[HOME] " : ""}#${it.seq}  CMD ${it.command}  FRAME ${it.frame}', style: const TextStyle(color: Colors.white)),
-                        subtitle: Text('x=${it.x.toStringAsFixed(6)}, y=${it.y.toStringAsFixed(6)}, z=${it.z.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white70)),
+                        title: Text(
+                          '${isHomeRow ? "[HOME] " : ""}#${it.seq}  CMD ${it.command}  FRAME ${it.frame}',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        subtitle: Text(
+                          'x=${it.x.toStringAsFixed(6)}, y=${it.y.toStringAsFixed(6)}, z=${it.z.toStringAsFixed(2)}',
+                          style: const TextStyle(color: Colors.white70),
+                        ),
                         trailing: Wrap(
                           spacing: 8,
                           children: [
                             OutlinedButton(
-                              onPressed: _connected ? () => _setCurrent(it.seq) : null,
+                              onPressed: _connected
+                                  ? () => _setCurrent(it.seq)
+                                  : null,
                               child: const Text('Set Current'),
                             ),
                           ],

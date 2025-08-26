@@ -9,6 +9,7 @@ class RoutePointTable extends StatefulWidget {
   final Function() onClearTap;
   final Function(List<RoutePoint>) onSendConfigs;
   final Function(RoutePoint point, int command, String altitude) onEditPoint;
+  final Function()? onReadMission;
 
   const RoutePointTable({
     super.key,
@@ -17,6 +18,7 @@ class RoutePointTable extends StatefulWidget {
     required this.onClearTap,
     required this.onSendConfigs,
     required this.onEditPoint,
+    this.onReadMission,
   });
 
   @override
@@ -45,6 +47,60 @@ class _RoutePointTableState extends State<RoutePointTable> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter coordinates as: lat, lng')),
+      );
+    }
+  }
+
+  void _saveAllChanges() {
+    // Kiểm tra xem có route points nào không
+    if (widget.routePoints.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No waypoints to save'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Kiểm tra xem có thay đổi nào không
+    bool hasChanges = false;
+
+    // Lưu tất cả thay đổi cho tất cả points
+    for (final point in widget.routePoints) {
+      final newAltitude = _altitudeEdits[point.id];
+      final newCommand = _commandEdits[point.id];
+
+      if (newAltitude != null || newCommand != null) {
+        hasChanges = true;
+        widget.onEditPoint(
+          point,
+          newCommand != null ? mavCmdMap[newCommand]! : point.command,
+          newAltitude ?? point.altitude,
+        );
+      }
+    }
+
+    // Clear edits sau khi save
+    setState(() {
+      _altitudeEdits.clear();
+      _commandEdits.clear();
+    });
+
+    // Hiển thị thông báo dựa trên việc có thay đổi hay không
+    if (hasChanges) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('All changes saved successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mission sent successfully'),
+          backgroundColor: Colors.green,
+        ),
       );
     }
   }
@@ -221,17 +277,22 @@ class _RoutePointTableState extends State<RoutePointTable> {
                 _ActionButton(
                   icon: Icons.file_download,
                   label: 'Read Mission',
-                  onTap: () {
-                    // TODO: Implement Read Mission
-                  },
+                  onTap:
+                      widget.onReadMission ??
+                      () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Read Mission not implemented'),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                      },
                 ),
                 const SizedBox(width: 8),
                 _ActionButton(
                   icon: Icons.file_upload,
                   label: 'Write Mission',
-                  onTap: () {
-                    // TODO: Implement Write Mission
-                  },
+                  onTap: _saveAllChanges,
                 ),
                 const SizedBox(width: 8),
                 _ActionButton(
@@ -423,7 +484,7 @@ class _RoutePointTableState extends State<RoutePointTable> {
                                   setState(() {
                                     _commandEdits[point.id] = newValue;
                                   });
-                                  _savePointChanges(point);
+                                  // Không tự động lưu, chờ đến khi bấm Write Mission
                                 }
                               },
                             ),

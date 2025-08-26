@@ -70,7 +70,7 @@ class _DroneInformationItemState extends State<DroneInformationItem>
                   widget.droneInformation.name,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: screenWidth < 1200 ? 16 : 20,
+                    fontSize: screenWidth < 1200 ? 16 : 19,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),

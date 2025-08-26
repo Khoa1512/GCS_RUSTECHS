@@ -31,6 +31,7 @@ class TelemetryService {
   String _currentMode = 'Unknown';
   bool _armed = false;
   String _lastGpsFixType = 'No GPS';
+  String _vehicleType = 'Unknown'; // Vehicle type from heartbeat
 
   // Public getters
   Stream<Map<String, double>> get telemetryStream =>
@@ -40,6 +41,9 @@ class TelemetryService {
   bool get isConnected => _isConnected;
   bool get hasReceivedData => _hasReceivedData;
   Map<String, double> get currentTelemetry => Map.from(_currentTelemetry);
+
+  // Public getters for vehicle info
+  String get vehicleType => _vehicleType;
 
   /// Set connection state and notify listeners
   void setConnected(bool connected) {
@@ -52,7 +56,6 @@ class TelemetryService {
 
   /// Initialize the service
   void initialize() {
-    // Hủy subscription cũ nếu có
     _apiSubscription?.cancel();
     _setupApiListener();
   }
@@ -151,6 +154,7 @@ class TelemetryService {
             final m = (event.data as Map);
             _currentMode = (m['mode'] as String?) ?? _currentMode;
             _armed = (m['armed'] as bool?) ?? _armed;
+            _vehicleType = (m['type'] as String?) ?? _vehicleType;
             _currentTelemetry['armed'] = _armed ? 1.0 : 0.0;
             // Optional: expose mode for UI
             // Store as double? keep in map as not used in numeric charts

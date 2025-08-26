@@ -69,10 +69,10 @@ class TelemetryService {
       }
 
       // print('TelemetryService: Calling API connect');
-  await _api.connect(port, baudRate: baudRate);
+      await _api.connect(port, baudRate: baudRate);
 
-  final success = _api.isConnected;
-  if (success) {
+      final success = _api.isConnected;
+      if (success) {
         print('TelemetryService: Port connected, waiting for data...');
         _hasReceivedData = false;
 
@@ -85,7 +85,7 @@ class TelemetryService {
         _dataReceiveController.add(false);
 
         // Request all data streams for real-time telemetry
-  _api.requestAllDataStreams();
+        _api.requestAllDataStreams();
       } else {
         // print('TelemetryService: Connection failed');
       }
@@ -160,11 +160,19 @@ class TelemetryService {
         case MAVLinkEventType.attitude:
           if (event.data is Map) {
             final m = (event.data as Map);
-            _currentTelemetry['roll'] = (m['roll'] as num?)?.toDouble() ?? (_currentTelemetry['roll'] ?? 0.0);
-            _currentTelemetry['pitch'] = (m['pitch'] as num?)?.toDouble() ?? (_currentTelemetry['pitch'] ?? 0.0);
-            _currentTelemetry['yaw'] = (m['yaw'] as num?)?.toDouble() ?? (_currentTelemetry['yaw'] ?? 0.0);
+            _currentTelemetry['roll'] =
+                (m['roll'] as num?)?.toDouble() ??
+                (_currentTelemetry['roll'] ?? 0.0);
+            _currentTelemetry['pitch'] =
+                (m['pitch'] as num?)?.toDouble() ??
+                (_currentTelemetry['pitch'] ?? 0.0);
+            _currentTelemetry['yaw'] =
+                (m['yaw'] as num?)?.toDouble() ??
+                (_currentTelemetry['yaw'] ?? 0.0);
             // Default compass heading to yaw when GPS course not available
-            _currentTelemetry['compass_heading'] = _currentTelemetry['gps_course'] != null && (_currentTelemetry['gps_course'] ?? 0) != 0
+            _currentTelemetry['compass_heading'] =
+                _currentTelemetry['gps_course'] != null &&
+                    (_currentTelemetry['gps_course'] ?? 0) != 0
                 ? _currentTelemetry['gps_course']!
                 : _currentTelemetry['yaw'] ?? 0.0;
           }
@@ -173,8 +181,12 @@ class TelemetryService {
         case MAVLinkEventType.vfrHud:
           if (event.data is Map) {
             final m = (event.data as Map);
-            _currentTelemetry['airspeed'] = (m['airspeed'] as num?)?.toDouble() ?? (_currentTelemetry['airspeed'] ?? 0.0);
-            _currentTelemetry['groundspeed'] = (m['groundspeed'] as num?)?.toDouble() ?? (_currentTelemetry['groundspeed'] ?? 0.0);
+            _currentTelemetry['airspeed'] =
+                (m['airspeed'] as num?)?.toDouble() ??
+                (_currentTelemetry['airspeed'] ?? 0.0);
+            _currentTelemetry['groundspeed'] =
+                (m['groundspeed'] as num?)?.toDouble() ??
+                (_currentTelemetry['groundspeed'] ?? 0.0);
             // vfrhud.alt can serve as MSL if GLOBAL_POSITION not yet arrived
             final alt = (m['alt'] as num?)?.toDouble();
             if (alt != null) {
@@ -186,11 +198,21 @@ class TelemetryService {
         case MAVLinkEventType.position:
           if (event.data is Map) {
             final m = (event.data as Map);
-            _currentTelemetry['gps_latitude'] = (m['lat'] as num?)?.toDouble() ?? (_currentTelemetry['gps_latitude'] ?? 0.0);
-            _currentTelemetry['gps_longitude'] = (m['lon'] as num?)?.toDouble() ?? (_currentTelemetry['gps_longitude'] ?? 0.0);
-            _currentTelemetry['altitude_msl'] = (m['altMSL'] as num?)?.toDouble() ?? (_currentTelemetry['altitude_msl'] ?? 0.0);
-            _currentTelemetry['altitude_rel'] = (m['altRelative'] as num?)?.toDouble() ?? (_currentTelemetry['altitude_rel'] ?? 0.0);
-            _currentTelemetry['groundspeed'] = (m['groundSpeed'] as num?)?.toDouble() ?? (_currentTelemetry['groundspeed'] ?? 0.0);
+            _currentTelemetry['gps_latitude'] =
+                (m['lat'] as num?)?.toDouble() ??
+                (_currentTelemetry['gps_latitude'] ?? 0.0);
+            _currentTelemetry['gps_longitude'] =
+                (m['lon'] as num?)?.toDouble() ??
+                (_currentTelemetry['gps_longitude'] ?? 0.0);
+            _currentTelemetry['altitude_msl'] =
+                (m['altMSL'] as num?)?.toDouble() ??
+                (_currentTelemetry['altitude_msl'] ?? 0.0);
+            _currentTelemetry['altitude_rel'] =
+                (m['altRelative'] as num?)?.toDouble() ??
+                (_currentTelemetry['altitude_rel'] ?? 0.0);
+            _currentTelemetry['groundspeed'] =
+                (m['groundSpeed'] as num?)?.toDouble() ??
+                (_currentTelemetry['groundspeed'] ?? 0.0);
             final heading = (m['heading'] as num?)?.toDouble();
             if (heading != null && heading > 0) {
               _currentTelemetry['compass_heading'] = heading;
@@ -202,24 +224,40 @@ class TelemetryService {
           if (event.data is Map) {
             final m = (event.data as Map);
             final fixType = (m['fixType'] as String?) ?? 'No GPS';
-            _currentTelemetry['satellites'] = ((m['satellites'] as num?)?.toDouble() ?? 0.0);
+            _currentTelemetry['satellites'] =
+                ((m['satellites'] as num?)?.toDouble() ?? 0.0);
             _currentTelemetry['gps_fix'] = _getGpsFixValue(fixType);
             // also store the string fix type for UI when needed
             // store separately in a special bucket using a sentinel negative value is messy; keep outside map for strings
             // However, some UI expects 'gps_fix_type' string
             // We can't store string in Map<String,double>, so expose via getter only
 
-            _currentTelemetry['gps_latitude'] = (m['lat'] as num?)?.toDouble() ?? (_currentTelemetry['gps_latitude'] ?? 0.0);
-            _currentTelemetry['gps_longitude'] = (m['lon'] as num?)?.toDouble() ?? (_currentTelemetry['gps_longitude'] ?? 0.0);
-            _currentTelemetry['gps_altitude'] = (m['alt'] as num?)?.toDouble() ?? (_currentTelemetry['gps_altitude'] ?? 0.0);
-            _currentTelemetry['gps_speed'] = (m['vel'] as num?)?.toDouble() ?? (_currentTelemetry['gps_speed'] ?? 0.0);
-            _currentTelemetry['gps_course'] = (m['cog'] as num?)?.toDouble() ?? (_currentTelemetry['gps_course'] ?? 0.0);
-            _currentTelemetry['gps_horizontal_accuracy'] = (m['eph'] as num?)?.toDouble() ?? (_currentTelemetry['gps_horizontal_accuracy'] ?? 0.0);
-            _currentTelemetry['gps_vertical_accuracy'] = (m['epv'] as num?)?.toDouble() ?? (_currentTelemetry['gps_vertical_accuracy'] ?? 0.0);
+            _currentTelemetry['gps_latitude'] =
+                (m['lat'] as num?)?.toDouble() ??
+                (_currentTelemetry['gps_latitude'] ?? 0.0);
+            _currentTelemetry['gps_longitude'] =
+                (m['lon'] as num?)?.toDouble() ??
+                (_currentTelemetry['gps_longitude'] ?? 0.0);
+            _currentTelemetry['gps_altitude'] =
+                (m['alt'] as num?)?.toDouble() ??
+                (_currentTelemetry['gps_altitude'] ?? 0.0);
+            _currentTelemetry['gps_speed'] =
+                (m['vel'] as num?)?.toDouble() ??
+                (_currentTelemetry['gps_speed'] ?? 0.0);
+            _currentTelemetry['gps_course'] =
+                (m['cog'] as num?)?.toDouble() ??
+                (_currentTelemetry['gps_course'] ?? 0.0);
+            _currentTelemetry['gps_horizontal_accuracy'] =
+                (m['eph'] as num?)?.toDouble() ??
+                (_currentTelemetry['gps_horizontal_accuracy'] ?? 0.0);
+            _currentTelemetry['gps_vertical_accuracy'] =
+                (m['epv'] as num?)?.toDouble() ??
+                (_currentTelemetry['gps_vertical_accuracy'] ?? 0.0);
 
             // Prefer GPS course for compass when valid
             if ((_currentTelemetry['gps_course'] ?? 0.0) != 0.0) {
-              _currentTelemetry['compass_heading'] = _currentTelemetry['gps_course']!;
+              _currentTelemetry['compass_heading'] =
+                  _currentTelemetry['gps_course']!;
             }
             // Cache last fix type string in a field for getters
             _lastGpsFixType = fixType;
@@ -230,8 +268,12 @@ class TelemetryService {
           if (event.data is Map) {
             final m = (event.data as Map);
             final bp = (m['batteryPercent'] as num?)?.toDouble();
+            final vb = (m['voltageBattery'] as num?)?.toDouble();
             if (bp != null) {
               _currentTelemetry['battery'] = bp;
+            }
+            if (vb != null) {
+              _currentTelemetry['voltageBattery'] = vb;
             }
           }
           _emitTelemetry();
@@ -260,7 +302,8 @@ class TelemetryService {
   /// Emit current telemetry map and mark data received when first meaningful data arrives
   void _emitTelemetry() {
     if (!_hasReceivedData) {
-      final hasPosition = ((_currentTelemetry['gps_latitude'] ?? 0.0) != 0.0) ||
+      final hasPosition =
+          ((_currentTelemetry['gps_latitude'] ?? 0.0) != 0.0) ||
           ((_currentTelemetry['gps_longitude'] ?? 0.0) != 0.0);
       final hasBattery = (_currentTelemetry['battery'] ?? 0.0) > 0.0;
       if (hasPosition || hasBattery) {
@@ -584,7 +627,7 @@ class TelemetryService {
       ),
       TelemetryData(
         label: 'GPS Fix Type',
-  value: gpsFixType,
+        value: gpsFixType,
         unit: '',
         color: Colors.lightGreen,
       ),
@@ -635,21 +678,23 @@ class TelemetryService {
   double get gpsAltitude => _currentTelemetry['gps_altitude'] ?? 0.0;
   double get gpsSpeed => _currentTelemetry['gps_speed'] ?? 0.0;
   double get gpsCourse => _currentTelemetry['gps_course'] ?? 0.0;
-  double get gpsHorizontalAccuracy => _currentTelemetry['gps_horizontal_accuracy'] ?? 0.0;
-  double get gpsVerticalAccuracy => _currentTelemetry['gps_vertical_accuracy'] ?? 0.0;
+  double get gpsHorizontalAccuracy =>
+      _currentTelemetry['gps_horizontal_accuracy'] ?? 0.0;
+  double get gpsVerticalAccuracy =>
+      _currentTelemetry['gps_vertical_accuracy'] ?? 0.0;
   String get gpsFixType => _lastGpsFixType;
   int get gpsFixValue => _getGpsFixValue(_lastGpsFixType).toInt();
 
   /// Check if GPS has a valid fix
   bool get hasValidGpsFix {
     // Only accept valid GPS fixes that can provide accurate position
-  return _lastGpsFixType == '2D Fix' ||
-    _lastGpsFixType == '3D Fix' ||
-    _lastGpsFixType == 'DGPS' ||
-    _lastGpsFixType == 'RTK Float' ||
-    _lastGpsFixType == 'RTK Fixed' ||
-    _lastGpsFixType == 'Static' ||
-    _lastGpsFixType == 'PPP';
+    return _lastGpsFixType == '2D Fix' ||
+        _lastGpsFixType == '3D Fix' ||
+        _lastGpsFixType == 'DGPS' ||
+        _lastGpsFixType == 'RTK Float' ||
+        _lastGpsFixType == 'RTK Fixed' ||
+        _lastGpsFixType == 'Static' ||
+        _lastGpsFixType == 'PPP';
   }
 
   /// Get GPS accuracy in human readable format

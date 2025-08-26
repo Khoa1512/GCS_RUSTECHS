@@ -17,10 +17,12 @@ class _BatteryStatusState extends State<BatteryStatus> {
   bool _isHovered = false;
   StreamSubscription? _batterySubscription;
   StreamSubscription? _telemetrySubscription;
+  StreamSubscription? _connectionSubscription;
   final TelemetryService _telemetryService = TelemetryService();
-  
+
   // Battery data from API
   double _batteryPercentage = 0.0;
+  double _batteryVoltage = 0.0;
 
   @override
   void initState() {
@@ -28,12 +30,14 @@ class _BatteryStatusState extends State<BatteryStatus> {
     _initializeBatteryData();
     _startBatteryUpdates();
     _listenToTelemetryStream();
+    _listenToConnectionChanges();
   }
 
   @override
   void dispose() {
     _batterySubscription?.cancel();
     _telemetrySubscription?.cancel();
+    _connectionSubscription?.cancel();
     super.dispose();
   }
 
@@ -41,9 +45,12 @@ class _BatteryStatusState extends State<BatteryStatus> {
     // Get initial battery data from TelemetryService
     if (_telemetryService.isConnected) {
       _batteryPercentage = _telemetryService.currentTelemetry['battery'] ?? 0.0;
+      _batteryVoltage =
+          _telemetryService.currentTelemetry['voltageBattery'] ?? 0.0;
     } else {
-      // Fallback to widget data if not connected
-      _batteryPercentage = double.tryParse(widget.flightInformation.battery.toString()) ?? 0.0;
+      // Set to 0 when not connected
+      _batteryPercentage = 0.0;
+      _batteryVoltage = 0.0;
     }
   }
 
@@ -58,12 +65,14 @@ class _BatteryStatusState extends State<BatteryStatus> {
       setState(() {
         // Get real-time battery data from TelemetryService
         if (_telemetryService.isConnected) {
-          _batteryPercentage = _telemetryService.currentTelemetry['battery'] ?? 0.0;
+          _batteryPercentage =
+              _telemetryService.currentTelemetry['battery'] ?? 0.0;
+          _batteryVoltage =
+              _telemetryService.currentTelemetry['voltageBattery'] ?? 0.0;
         } else {
-          // Simulate battery changes when not connected for demo
-          double baseBattery = double.tryParse(widget.flightInformation.battery.toString()) ?? 0.0;
-          _batteryPercentage = (baseBattery + 
-              (DateTime.now().millisecond % 10 - 5) * 0.1).clamp(0.0, 100.0);
+          // Set to 0 when not connected
+          _batteryPercentage = 0.0;
+          _batteryVoltage = 0.0;
         }
       });
     }
@@ -71,10 +80,38 @@ class _BatteryStatusState extends State<BatteryStatus> {
 
   void _listenToTelemetryStream() {
     // Listen to telemetry stream for real-time battery updates
-    _telemetrySubscription = _telemetryService.telemetryStream.listen((telemetryData) {
-      if (mounted && telemetryData.containsKey('battery')) {
-        setState(() {
+    _telemetrySubscription = _telemetryService.telemetryStream.listen((
+      telemetryData,
+    ) {
+      if (mounted) {
+        bool needsUpdate = false;
+
+        if (telemetryData.containsKey('battery')) {
           _batteryPercentage = telemetryData['battery'] ?? 0.0;
+          needsUpdate = true;
+        }
+
+        if (telemetryData.containsKey('voltageBattery')) {
+          _batteryVoltage = telemetryData['voltageBattery'] ?? 0.0;
+          needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+          setState(() {});
+        }
+      }
+    });
+  }
+
+  void _listenToConnectionChanges() {
+    // Listen to connection changes to reset battery data when disconnected
+    _connectionSubscription = _telemetryService.connectionStream.listen((
+      isConnected,
+    ) {
+      if (mounted && !isConnected) {
+        setState(() {
+          _batteryPercentage = 0.0;
+          _batteryVoltage = 0.0;
         });
       }
     });
@@ -92,7 +129,9 @@ class _BatteryStatusState extends State<BatteryStatus> {
     if (_batteryPercentage > 40) return Icons.battery_4_bar;
     if (_batteryPercentage > 20) return Icons.battery_2_bar;
     return Icons.battery_1_bar;
-  }  @override
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,24 +166,43 @@ class _BatteryStatusState extends State<BatteryStatus> {
                         size: 24,
                       ),
                       SizedBox(width: 12),
-                      
-                      // Progress bar with percentage
+
+                      // Progress bar with percentage and voltage
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Percentage text
-                            Text(
-                              "${_batteryPercentage.toStringAsFixed(1)}%",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: _isHovered ? Colors.black : Colors.white,
-                              ),
+                            // Battery info row
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Percentage text
+                                Text(
+                                  "${_batteryPercentage.toStringAsFixed(1)}%",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: _isHovered
+                                        ? Colors.black
+                                        : Colors.white,
+                                  ),
+                                ),
+                                // Voltage text
+                                Text(
+                                  "${_batteryVoltage.toStringAsFixed(2)}V",
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: _isHovered
+                                        ? Colors.black87
+                                        : Colors.white70,
+                                  ),
+                                ),
+                              ],
                             ),
                             SizedBox(height: 8),
-                            
+
                             // Progress bar
                             Container(
                               height: 8,
@@ -157,7 +215,9 @@ class _BatteryStatusState extends State<BatteryStatus> {
                                 child: LinearProgressIndicator(
                                   value: _batteryPercentage / 100,
                                   backgroundColor: Colors.transparent,
-                                  valueColor: AlwaysStoppedAnimation<Color>(_getBatteryColor()),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    _getBatteryColor(),
+                                  ),
                                 ),
                               ),
                             ),

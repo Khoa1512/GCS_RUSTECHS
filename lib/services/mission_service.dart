@@ -54,16 +54,26 @@ class MissionService {
     // Add remaining waypoints
     for (var i = 0; i < points.length; i++) {
       final point = points[i];
+
+      // Extract parameters from commandParams or use defaults
+      double param1 = 0, param2 = 0, param3 = 0, param4 = 0;
+      if (point.commandParams != null) {
+        param1 = (point.commandParams!['param1'] as num?)?.toDouble() ?? 0;
+        param2 = (point.commandParams!['param2'] as num?)?.toDouble() ?? 0;
+        param3 = (point.commandParams!['param3'] as num?)?.toDouble() ?? 0;
+        param4 = (point.commandParams!['param4'] as num?)?.toDouble() ?? 0;
+      }
+
       missionItems.add(
         PlanMissionItem(
           seq: i + 1, // Start from 1
           current: 0, // Not current
           frame: 3, // MAV_FRAME_GLOBAL_RELATIVE_ALT
           command: point.command,
-          param1: 0, // Hold time
-          param2: 0, // Acceptance radius
-          param3: 0, // Pass radius
-          param4: 0, // Yaw
+          param1: param1,
+          param2: param2,
+          param3: param3,
+          param4: param4,
           x: double.parse(point.latitude),
           y: double.parse(point.longitude),
           z: double.parse(point.altitude),

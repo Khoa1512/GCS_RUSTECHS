@@ -415,10 +415,10 @@ class _MapPageState extends State<MapPage> {
     setState(() {
       routePoints = [];
     });
-    
+
     // Clear mission in service so it's not shown in mini map
     MissionService().clearMission();
-    
+
     // Clear mission on Flight Controller if connected
     if (TelemetryService().mavlinkAPI.isConnected) {
       TelemetryService().mavlinkAPI.clearMission();

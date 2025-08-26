@@ -50,7 +50,7 @@ class DroneMAVLinkAPI {
 	// Sequence number and identity
 	int _sequence = 0;
 	// Source IDs (GCS)
-	int _sourceSystemId = 255; // GCS
+	final int _sourceSystemId = 255; // GCS
 	final int _sourceComponentId = 190; // MAV_COMP_ID_MISSIONPLANNER
 	// Target IDs (vehicle)
 	int _targetSystemId = 1; // will be updated from Heartbeat

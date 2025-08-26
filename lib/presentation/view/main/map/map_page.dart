@@ -426,6 +426,18 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
+  // Handle waypoint drag - update coordinates
+  void _onWaypointDrag(int index, LatLng newPosition) {
+    if (index >= 0 && index < routePoints.length) {
+      setState(() {
+        routePoints[index] = routePoints[index].copyWith(
+          latitude: newPosition.latitude.toString(),
+          longitude: newPosition.longitude.toString(),
+        );
+      });
+    }
+  }
+
   void addRoutePoint(LatLng latLng) {
     setState(() {
       routePoints.add(
@@ -479,11 +491,12 @@ class _MapPageState extends State<MapPage> {
     return Stack(
       children: [
         // Map chiếm full màn hình
-        MainMap(
+        MainMapSimple(
           mapController: mapController,
           mapType: selectedMapType!,
           routePoints: routePoints,
           onTap: addRoutePoint,
+          onWaypointDrag: _onWaypointDrag,
           isConfigValid: true,
           homePoint:
               homePoint, // Truyền home point để hiển thị marker H và zoom

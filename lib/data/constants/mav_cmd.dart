@@ -9,19 +9,21 @@ class MavCmd {
   static const int splineWaypoint = 82;
   static const int changeSpeed = 178;
   static const int conditionYaw = 115;
+  static const int vtolTakeoff = 84;
 }
 
 // Command name to number mapping
 final Map<String, int> mavCmdMap = {
   'Waypoint': MavCmd.waypoint,
-  'Loiter (Turns)': MavCmd.loiterTurns,
-  'Loiter (Time)': MavCmd.loiterTime,
+  'Loiter Turns': MavCmd.loiterTurns,
+  'Loiter Time': MavCmd.loiterTime,
   'Return to Launch': MavCmd.returnToLaunch,
   'Land': MavCmd.land,
   'Takeoff': MavCmd.takeoff,
   'Spline Waypoint': MavCmd.splineWaypoint,
   'Change Speed': MavCmd.changeSpeed,
   'Set Yaw': MavCmd.conditionYaw,
+  'Vtol Takeoff': MavCmd.vtolTakeoff
 };
 
 // Command number to name mapping (reverse of above)

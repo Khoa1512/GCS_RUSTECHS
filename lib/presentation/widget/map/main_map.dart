@@ -11,7 +11,7 @@ class MainMapSimple extends StatefulWidget {
   final MapController mapController;
   final MapType mapType;
   final List<RoutePoint> routePoints;
-  final Function(LatLng latLng) onTap;
+  final Function(LatLng latLng)? onTap;
   final Function(int index, LatLng newPosition)? onWaypointDrag;
   final bool isConfigValid;
   final LatLng? homePoint;
@@ -21,7 +21,7 @@ class MainMapSimple extends StatefulWidget {
     required this.mapController,
     required this.mapType,
     required this.routePoints,
-    required this.onTap,
+    this.onTap,
     this.onWaypointDrag,
     required this.isConfigValid,
     this.homePoint,
@@ -65,13 +65,13 @@ class _MainMapSimpleState extends State<MainMapSimple> {
     if (widget.homePoint != null && !_hasZoomedToHome) {
       _zoomToHomePoint();
     } else {
-      widget.mapController.move(const LatLng(10.7302, 106.6988), 16);
+      widget.mapController.move(const LatLng(10.7302, 106.6988), 18);
     }
   }
 
   void _zoomToHomePoint() {
     if (widget.homePoint != null) {
-      widget.mapController.move(widget.homePoint!, 18);
+      widget.mapController.move(widget.homePoint!, 20);
       _hasZoomedToHome = true;
     }
   }
@@ -202,8 +202,8 @@ class _MainMapSimpleState extends State<MainMapSimple> {
                   : InteractiveFlag.all,
             ),
             onTap: (tapPosition, latlng) {
-              if (widget.isConfigValid) {
-                widget.onTap(latlng);
+              if (widget.isConfigValid && widget.onTap != null) {
+                widget.onTap!(latlng);
               }
             },
           ),
@@ -268,35 +268,47 @@ class _MainMapSimpleState extends State<MainMapSimple> {
                       behavior: HitTestBehavior.opaque,
                       // Cải thiện độ nhạy cho trackpad
                       dragStartBehavior: DragStartBehavior.down,
-                      onTapDown: (details) {
-                        // Haptic feedback khi bắt đầu chạm
-                        HapticFeedback.lightImpact();
-                        // Chuẩn bị cho việc kéo
-                        setState(() {
-                          _draggedWaypointIndex = index;
-                        });
-                      },
-                      onLongPressStart: (details) {
-                        // Long press để bắt đầu drag (tốt cho trackpad)
-                        setState(() {
-                          _draggedWaypointIndex = index;
-                          _draggedPosition = point;
-                        });
-                        HapticFeedback.mediumImpact();
-                      },
-                      onLongPressMoveUpdate: (details) =>
-                          _onWaypointLongPressMoveUpdate(index, details),
-                      onLongPressEnd: (details) =>
-                          _onWaypointLongPressEnd(index, details),
-                      onPanStart: (details) {
-                        setState(() {
-                          _draggedWaypointIndex = index;
-                          _draggedPosition = point;
-                        });
-                      },
-                      onPanUpdate: (details) =>
-                          _onWaypointPanUpdate(index, details),
-                      onPanEnd: (details) => _onWaypointPanEnd(index, details),
+                      onTapDown: widget.onWaypointDrag != null
+                          ? (details) {
+                              // Haptic feedback khi bắt đầu chạm
+                              HapticFeedback.lightImpact();
+                              // Chuẩn bị cho việc kéo
+                              setState(() {
+                                _draggedWaypointIndex = index;
+                              });
+                            }
+                          : null,
+                      onLongPressStart: widget.onWaypointDrag != null
+                          ? (details) {
+                              // Long press để bắt đầu drag (tốt cho trackpad)
+                              setState(() {
+                                _draggedWaypointIndex = index;
+                                _draggedPosition = point;
+                              });
+                              HapticFeedback.mediumImpact();
+                            }
+                          : null,
+                      onLongPressMoveUpdate: widget.onWaypointDrag != null
+                          ? (details) =>
+                                _onWaypointLongPressMoveUpdate(index, details)
+                          : null,
+                      onLongPressEnd: widget.onWaypointDrag != null
+                          ? (details) => _onWaypointLongPressEnd(index, details)
+                          : null,
+                      onPanStart: widget.onWaypointDrag != null
+                          ? (details) {
+                              setState(() {
+                                _draggedWaypointIndex = index;
+                                _draggedPosition = point;
+                              });
+                            }
+                          : null,
+                      onPanUpdate: widget.onWaypointDrag != null
+                          ? (details) => _onWaypointPanUpdate(index, details)
+                          : null,
+                      onPanEnd: widget.onWaypointDrag != null
+                          ? (details) => _onWaypointPanEnd(index, details)
+                          : null,
                       onTap: () {
                         // Reset khi chỉ tap không kéo
                         setState(() {

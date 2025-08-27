@@ -18,6 +18,8 @@ class RoutePointTable extends StatefulWidget {
   onEditPoint;
   final Function()? onReadMission;
   final Function(RoutePoint)? onDeletePoint;
+  final Function()? onSavePlan;
+  final bool isCreatingNewPlan;
 
   const RoutePointTable({
     super.key,
@@ -28,6 +30,8 @@ class RoutePointTable extends StatefulWidget {
     required this.onEditPoint,
     this.onReadMission,
     this.onDeletePoint,
+    this.onSavePlan,
+    this.isCreatingNewPlan = false,
   });
 
   @override
@@ -64,19 +68,8 @@ class _RoutePointTableState extends State<RoutePointTable> {
     }
   }
 
-  void _saveAllChanges() {
-    // Kiểm tra xem có route points nào không
-    if (widget.routePoints.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No waypoints to save'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    // Lưu tất cả thay đổi cho tất cả points
+  void _applyAllChanges() {
+    // Apply tất cả thay đổi vào routePoints mà không clear edits và không gửi đến FC
     for (final point in widget.routePoints) {
       final newAltitude = _altitudeEdits[point.id];
       final newCommand = _commandEdits[point.id];
@@ -102,6 +95,22 @@ class _RoutePointTableState extends State<RoutePointTable> {
         );
       }
     }
+  }
+
+  void _saveAllChanges() {
+    // Kiểm tra xem có route points nào không
+    if (widget.routePoints.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No waypoints to save'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Apply tất cả thay đổi
+    _applyAllChanges();
 
     // Clear edits sau khi save
     setState(() {
@@ -346,6 +355,7 @@ class _RoutePointTableState extends State<RoutePointTable> {
       ),
       keyboardType: TextInputType.number,
       textAlign: TextAlign.center,
+      textInputAction: TextInputAction.done,
       onChanged: (newValue) {
         // Always update the text display
         _updateParamText(point, paramIndex, newValue);
@@ -363,6 +373,12 @@ class _RoutePointTableState extends State<RoutePointTable> {
         }
       },
     );
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -478,6 +494,8 @@ class _RoutePointTableState extends State<RoutePointTable> {
                               isDense: true,
                               contentPadding: EdgeInsets.zero,
                             ),
+                            onSubmitted: (_) => handleSearchLocation(),
+                            textInputAction: TextInputAction.search,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -533,18 +551,38 @@ class _RoutePointTableState extends State<RoutePointTable> {
                       Expanded(
                         child: _CompactActionButton(
                           icon: Icons.save,
-                          label: 'Save',
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Save Plan functionality coming soon',
-                                ),
-                                backgroundColor: Colors.orange,
-                              ),
-                            );
-                          },
-                          color: Colors.green,
+                          label: widget.isCreatingNewPlan
+                              ? 'Save Plan'
+                              : 'Save',
+                          onTap:
+                              widget.isCreatingNewPlan &&
+                                  widget.onSavePlan != null
+                              ? () {
+                                  // Apply tất cả thay đổi trước khi save plan
+                                  _applyAllChanges();
+                                  // Clear edits sau khi apply
+                                  setState(() {
+                                    _altitudeEdits.clear();
+                                    _commandEdits.clear();
+                                    _paramEdits.clear();
+                                    _paramTextEdits.clear();
+                                  });
+                                  // Save plan
+                                  widget.onSavePlan!();
+                                }
+                              : () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Save Plan functionality coming soon',
+                                      ),
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  );
+                                },
+                          color: widget.isCreatingNewPlan
+                              ? Colors.blue
+                              : Colors.green,
                         ),
                       ),
                       const SizedBox(width: 8),

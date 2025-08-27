@@ -261,6 +261,25 @@ final Map<int, List<MavCmdParam>> mavCmdParams = {
       enumValues: ['0: Absolute', '1: Relative'],
     ),
   ],
+  // MAV_CMD_CONDITION_YAW (115)
+  84: [
+    MavCmdParam(
+      name: '',
+      description: 'Empty',
+      unit: '',
+    ),
+    MavCmdParam(
+      name: 'Transition Heading',
+      description: 'Front transition heading.',
+      unit: '',
+    ),
+    MavCmdParam(name: '', description: 'Empty', unit: ''),
+    MavCmdParam(
+      name: 'Yaw Angle',
+      description: 'Yaw angle. NaN to use the current system yaw heading mode',
+      unit: 'deg',
+    ),
+  ],
 };
 
 // Helper function to get parameters for a command

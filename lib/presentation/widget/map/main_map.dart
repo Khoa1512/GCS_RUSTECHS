@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:skylink/core/constant/map_type.dart';
 import 'package:skylink/data/models/route_point_model.dart';
+import 'package:skylink/presentation/widget/mission/mission_visualization_helpers.dart';
 
 class MainMapSimple extends StatefulWidget {
   final MapController mapController;
@@ -228,6 +228,11 @@ class _MainMapSimpleState extends State<MainMapSimple> {
                       strokeWidth: 4,
                     );
                   }),
+                  // Add loiter circles visualization
+                  ...MissionVisualizationHelpers.generateLoiterPolylines(
+                    widget.routePoints,
+                    mapZoom: widget.mapController.camera.zoom,
+                  ),
                 ],
               ),
             MarkerLayer(
@@ -362,6 +367,7 @@ class _MainMapSimpleState extends State<MainMapSimple> {
                     ),
                   );
                 }),
+                // Remove loiter radius markers - no more label boxes
               ],
             ),
           ],

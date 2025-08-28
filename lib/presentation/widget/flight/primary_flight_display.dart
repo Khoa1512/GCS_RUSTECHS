@@ -205,10 +205,8 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
               stream: _telemetryService.telemetryStream,
               builder: (context, snapshot) {
                 final telemetryData = snapshot.data ?? {};
-                final compassHeading =
-                    telemetryData['compass_heading'] ??
-                    telemetryData['yaw'] ??
-                    0.0;
+                // Only use stabilized compass_heading
+                final compassHeading = telemetryData['compass_heading'] ?? 0.0;
 
                 return CompassHeadingTape(
                   heading: compassHeading < 0
@@ -231,10 +229,8 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                 final pitch = telemetryData['pitch'] ?? 0.0;
                 final roll = telemetryData['roll'] ?? 0.0;
                 final yaw = telemetryData['yaw'] ?? 0.0;
-                final compassHeading =
-                    telemetryData['compass_heading'] ??
-                    telemetryData['yaw'] ??
-                    0.0;
+                // Only use stabilized compass_heading
+                final compassHeading = telemetryData['compass_heading'] ?? 0.0;
                 final altitude = telemetryData['altitude_rel'] ?? 0.0;
                 final speed = telemetryData['groundspeed'] ?? 0.0;
                 final isArmed = (telemetryData['armed'] ?? 0.0) > 0.5;

@@ -386,7 +386,6 @@ class _MapPageState extends State<MapPage> {
             if (!clearAckReceived) break;
 
             final errorCode = event.data as int;
-            print('Mission ACK received with error code: $errorCode');
 
             if (_isActualError(errorCode)) {
               // Chỉ các lỗi nghiêm trọng mới báo failed
@@ -554,7 +553,36 @@ class _MapPageState extends State<MapPage> {
 
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
+        // Function để đóng dialog - sử dụng dialogContext
+        void closeDialog() {
+          Navigator.of(dialogContext).pop();
+        }
+
+        // Function để submit form - sử dụng context gốc cho SnackBar và main context
+        void submitForm() {
+          final title = titleController.text.trim();
+          final description = descriptionController.text.trim();
+
+          if (title.isEmpty) {
+            // Hiển thị thông báo lỗi nếu title trống - dùng context gốc
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Plan title is required'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 2),
+              ),
+            );
+            return;
+          }
+
+          // Đóng dialog trước - dùng dialogContext
+          Navigator.of(dialogContext).pop();
+
+          // Sau đó tạo plan - dùng context gốc
+          _startCreatingPlan(title, description);
+        }
+
         return AlertDialog(
           backgroundColor: const Color(0xFF2D2D2D),
           title: const Text(
@@ -566,9 +594,12 @@ class _MapPageState extends State<MapPage> {
             children: [
               TextField(
                 controller: titleController,
+                autofocus: true,
                 style: const TextStyle(color: Colors.white),
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => submitForm(), // Submit khi nhấn Enter
                 decoration: const InputDecoration(
-                  labelText: 'Plan Title',
+                  labelText: 'Plan Title *',
                   labelStyle: TextStyle(color: Colors.grey),
                   enabledBorder: UnderlineInputBorder(
                     borderSide: BorderSide(color: Colors.grey),
@@ -583,6 +614,8 @@ class _MapPageState extends State<MapPage> {
                 controller: descriptionController,
                 style: const TextStyle(color: Colors.white),
                 maxLines: 3,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => submitForm(), // Submit khi nhấn Enter
                 decoration: const InputDecoration(
                   labelText: 'Description (optional)',
                   labelStyle: TextStyle(color: Colors.grey),
@@ -598,21 +631,16 @@ class _MapPageState extends State<MapPage> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: closeDialog, // Dùng function với dialogContext
               child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
             ),
-            TextButton(
-              onPressed: () {
-                if (titleController.text.trim().isNotEmpty) {
-                  Navigator.of(context).pop();
-                  // Start creating plan - show Route Point Table
-                  _startCreatingPlan(
-                    titleController.text.trim(),
-                    descriptionController.text.trim(),
-                  );
-                }
-              },
-              child: const Text('Create', style: TextStyle(color: Colors.teal)),
+            ElevatedButton(
+              onPressed: submitForm, // Dùng function với logic phù hợp
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Create'),
             ),
           ],
         );
@@ -621,35 +649,50 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _startCreatingPlan(String title, String description) {
-    // Tạo plan ngay lập tức khi bấm Create trong dialog
-    final newPlan = UserMissionPlan(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: title,
-      description: description,
-      waypoints: [], // Bắt đầu với waypoints rỗng
-      createdAt: DateTime.now(),
-    );
+    try {
 
-    print('_startCreatingPlan called - creating plan: ${newPlan.title}');
+      // Tạo plan ngay lập tức khi bấm Create trong dialog
+      final newPlan = UserMissionPlan(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        title: title,
+        description: description,
+        waypoints: [], // Bắt đầu với waypoints rỗng
+        createdAt: DateTime.now(),
+      );
 
-    setState(() {
-      // Thêm plan vào list ngay lập tức
-      savedPlans.add(newPlan);
-      selectedPlan = newPlan;
-      isCreatingNewPlan = true; // Vẫn giữ flag này để hiện RoutePointTable
-      routePoints.clear();
-    });
+      if (mounted) {
+        setState(() {
+          // Thêm plan vào list ngay lập tức
+          savedPlans.add(newPlan);
+          selectedPlan = newPlan;
+          isCreatingNewPlan = true; // Vẫn giữ flag này để hiện RoutePointTable
+          routePoints.clear();
+        });
 
-    print(
-      '_startCreatingPlan completed - selectedPlan: ${selectedPlan?.title}, isCreatingNewPlan: $isCreatingNewPlan',
-    );
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Mission plan "$title" created successfully!'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error in _startCreatingPlan: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error creating mission plan: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   void handleCreatePlan(String title, String description) {
-    // Debug
-    print(
-      'handleCreatePlan called - selectedPlan: ${selectedPlan?.title}, isCreatingNewPlan: $isCreatingNewPlan',
-    );
 
     // Update plan đã tồn tại với waypoints (có thể rỗng)
     if (selectedPlan == null) {
@@ -713,9 +756,9 @@ class _MapPageState extends State<MapPage> {
         final maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
 
         double zoomLevel = 18; // Default zoom - tăng từ 16 lên 18
-        if (maxDiff > 0.01)
+        if (maxDiff > 0.01) {
           zoomLevel = 15; // tăng từ 13 lên 15
-        else if (maxDiff > 0.005)
+        } else if (maxDiff > 0.005)
           zoomLevel = 16; // tăng từ 14 lên 16
         else if (maxDiff > 0.002)
           zoomLevel = 17; // tăng từ 15 lên 17
@@ -751,9 +794,9 @@ class _MapPageState extends State<MapPage> {
         final maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
 
         double zoomLevel = 18; // Default zoom - tăng từ 16 lên 18
-        if (maxDiff > 0.01)
+        if (maxDiff > 0.01) {
           zoomLevel = 15; // tăng từ 13 lên 15
-        else if (maxDiff > 0.005)
+        } else if (maxDiff > 0.005)
           zoomLevel = 16; // tăng từ 14 lên 16
         else if (maxDiff > 0.002)
           zoomLevel = 17; // tăng từ 15 lên 17

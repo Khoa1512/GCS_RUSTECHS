@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_libserialport/flutter_libserialport.dart';
 import 'package:skylink/api/telemetry/mavlink_api.dart';
@@ -33,7 +34,20 @@ class TelemetryService {
   String _lastGpsFixType = 'No GPS';
   String _vehicleType = 'Unknown'; // Vehicle type from heartbeat
 
-  // Public getters
+  // Heading stabilization - Optimized for ATTITUDE.yaw (more stable than VFR_HUD)
+  double _lastStableHeading = 0.0;
+  DateTime _lastHeadingUpdate = DateTime.now();
+  static const double _headingStabilityThreshold =
+      3.0; // degrees - Reduced since ATTITUDE.yaw is much more stable
+  static const Duration _headingUpdateInterval = Duration(
+    milliseconds: 500,
+  ); // Reduced since we're using stable ATTITUDE.yaw instead of noisy VFR_HUD
+
+  // Moving average filter for heading (reduce magnetometer noise)
+  final List<double> _headingBuffer = [];
+  static const int _headingBufferSize =
+      8; // increased from 5 for stronger filtering
+
   Stream<Map<String, double>> get telemetryStream =>
       _telemetryController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
@@ -53,6 +67,67 @@ class TelemetryService {
 
   // Expose MAVLink API for accessing other event types (like statusText)
   DroneMAVLinkAPI get mavlinkAPI => _api;
+
+  /// Apply moving average filter to reduce magnetometer noise
+  double _filterHeading(double newHeading) {
+    // Add to buffer
+    _headingBuffer.add(newHeading);
+
+    // Keep buffer size limited
+    if (_headingBuffer.length > _headingBufferSize) {
+      _headingBuffer.removeAt(0);
+    }
+
+    // Return simple average if buffer not full
+    if (_headingBuffer.length < 3) {
+      return newHeading;
+    }
+
+    // Calculate weighted average (recent values have more weight)
+    double sum = 0.0;
+    double weightSum = 0.0;
+
+    for (int i = 0; i < _headingBuffer.length; i++) {
+      double weight = (i + 1).toDouble(); // Recent values get higher weight
+      sum += _headingBuffer[i] * weight;
+      weightSum += weight;
+    }
+
+    return sum / weightSum;
+  }
+
+  /// Update compass heading with stability filtering
+  void _updateCompassHeading(double newHeading) {
+    final now = DateTime.now();
+
+    // Skip update if too frequent (reduce noise)
+    if (now.difference(_lastHeadingUpdate) < _headingUpdateInterval) {
+      return;
+    }
+
+    // Normalize heading to 0-360
+    newHeading = newHeading % 360;
+    if (newHeading < 0) newHeading += 360;
+
+    // Apply moving average filter to smooth out noise
+    final filteredHeading = _filterHeading(newHeading);
+
+    // Calculate heading difference handling 360/0 wraparound
+    double headingDiff = (filteredHeading - _lastStableHeading).abs();
+    if (headingDiff > 180) {
+      headingDiff = 360 - headingDiff;
+    }
+
+    // Only update if change is significant enough to be meaningful
+    // Reduced threshold for more responsive updates while filtering noise
+    if (headingDiff > _headingStabilityThreshold ||
+        now.difference(_lastHeadingUpdate) > Duration(seconds: 2)) {
+      _currentTelemetry['compass_heading'] = filteredHeading;
+      _lastStableHeading = filteredHeading;
+      _lastHeadingUpdate = now;
+
+    }
+  }
 
   /// Initialize the service
   void initialize() {
@@ -76,7 +151,6 @@ class TelemetryService {
 
       final success = _api.isConnected;
       if (success) {
-        print('TelemetryService: Port connected, waiting for data...');
         _hasReceivedData = false;
 
         // Setup API listener mới
@@ -87,8 +161,25 @@ class TelemetryService {
         _connectionController.add(false);
         _dataReceiveController.add(false);
 
-        // Request all data streams for real-time telemetry
-        _api.requestAllDataStreams();
+        // Request all data streams for real-time telemetry với delay
+        Timer(const Duration(milliseconds: 1000), () {
+          if (_isConnected) {
+            // if (kDebugMode) {
+            //   print('TelemetryService: Requesting data streams...');
+            // }
+            _api.requestAllDataStreams();
+
+            // Send again after delay để ensure FC receives
+            Timer(const Duration(milliseconds: 500), () {
+              if (_isConnected) {
+                _api.requestAllDataStreams();
+                // if (kDebugMode) {
+                //   print('TelemetryService: Data streams requested (retry)');
+                // }
+              }
+            });
+          }
+        });
       } else {
         // print('TelemetryService: Connection failed');
       }
@@ -124,10 +215,7 @@ class TelemetryService {
       _currentTelemetry.clear();
       _telemetryController.add(_currentTelemetry);
 
-      // print('TelemetryService: Disconnected successfully');
     } catch (e) {
-      // print('TelemetryService: Error during disconnect: $e');
-      // Đảm bảo các trạng thái vẫn được reset ngay cả khi có lỗi
       _isConnected = false;
       _hasReceivedData = false;
       _connectionController.add(false);
@@ -137,7 +225,6 @@ class TelemetryService {
 
   /// Get available serial ports
   List<String> getAvailablePorts() {
-    // Query serial ports directly; API no longer exposes this helper
     final ports = SerialPort.availablePorts;
     return ports;
   }
@@ -156,8 +243,6 @@ class TelemetryService {
             _armed = (m['armed'] as bool?) ?? _armed;
             _vehicleType = (m['type'] as String?) ?? _vehicleType;
             _currentTelemetry['armed'] = _armed ? 1.0 : 0.0;
-            // Optional: expose mode for UI
-            // Store as double? keep in map as not used in numeric charts
           }
           _emitTelemetry();
           break;
@@ -170,15 +255,21 @@ class TelemetryService {
             _currentTelemetry['pitch'] =
                 (m['pitch'] as num?)?.toDouble() ??
                 (_currentTelemetry['pitch'] ?? 0.0);
-            _currentTelemetry['yaw'] =
+
+            final rawYaw =
                 (m['yaw'] as num?)?.toDouble() ??
                 (_currentTelemetry['yaw'] ?? 0.0);
-            // Default compass heading to yaw when GPS course not available
-            _currentTelemetry['compass_heading'] =
-                _currentTelemetry['gps_course'] != null &&
-                    (_currentTelemetry['gps_course'] ?? 0) != 0
-                ? _currentTelemetry['gps_course']!
-                : _currentTelemetry['yaw'] ?? 0.0;
+
+            // Convert yaw from radians to degrees if needed
+            double yawDegrees = rawYaw;
+            if (rawYaw.abs() <= 6.28) {
+              // likely radians (-π to π)
+              yawDegrees = rawYaw * 180.0 / 3.14159;
+              if (yawDegrees < 0) yawDegrees += 360; // normalize 0-360
+            }
+            _currentTelemetry['yaw'] = yawDegrees;
+            _updateCompassHeading(yawDegrees);
+
           }
           _emitTelemetry();
           break;
@@ -191,6 +282,7 @@ class TelemetryService {
             _currentTelemetry['groundspeed'] =
                 (m['groundspeed'] as num?)?.toDouble() ??
                 (_currentTelemetry['groundspeed'] ?? 0.0);
+
             // vfrhud.alt can serve as MSL if GLOBAL_POSITION not yet arrived
             final alt = (m['alt'] as num?)?.toDouble();
             if (alt != null) {
@@ -202,12 +294,10 @@ class TelemetryService {
         case MAVLinkEventType.position:
           if (event.data is Map) {
             final m = (event.data as Map);
-            _currentTelemetry['gps_latitude'] =
-                (m['lat'] as num?)?.toDouble() ??
-                (_currentTelemetry['gps_latitude'] ?? 0.0);
-            _currentTelemetry['gps_longitude'] =
-                (m['lon'] as num?)?.toDouble() ??
-                (_currentTelemetry['gps_longitude'] ?? 0.0);
+            // KHÔNG cập nhật GPS coordinates từ position event nữa
+            // Chỉ ưu tiên gpsInfo event cho GPS coordinates để tránh conflict
+            // Position event chỉ cập nhật altitude và movement data
+
             _currentTelemetry['altitude_msl'] =
                 (m['altMSL'] as num?)?.toDouble() ??
                 (_currentTelemetry['altitude_msl'] ?? 0.0);
@@ -217,10 +307,9 @@ class TelemetryService {
             _currentTelemetry['groundspeed'] =
                 (m['groundSpeed'] as num?)?.toDouble() ??
                 (_currentTelemetry['groundspeed'] ?? 0.0);
-            final heading = (m['heading'] as num?)?.toDouble();
-            if (heading != null && heading > 0) {
-              _currentTelemetry['compass_heading'] = heading;
-            }
+
+            // Don't use GLOBAL_POSITION_INT heading to avoid conflicts
+            // Priority: GPS course > Yaw (handled in other events)
           }
           _emitTelemetry();
           break;
@@ -236,12 +325,15 @@ class TelemetryService {
             // However, some UI expects 'gps_fix_type' string
             // We can't store string in Map<String,double>, so expose via getter only
 
-            _currentTelemetry['gps_latitude'] =
+            final newLat =
                 (m['lat'] as num?)?.toDouble() ??
                 (_currentTelemetry['gps_latitude'] ?? 0.0);
-            _currentTelemetry['gps_longitude'] =
+            final newLon =
                 (m['lon'] as num?)?.toDouble() ??
                 (_currentTelemetry['gps_longitude'] ?? 0.0);
+
+            _currentTelemetry['gps_latitude'] = newLat;
+            _currentTelemetry['gps_longitude'] = newLon;
             _currentTelemetry['gps_altitude'] =
                 (m['alt'] as num?)?.toDouble() ??
                 (_currentTelemetry['gps_altitude'] ?? 0.0);
@@ -258,11 +350,13 @@ class TelemetryService {
                 (m['epv'] as num?)?.toDouble() ??
                 (_currentTelemetry['gps_vertical_accuracy'] ?? 0.0);
 
-            // Prefer GPS course for compass when valid
-            if ((_currentTelemetry['gps_course'] ?? 0.0) != 0.0) {
-              _currentTelemetry['compass_heading'] =
-                  _currentTelemetry['gps_course']!;
-            }
+            // GPS course is for navigation, not compass display
+            // Compass should show FC orientation (IMU yaw), not movement direction
+            // Comment out GPS course override to keep IMU yaw priority
+            // final gpsCourse = _currentTelemetry['gps_course'] ?? 0.0;
+            // if (gpsCourse > 0.0) {
+            //   _updateCompassHeading(gpsCourse);
+            // }
             // Cache last fix type string in a field for getters
             _lastGpsFixType = fixType;
           }

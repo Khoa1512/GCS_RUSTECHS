@@ -505,20 +505,20 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     if (isCurrentlyArmed && !_wasPreviouslyArmed) {
       _groundAltitude = alt;
       _wasPreviouslyArmed = true;
-      if (kDebugMode) {
-        print(
-          'Armed detected. Ground altitude: ${_groundAltitude.toStringAsFixed(1)}m',
-        );
-      }
+      // if (kDebugMode) {
+      //   print(
+      //     'Armed detected. Ground altitude: ${_groundAltitude.toStringAsFixed(1)}m',
+      //   );
+      // }
     }
 
     // Reset when disarmed
     if (!isCurrentlyArmed && _wasPreviouslyArmed) {
       _wasPreviouslyArmed = false;
       _hasSetHomePointOnTakeoff = false;
-      if (kDebugMode) {
-        print('Disarmed detected. Reset takeoff detection.');
-      }
+      // if (kDebugMode) {
+      //   print('Disarmed detected. Reset takeoff detection.');
+      // }
     }
 
     // Detect takeoff: armed + altitude > threshold + chưa set home point
@@ -531,12 +531,12 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
         _hasSetHomePointOnTakeoff = true;
       });
 
-      if (kDebugMode) {
-        print('TAKEOFF DETECTED! Home point set at: ($lat, $lon)');
-        print(
-          'Takeoff altitude: ${(alt - _groundAltitude).toStringAsFixed(1)}m above ground',
-        );
-      }
+      // if (kDebugMode) {
+      //   print('TAKEOFF DETECTED! Home point set at: ($lat, $lon)');
+      //   print(
+      //     'Takeoff altitude: ${(alt - _groundAltitude).toStringAsFixed(1)}m above ground',
+      //   );
+      // }
     }
   }
 
@@ -555,9 +555,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     double rawLat = _telemetryService.gpsLatitude;
     double rawLon = _telemetryService.gpsLongitude;
 
-    if (kDebugMode) {
-      print('Setting home point at: ($rawLat, $rawLon)');
-    }
 
     setState(() {
       _homePoint = LatLng(rawLat, rawLon);
@@ -566,9 +563,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 
   // Method để clear home point
   void _clearHomePoint() {
-    if (kDebugMode) {
-      print('Clearing home point');
-    }
 
     setState(() {
       _homePoint = null;
@@ -592,10 +586,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
         _homePoint = LatLng(rawLat, rawLon);
         _hasSetHomePointOnTakeoff = true; // Mark as set để không bị override
       });
-
-      if (kDebugMode) {
-        print('Manual home point set at: ($rawLat, $rawLon)');
-      }
     }
   }
 
@@ -605,10 +595,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       // Nếu đã có home point → Clear nó
       _clearHomePoint();
       _hasSetHomePointOnTakeoff = false; // Reset để có thể set lại
-
-      if (kDebugMode) {
-        print('Home point cleared by user');
-      }
     } else {
       // Nếu chưa có home point → Set tại vị trí hiện tại
       setHomePointHere();
@@ -628,14 +614,14 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
         smoothed.longitude,
       );
 
-      if (difference > 10.0) {
-        // Nếu khác biệt > 10m thì cảnh báo
-        print(
-          'WARNING: Large difference between raw GPS and smoothed position: ${difference.toStringAsFixed(2)}m',
-        );
-        print('Raw GPS: (${rawGps.latitude}, ${rawGps.longitude})');
-        print('Smoothed: (${smoothed.latitude}, ${smoothed.longitude})');
-      }
+      // if (difference > 10.0) {
+      //   // Nếu khác biệt > 10m thì cảnh báo
+      //   print(
+      //     'WARNING: Large difference between raw GPS and smoothed position: ${difference.toStringAsFixed(2)}m',
+      //   );
+      //   print('Raw GPS: (${rawGps.latitude}, ${rawGps.longitude})');
+      //   print('Smoothed: (${smoothed.latitude}, ${smoothed.longitude})');
+      // }
     }
   }
 
@@ -722,49 +708,52 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 
                   // Waypoint markers
                   MarkerLayer(
-                    markers: _missionService.currentMissionPoints
-                        .asMap()
-                        .entries
-                        .map((entry) {
-                          final index = entry.key;
-                          final point = entry.value;
-                          return Marker(
-                            point: LatLng(
-                              double.parse(point.latitude),
-                              double.parse(point.longitude),
-                            ),
-                            width: 40,
-                            height: 40,
-                            alignment: Alignment.center,
-                            child: Stack(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  color: Colors.red,
-                                  size: 40,
-                                ),
-                                Positioned.fill(
-                                  child: Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 12,
-                                      ),
-                                      child: Text(
-                                        '${index + 1}',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
+                    markers: [
+                      // Regular waypoint markers
+                      ..._missionService.currentMissionPoints
+                          .asMap()
+                          .entries
+                          .map((entry) {
+                            final index = entry.key;
+                            final point = entry.value;
+                            return Marker(
+                              point: LatLng(
+                                double.parse(point.latitude),
+                                double.parse(point.longitude),
+                              ),
+                              width: 40,
+                              height: 40,
+                              alignment: Alignment.center,
+                              child: Stack(
+                                children: [
+                                  Icon(
+                                    Icons.location_on,
+                                    color: Colors.red,
+                                    size: 40,
+                                  ),
+                                  Positioned.fill(
+                                    child: Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 12,
+                                        ),
+                                        child: Text(
+                                          '${index + 1}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          );
-                        })
-                        .toList(),
+                                ],
+                              ),
+                            );
+                          })
+                          ,
+                    ],
                   ),
                 ],
 

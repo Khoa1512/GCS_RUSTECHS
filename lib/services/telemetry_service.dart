@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_libserialport/flutter_libserialport.dart';
 import 'package:skylink/api/telemetry/mavlink_api.dart';
@@ -124,7 +125,6 @@ class TelemetryService {
       _currentTelemetry['compass_heading'] = filteredHeading;
       _lastStableHeading = filteredHeading;
       _lastHeadingUpdate = now;
-
     }
   }
 
@@ -213,7 +213,6 @@ class TelemetryService {
       // Xóa dữ liệu telemetry
       _currentTelemetry.clear();
       _telemetryController.add(_currentTelemetry);
-
     } catch (e) {
       _isConnected = false;
       _hasReceivedData = false;
@@ -268,7 +267,6 @@ class TelemetryService {
             }
             _currentTelemetry['yaw'] = yawDegrees;
             _updateCompassHeading(yawDegrees);
-
           }
           _emitTelemetry();
           break;
@@ -399,13 +397,33 @@ class TelemetryService {
   /// Emit current telemetry map and mark data received when first meaningful data arrives
   void _emitTelemetry() {
     if (!_hasReceivedData) {
+      // Relaxed meaningful data detection - accept basic telemetry
       final hasPosition =
           ((_currentTelemetry['gps_latitude'] ?? 0.0) != 0.0) ||
           ((_currentTelemetry['gps_longitude'] ?? 0.0) != 0.0);
       final hasBattery = (_currentTelemetry['battery'] ?? 0.0) > 0.0;
-      if (hasPosition || hasBattery) {
+      final hasAttitude =
+          (_currentTelemetry['roll'] != null) ||
+          (_currentTelemetry['pitch'] != null) ||
+          (_currentTelemetry['yaw'] != null);
+      final hasBasicData =
+          (_currentTelemetry['armed'] != null) ||
+          (_currentTelemetry['airspeed'] != null) ||
+          (_currentTelemetry['groundspeed'] != null);
+
+      // Accept data if we have any meaningful telemetry (not just GPS+battery)
+      if (hasPosition || hasBattery || hasAttitude || hasBasicData) {
         _hasReceivedData = true;
         _dataReceiveController.add(true);
+
+        // Debug logging để tracking
+        if (kDebugMode) {
+          print(
+            'TelemetryService: First meaningful data received! '
+            'Position: $hasPosition, Battery: $hasBattery, '
+            'Attitude: $hasAttitude, Basic: $hasBasicData',
+          );
+        }
       }
     }
     _telemetryController.add(Map.from(_currentTelemetry));

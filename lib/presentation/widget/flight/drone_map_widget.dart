@@ -72,6 +72,10 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   late AnimationController _positionController;
   late Animation<double> _positionAnimation;
 
+  // UI Update optimization
+  Timer? _uiUpdateTimer;
+  bool _needsUIUpdate = false;
+
   // Debug option để tắt smoothing
   static const bool _enableGpsSmoothing = true; // Set false để tắt smoothing
 
@@ -119,6 +123,9 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       CurvedAnimation(parent: _positionController, curve: Curves.easeOut),
     );
 
+    // Add listener for smooth position updates instead of Timer.periodic
+    _positionController.addListener(_onPositionAnimationUpdate);
+
     // Initialize interpolated position
     _currentInterpolatedPosition = LatLng(_currentLatitude, _currentLongitude);
   }
@@ -153,6 +160,13 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
           double newLon = data['gps_longitude'] ?? _currentLongitude;
           double newAlt = data['gps_altitude'] ?? _currentAltitude;
 
+          // Early return nếu không có thay đổi
+          if (newLat == _currentLatitude &&
+              newLon == _currentLongitude &&
+              newAlt == _currentAltitude) {
+            return;
+          }
+
           // Nếu đây là GPS data đầu tiên (vẫn ở default position), khởi tạo ngay
           if (_currentLatitude == 10.7302 && _currentLongitude == 106.6988) {
             if (kDebugMode) {
@@ -181,21 +195,12 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
           // Detect takeoff và set home point
           _detectTakeoffAndSetHome(newLat, newLon, newAlt);
 
-          // Mission Planner approach: Quality-based GPS processing
+          // Mission Planner approach: Quality-based GPS processing với caching
           String gpsFixType = _telemetryService.gpsFixType;
+          double threshold = _getDistanceThreshold(gpsFixType);
 
-          if (gpsFixType == 'RTK Fixed' ||
-              gpsFixType == 'RTK Float' ||
-              gpsFixType == 'DGPS') {
-            // High-quality GPS → Smooth interpolation (works cho cả telemetry và direct)
-            if (distanceFromCurrent > 0.1) {
-              _processMissionPlannerStyleGPS(newLat, newLon, newAlt);
-            }
-          } else {
-            // Low-quality GPS → Conservative processing
-            if (distanceFromCurrent > 0.5) {
-              _processMissionPlannerStyleGPS(newLat, newLon, newAlt);
-            }
+          if (distanceFromCurrent > threshold) {
+            _processMissionPlannerStyleGPS(newLat, newLon, newAlt);
           }
         }
 
@@ -375,7 +380,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     return LatLng(weightedLat / totalWeight, weightedLon / totalWeight);
   }
 
-  // Smooth interpolation như Mission Planner
+  // Smooth interpolation như Mission Planner - OPTIMIZED
   void _startInterpolation() {
     if (_targetPosition == null || _currentInterpolatedPosition == null) return;
 
@@ -403,7 +408,11 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       return;
     }
 
-    // Start position animation
+    // Store interpolation data for listener
+    _interpolationStartPos = startPos;
+    _interpolationEndPos = endPos;
+
+    // Start position animation using controller listener (more efficient)
     _positionController.duration = Duration(milliseconds: duration);
     _positionAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _positionController, curve: Curves.easeOut),
@@ -411,24 +420,42 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 
     _positionController.reset();
     _positionController.forward();
+  }
 
-    // Update position during animation - 60 FPS như Mission Planner
-    _interpolationTimer = Timer.periodic(const Duration(milliseconds: 16), (
-      timer,
-    ) {
-      if (!mounted || _positionController.isCompleted) {
-        timer.cancel();
-        return;
-      }
+  // Interpolation state for listener
+  LatLng? _interpolationStartPos;
+  LatLng? _interpolationEndPos;
 
-      double t = _positionAnimation.value;
-      _currentInterpolatedPosition = LatLng(
-        startPos.latitude + (endPos.latitude - startPos.latitude) * t,
-        startPos.longitude + (endPos.longitude - startPos.longitude) * t,
-      );
+  // Position animation listener - more efficient than Timer.periodic
+  void _onPositionAnimationUpdate() {
+    if (!mounted ||
+        _interpolationStartPos == null ||
+        _interpolationEndPos == null)
+      return;
 
-      _updateCurrentPosition();
-    });
+    double t = _positionAnimation.value;
+    _currentInterpolatedPosition = LatLng(
+      _interpolationStartPos!.latitude +
+          (_interpolationEndPos!.latitude - _interpolationStartPos!.latitude) *
+              t,
+      _interpolationStartPos!.longitude +
+          (_interpolationEndPos!.longitude -
+                  _interpolationStartPos!.longitude) *
+              t,
+    );
+
+    _updateCurrentPosition();
+  }
+
+  // Helper method để get distance threshold dựa trên GPS quality - CACHED
+  static const Map<String, double> _gpsThresholds = {
+    'RTK Fixed': 0.1,
+    'RTK Float': 0.1,
+    'DGPS': 0.1,
+  };
+
+  double _getDistanceThreshold(String gpsFixType) {
+    return _gpsThresholds[gpsFixType] ?? 0.5; // Default 0.5 for standard GPS
   }
 
   int _calculateInterpolationDuration(double distance) {
@@ -451,7 +478,19 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     _validateCoordinateConsistency();
 
     _updateMapPositionInterpolated();
-    setState(() {});
+    _scheduleUIUpdate(); // Use debounced UI update
+  }
+
+  // Debounced UI update to reduce setState calls
+  void _scheduleUIUpdate() {
+    _needsUIUpdate = true;
+    _uiUpdateTimer?.cancel();
+    _uiUpdateTimer = Timer(const Duration(milliseconds: 16), () {
+      if (mounted && _needsUIUpdate) {
+        setState(() {});
+        _needsUIUpdate = false;
+      }
+    });
   }
 
   void _updateMapPositionInterpolated() {
@@ -555,7 +594,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     double rawLat = _telemetryService.gpsLatitude;
     double rawLon = _telemetryService.gpsLongitude;
 
-
     setState(() {
       _homePoint = LatLng(rawLat, rawLon);
     });
@@ -563,7 +601,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 
   // Method để clear home point
   void _clearHomePoint() {
-
     setState(() {
       _homePoint = null;
     });
@@ -601,27 +638,28 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     }
   }
 
-  // Method để kiểm tra sự khác biệt giữa raw GPS và smoothed position
+  // Method để kiểm tra sự khác biệt giữa raw GPS và smoothed position - OPTIMIZED
   void _validateCoordinateConsistency() {
-    if (kDebugMode && _telemetryService.hasValidGpsFix) {
-      LatLng rawGps = _getRawGpsPosition();
-      LatLng smoothed = LatLng(_currentLatitude, _currentLongitude);
+    // Chỉ validate trong debug mode và khi cần thiết
+    if (!kDebugMode || !_telemetryService.hasValidGpsFix) return;
 
-      double difference = _calculateRealDistance(
-        rawGps.latitude,
-        rawGps.longitude,
-        smoothed.latitude,
-        smoothed.longitude,
+    LatLng rawGps = _getRawGpsPosition();
+    LatLng smoothed = LatLng(_currentLatitude, _currentLongitude);
+
+    double difference = _calculateRealDistance(
+      rawGps.latitude,
+      rawGps.longitude,
+      smoothed.latitude,
+      smoothed.longitude,
+    );
+
+    // Chỉ log khi có vấn đề đáng kể (>10m)
+    if (difference > 10.0) {
+      print(
+        'WARNING: Large GPS difference: ${difference.toStringAsFixed(2)}m\n'
+        'Raw: (${rawGps.latitude.toStringAsFixed(7)}, ${rawGps.longitude.toStringAsFixed(7)})\n'
+        'Smoothed: (${smoothed.latitude.toStringAsFixed(7)}, ${smoothed.longitude.toStringAsFixed(7)})',
       );
-
-      // if (difference > 10.0) {
-      //   // Nếu khác biệt > 10m thì cảnh báo
-      //   print(
-      //     'WARNING: Large difference between raw GPS and smoothed position: ${difference.toStringAsFixed(2)}m',
-      //   );
-      //   print('Raw GPS: (${rawGps.latitude}, ${rawGps.longitude})');
-      //   print('Smoothed: (${smoothed.latitude}, ${smoothed.longitude})');
-      // }
     }
   }
 
@@ -751,8 +789,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                                 ],
                               ),
                             );
-                          })
-                          ,
+                          }),
                     ],
                   ),
                 ],
@@ -942,13 +979,23 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 
   @override
   void dispose() {
+    // Cancel all timers first to prevent memory leaks
+    _interpolationTimer?.cancel();
+    _uiUpdateTimer?.cancel();
+
+    // Remove animation listeners
+    _positionController.removeListener(_onPositionAnimationUpdate);
+
+    // Dispose animation controllers
     _pulseController.dispose();
     _rotationController.dispose();
     _positionController.dispose();
-    _interpolationTimer?.cancel();
+
+    // Cancel subscriptions
     _telemetrySubscription?.cancel();
     _connectionSubscription?.cancel();
     _missionSubscription?.cancel();
+
     super.dispose();
   }
 }

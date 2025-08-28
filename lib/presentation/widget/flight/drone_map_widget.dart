@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -45,14 +46,24 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   double _currentAltitude = 0.0;
   bool _hasZoomedToGPS = false;
 
-  // Home point và tracking
+  // Professional UX controls
+  bool _isFollowModeEnabled = true; // Follow drone by default
+  bool _userInteractedWithMap = false; // Track user pan/zoom
+  DateTime? _lastUserInteraction;
+
+  // Home point
   LatLng? _homePoint;
-  LatLng? _lastDronePosition;
-  bool _hasMovedFromStart = false;
+
+  // Takeoff detection
+  bool _hasSetHomePointOnTakeoff = false;
+  bool _wasPreviouslyArmed = false;
+  double _groundAltitude = 0.0;
+  static const double _takeoffAltitudeThreshold = 2.0; // 2 meters
 
   // GPS smoothing để giảm jitter - Mission Planner style
-  List<LatLng> _gpsBuffer = [];
-  static const int _gpsBufferSize = 5; // Tăng buffer size
+  final List<LatLng> _gpsBuffer = [];
+  static const int _gpsBufferSize =
+      2; // Keep minimal buffer cho both connections
 
   // Interpolation variables - như Mission Planner
   LatLng? _targetPosition;
@@ -61,9 +72,8 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   late AnimationController _positionController;
   late Animation<double> _positionAnimation;
 
-  // Adaptive smoothing
-  double _currentSpeed = 0.0;
-  DateTime _lastGpsUpdate = DateTime.now();
+  // Debug option để tắt smoothing
+  static const bool _enableGpsSmoothing = true; // Set false để tắt smoothing
 
   @override
   void initState() {
@@ -115,21 +125,12 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 
   void _setupSubscriptions() {
     _missionSubscription = _missionService.missionStream.listen((points) {
-      if (points.isNotEmpty && _telemetryService.hasValidGpsFix) {
-        // Khi có mission mới, set home point tại vị trí hiện tại của drone
-        setState(() {
-          _homePoint = LatLng(_currentLatitude, _currentLongitude);
-          _lastDronePosition = LatLng(_currentLatitude, _currentLongitude);
-          _hasMovedFromStart = false; // Reset movement tracking
-        });
-      } else {
-        // Khi mission bị clear, xóa home point
-        setState(() {
-          _homePoint = null;
-          _lastDronePosition = null;
-          _hasMovedFromStart = false;
-        });
+      // Khi mission được clear, xóa home point
+      if (points.isEmpty) {
+        _clearHomePoint();
       }
+      // NOTE: Không set home point khi có mission mới nữa
+      // Home point sẽ được set khi drone thực sự cất cánh
 
       setState(() {});
     });
@@ -152,8 +153,50 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
           double newLon = data['gps_longitude'] ?? _currentLongitude;
           double newAlt = data['gps_altitude'] ?? _currentAltitude;
 
-          // Mission Planner style GPS processing
-          _processMissionPlannerStyleGPS(newLat, newLon, newAlt);
+          // Nếu đây là GPS data đầu tiên (vẫn ở default position), khởi tạo ngay
+          if (_currentLatitude == 10.7302 && _currentLongitude == 106.6988) {
+            if (kDebugMode) {
+              print(
+                'Initializing position from first GPS data: ($newLat, $newLon)',
+              );
+            }
+            _currentLatitude = newLat;
+            _currentLongitude = newLon;
+            _currentAltitude = newAlt;
+            _currentInterpolatedPosition = LatLng(newLat, newLon);
+            _gpsBuffer.clear();
+            _gpsBuffer.add(LatLng(newLat, newLon));
+            _updateMapPosition();
+            return;
+          }
+
+          // Kiểm tra xem có thay đổi đáng kể không
+          double distanceFromCurrent = _calculateRealDistance(
+            _currentLatitude,
+            _currentLongitude,
+            newLat,
+            newLon,
+          );
+
+          // Detect takeoff và set home point
+          _detectTakeoffAndSetHome(newLat, newLon, newAlt);
+
+          // Mission Planner approach: Quality-based GPS processing
+          String gpsFixType = _telemetryService.gpsFixType;
+
+          if (gpsFixType == 'RTK Fixed' ||
+              gpsFixType == 'RTK Float' ||
+              gpsFixType == 'DGPS') {
+            // High-quality GPS → Smooth interpolation (works cho cả telemetry và direct)
+            if (distanceFromCurrent > 0.1) {
+              _processMissionPlannerStyleGPS(newLat, newLon, newAlt);
+            }
+          } else {
+            // Low-quality GPS → Conservative processing
+            if (distanceFromCurrent > 0.5) {
+              _processMissionPlannerStyleGPS(newLat, newLon, newAlt);
+            }
+          }
         }
 
         if (needsRotationUpdate) {
@@ -189,26 +232,60 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     }
   }
 
+  // Professional UX: Handle user interaction with map
+  void _onUserInteraction() {
+    setState(() {
+      _userInteractedWithMap = true;
+      _lastUserInteraction = DateTime.now();
+    });
+  }
+
+  // Professional UX: Check if we should resume following after user interaction timeout
+  bool _shouldResumeFollowing() {
+    if (!_userInteractedWithMap || _lastUserInteraction == null) return true;
+
+    final now = DateTime.now();
+    final timeSinceInteraction = now.difference(_lastUserInteraction!);
+
+    // Resume following after 30 seconds of no interaction
+    if (timeSinceInteraction.inSeconds > 30) {
+      return true;
+    }
+
+    return false;
+  }
+
   void _updateMapPosition() {
     LatLng newPosition = LatLng(_currentLatitude, _currentLongitude);
 
-    // Nếu chưa zoom về GPS và có GPS fix thì zoom về vị trí GPS
+    // Initial zoom to GPS location
     if (!_hasZoomedToGPS && _telemetryService.hasValidGpsFix) {
-      _mapController.move(newPosition, 16.0); // Zoom level 16 để thấy rõ drone
+      _mapController.move(newPosition, 17.0);
       _hasZoomedToGPS = true;
-    } else {
-      // Chỉ di chuyển mà không thay đổi zoom - sử dụng moveAndRotate cho smooth animation
+      return;
+    }
+
+    // Professional UX: Only follow drone if follow mode enabled and user hasn't interacted recently
+    if (_isFollowModeEnabled && _shouldResumeFollowing()) {
+      // Auto-resume follow mode after timeout
+      if (_userInteractedWithMap && _shouldResumeFollowing()) {
+        setState(() {
+          _userInteractedWithMap = false;
+        });
+      }
+
       try {
+        // Smooth camera movement without jerky updates
         _mapController.moveAndRotate(
           newPosition,
           _mapController.camera.zoom,
           _mapController.camera.rotation,
         );
       } catch (e) {
-        // Fallback nếu moveAndRotate không khả dụng
         _mapController.move(newPosition, _mapController.camera.zoom);
       }
     }
+    // If follow mode disabled or user interacted, drone marker moves but camera stays
   }
 
   void _resetToDefaultPosition() {
@@ -223,6 +300,12 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
           _currentLatitude,
           _currentLongitude,
         );
+
+        // Reset takeoff detection khi disconnect
+        _hasSetHomePointOnTakeoff = false;
+        _wasPreviouslyArmed = false;
+        _groundAltitude = 0.0;
+        _homePoint = null;
       }
       _currentAltitude = 0.0;
       _currentYaw = 0.0;
@@ -236,10 +319,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     double newLon,
     double newAlt,
   ) {
-    DateTime now = DateTime.now();
-    double deltaTime = now.difference(_lastGpsUpdate).inMilliseconds / 1000.0;
-    _lastGpsUpdate = now;
-
     // Add to buffer với weight dựa trên GPS fix quality
     LatLng newPosition = LatLng(newLat, newLon);
     _gpsBuffer.add(newPosition);
@@ -247,19 +326,8 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       _gpsBuffer.removeAt(0);
     }
 
-    // Adaptive smoothing dựa trên tốc độ di chuyển
+    // Adaptive smoothing
     LatLng smoothedPosition = _adaptiveSmoothing();
-
-    // Calculate speed cho adaptive processing
-    if (_currentInterpolatedPosition != null) {
-      double distance = _calculateRealDistance(
-        _currentInterpolatedPosition!.latitude,
-        _currentInterpolatedPosition!.longitude,
-        smoothedPosition.latitude,
-        smoothedPosition.longitude,
-      );
-      _currentSpeed = deltaTime > 0 ? distance / deltaTime : 0.0;
-    }
 
     // Set target position cho interpolation
     _targetPosition = smoothedPosition;
@@ -269,24 +337,35 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     _startInterpolation();
   }
 
-  // Adaptive smoothing như Mission Planner - mạnh khi đứng yên, nhẹ khi di chuyển nhanh
+  // Adaptive smoothing như Mission Planner - minimal cho high-quality GPS
   LatLng _adaptiveSmoothing() {
     if (_gpsBuffer.isEmpty) return LatLng(_currentLatitude, _currentLongitude);
 
-    // Weighted average với trọng số cao hơn cho data mới
+    // Option để tắt smoothing trong debug
+    if (!_enableGpsSmoothing) {
+      return _gpsBuffer.last; // Return raw GPS position
+    }
+
+    // High-quality GPS (RTK/DGPS) → Almost raw với minimal smoothing
+    String gpsFixType = _telemetryService.gpsFixType;
+    if (gpsFixType == 'RTK Fixed' ||
+        gpsFixType == 'RTK Float' ||
+        gpsFixType == 'DGPS') {
+      // Return latest GPS với minimal delay để mượt như Mission Planner
+      return _gpsBuffer.last;
+    }
+
+    // Low-quality GPS → Light smoothing
+    if (_gpsBuffer.length == 1) return _gpsBuffer.first;
+
+    // Simple weighted average cho standard GPS
     double totalWeight = 0.0;
     double weightedLat = 0.0;
     double weightedLon = 0.0;
 
     for (int i = 0; i < _gpsBuffer.length; i++) {
-      // Weight tăng theo thời gian (data mới có weight cao hơn)
-      double weight = (i + 1).toDouble();
-
-      // Adaptive weight dựa trên speed - speed cao thì ít smooth hơn
-      if (_currentSpeed > 5.0) {
-        // >5 m/s thì giảm smoothing
-        weight = i == _gpsBuffer.length - 1 ? weight * 3 : weight * 0.5;
-      }
+      // Recent sample có weight cao hơn (Mission Planner: 80/20 split)
+      double weight = i == _gpsBuffer.length - 1 ? 0.8 : 0.2;
 
       weightedLat += _gpsBuffer[i].latitude * weight;
       weightedLon += _gpsBuffer[i].longitude * weight;
@@ -317,8 +396,8 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     // Adaptive duration dựa trên distance và speed
     int duration = _calculateInterpolationDuration(distance);
 
-    if (duration <= 50) {
-      // Quá gần thì update trực tiếp
+    if (duration <= 0) {
+      // Không cần animate, update trực tiếp
       _currentInterpolatedPosition = endPos;
       _updateCurrentPosition();
       return;
@@ -333,7 +412,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     _positionController.reset();
     _positionController.forward();
 
-    // Update position during animation
+    // Update position during animation - 60 FPS như Mission Planner
     _interpolationTimer = Timer.periodic(const Duration(milliseconds: 16), (
       timer,
     ) {
@@ -353,12 +432,13 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   }
 
   int _calculateInterpolationDuration(double distance) {
-    // Distance < 1m: 50ms, distance > 100m: 300ms
-    if (distance < 1.0) return 50;
-    if (distance > 100.0) return 300;
+    // Mission Planner style: Smoother movement với adaptive duration
+    if (distance < 0.1) return 0; // Không animate cho movement rất nhỏ
+    if (distance < 0.5) return 50; // Rất nhanh cho small movements
+    if (distance < 2.0) return 100; // Medium speed cho normal movements
+    if (distance < 5.0) return 200; // Slower cho longer movements
 
-    // Linear interpolation cho các giá trị ở giữa
-    return (50 + (distance / 100.0) * 250).round();
+    return 300; // Max duration cho very long movements
   }
 
   void _updateCurrentPosition() {
@@ -367,19 +447,8 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     _currentLatitude = _currentInterpolatedPosition!.latitude;
     _currentLongitude = _currentInterpolatedPosition!.longitude;
 
-    // Track movement để quyết định có hiển thị home marker không
-    if (_homePoint != null && _lastDronePosition != null) {
-      double distanceFromStart = _calculateRealDistance(
-        _lastDronePosition!.latitude,
-        _lastDronePosition!.longitude,
-        _currentLatitude,
-        _currentLongitude,
-      );
-      if (distanceFromStart > 1.0) {
-        // 1 meter threshold
-        _hasMovedFromStart = true;
-      }
-    }
+    // Validate coordinate consistency in debug mode
+    _validateCoordinateConsistency();
 
     _updateMapPositionInterpolated();
     setState(() {});
@@ -388,12 +457,22 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   void _updateMapPositionInterpolated() {
     LatLng newPosition = LatLng(_currentLatitude, _currentLongitude);
 
-    // Nếu chưa zoom về GPS và có GPS fix thì zoom về vị trí GPS
+    // Initial zoom to GPS location
     if (!_hasZoomedToGPS && _telemetryService.hasValidGpsFix) {
-      _mapController.move(newPosition, 16.0);
+      _mapController.move(newPosition, 17.0);
       _hasZoomedToGPS = true;
-    } else {
-      // Smooth map movement - không dùng animation của map mà dùng interpolation riêng
+      return;
+    }
+
+    // Professional UX: Only follow drone if enabled and no recent user interaction
+    if (_isFollowModeEnabled && _shouldResumeFollowing()) {
+      // Auto-resume follow mode after timeout
+      if (_userInteractedWithMap && _shouldResumeFollowing()) {
+        setState(() {
+          _userInteractedWithMap = false;
+        });
+      }
+
       _mapController.move(newPosition, _mapController.camera.zoom);
     }
   }
@@ -418,6 +497,148 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     return earthRadius * c;
   }
 
+  // Method để detect takeoff và set home point
+  void _detectTakeoffAndSetHome(double lat, double lon, double alt) {
+    bool isCurrentlyArmed = _telemetryService.isArmed;
+
+    // Set ground altitude when first armed (before takeoff)
+    if (isCurrentlyArmed && !_wasPreviouslyArmed) {
+      _groundAltitude = alt;
+      _wasPreviouslyArmed = true;
+      if (kDebugMode) {
+        print(
+          'Armed detected. Ground altitude: ${_groundAltitude.toStringAsFixed(1)}m',
+        );
+      }
+    }
+
+    // Reset when disarmed
+    if (!isCurrentlyArmed && _wasPreviouslyArmed) {
+      _wasPreviouslyArmed = false;
+      _hasSetHomePointOnTakeoff = false;
+      if (kDebugMode) {
+        print('Disarmed detected. Reset takeoff detection.');
+      }
+    }
+
+    // Detect takeoff: armed + altitude > threshold + chưa set home point
+    if (isCurrentlyArmed &&
+        !_hasSetHomePointOnTakeoff &&
+        (alt - _groundAltitude) >= _takeoffAltitudeThreshold) {
+      // Set home point tại vị trí cất cánh
+      setState(() {
+        _homePoint = LatLng(lat, lon);
+        _hasSetHomePointOnTakeoff = true;
+      });
+
+      if (kDebugMode) {
+        print('TAKEOFF DETECTED! Home point set at: ($lat, $lon)');
+        print(
+          'Takeoff altitude: ${(alt - _groundAltitude).toStringAsFixed(1)}m above ground',
+        );
+      }
+    }
+  }
+
+  // Method để get raw GPS coordinates trực tiếp từ TelemetryService
+  LatLng _getRawGpsPosition() {
+    return LatLng(
+      _telemetryService.gpsLatitude,
+      _telemetryService.gpsLongitude,
+    );
+  }
+
+  // Method để set home point từ GPS hiện tại
+  void _setHomePointFromCurrentGPS() {
+    if (!_telemetryService.hasValidGpsFix) return;
+
+    double rawLat = _telemetryService.gpsLatitude;
+    double rawLon = _telemetryService.gpsLongitude;
+
+    if (kDebugMode) {
+      print('Setting home point at: ($rawLat, $rawLon)');
+    }
+
+    setState(() {
+      _homePoint = LatLng(rawLat, rawLon);
+    });
+  }
+
+  // Method để clear home point
+  void _clearHomePoint() {
+    if (kDebugMode) {
+      print('Clearing home point');
+    }
+
+    setState(() {
+      _homePoint = null;
+    });
+  }
+
+  // Method để force update home point (có thể gọi từ bên ngoài)
+  void updateHomePoint() {
+    if (_telemetryService.hasValidGpsFix) {
+      _setHomePointFromCurrentGPS();
+    }
+  }
+
+  // Method để manual set home point tại vị trí hiện tại
+  void setHomePointHere() {
+    if (_telemetryService.hasValidGpsFix) {
+      double rawLat = _telemetryService.gpsLatitude;
+      double rawLon = _telemetryService.gpsLongitude;
+
+      setState(() {
+        _homePoint = LatLng(rawLat, rawLon);
+        _hasSetHomePointOnTakeoff = true; // Mark as set để không bị override
+      });
+
+      if (kDebugMode) {
+        print('Manual home point set at: ($rawLat, $rawLon)');
+      }
+    }
+  }
+
+  // Method để toggle home point (set/clear)
+  void _toggleHomePoint() {
+    if (_homePoint != null) {
+      // Nếu đã có home point → Clear nó
+      _clearHomePoint();
+      _hasSetHomePointOnTakeoff = false; // Reset để có thể set lại
+
+      if (kDebugMode) {
+        print('Home point cleared by user');
+      }
+    } else {
+      // Nếu chưa có home point → Set tại vị trí hiện tại
+      setHomePointHere();
+    }
+  }
+
+  // Method để kiểm tra sự khác biệt giữa raw GPS và smoothed position
+  void _validateCoordinateConsistency() {
+    if (kDebugMode && _telemetryService.hasValidGpsFix) {
+      LatLng rawGps = _getRawGpsPosition();
+      LatLng smoothed = LatLng(_currentLatitude, _currentLongitude);
+
+      double difference = _calculateRealDistance(
+        rawGps.latitude,
+        rawGps.longitude,
+        smoothed.latitude,
+        smoothed.longitude,
+      );
+
+      if (difference > 10.0) {
+        // Nếu khác biệt > 10m thì cảnh báo
+        print(
+          'WARNING: Large difference between raw GPS and smoothed position: ${difference.toStringAsFixed(2)}m',
+        );
+        print('Raw GPS: (${rawGps.latitude}, ${rawGps.longitude})');
+        print('Smoothed: (${smoothed.latitude}, ${smoothed.longitude})');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -427,179 +648,285 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: FlutterMap(
-          mapController: _mapController,
-          options: MapOptions(
-            initialCenter: LatLng(_currentLatitude, _currentLongitude),
-            initialZoom: 18,
-            minZoom: 1,
-            maxZoom: 22,
-          ),
+        child: Stack(
           children: [
-            TileLayer(
-              urlTemplate: _selectedMapType.urlTemplate,
-              userAgentPackageName: "com.example.vtol_rustech",
-              maxZoom: 22,
-            ),
-
-            if (_missionService.hasMission) ...[
-              // Mission route line
-              PolylineLayer(
-                polylines: [
-                  // Route từ home point đến waypoint đầu tiên (nếu có home point)
-                  if (_homePoint != null &&
-                      _missionService.currentMissionPoints.isNotEmpty)
-                    Polyline(
-                      points: [
-                        _homePoint!,
-                        LatLng(
-                          double.parse(
-                            _missionService.currentMissionPoints.first.latitude,
-                          ),
-                          double.parse(
-                            _missionService
-                                .currentMissionPoints
-                                .first
-                                .longitude,
-                          ),
-                        ),
-                      ],
-                      strokeWidth: 4.0,
-                      strokeCap: StrokeCap.round,
-                      color: Colors.cyanAccent.withOpacity(0.8),
-                    ),
-                  // Route giữa các mission waypoints
-                  Polyline(
-                    points: _missionService.currentMissionPoints
-                        .map(
-                          (point) => LatLng(
-                            double.parse(point.latitude),
-                            double.parse(point.longitude),
-                          ),
-                        )
-                        .toList(),
-                    strokeWidth: 4.0,
-                    strokeCap: StrokeCap.round,
-                    color: Colors.cyanAccent.withOpacity(0.8),
-                  ),
-                ],
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: LatLng(_currentLatitude, _currentLongitude),
+                initialZoom: 18,
+                minZoom: 1,
+                maxZoom: 22,
+                // Professional UX: Detect user interactions
+                onPositionChanged: (position, hasGesture) {
+                  if (hasGesture) {
+                    _onUserInteraction();
+                  }
+                },
+                onTap: (tapPosition, point) {
+                  _onUserInteraction();
+                },
               ),
+              children: [
+                TileLayer(
+                  urlTemplate: _selectedMapType.urlTemplate,
+                  userAgentPackageName: "com.example.vtol_rustech",
+                  maxZoom: 22,
+                ),
 
-              // Waypoint markers
-              MarkerLayer(
-                markers: _missionService.currentMissionPoints
-                    .asMap()
-                    .entries
-                    .map((entry) {
-                      final index = entry.key;
-                      final point = entry.value;
-                      return Marker(
-                        point: LatLng(
-                          double.parse(point.latitude),
-                          double.parse(point.longitude),
-                        ),
-                        width: 40,
-                        height: 40,
-                        alignment: Alignment.center,
-                        child: Stack(
-                          children: [
-                            Icon(
-                              Icons.location_on,
-                              color: Colors.red,
-                              size: 40,
-                            ),
-                            Positioned.fill(
-                              child: Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: Text(
-                                    '${index + 1}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
+                if (_missionService.hasMission) ...[
+                  // Mission route line
+                  PolylineLayer(
+                    polylines: [
+                      // Route từ home point đến waypoint đầu tiên (nếu có home point)
+                      if (_homePoint != null &&
+                          _missionService.currentMissionPoints.isNotEmpty)
+                        Polyline(
+                          points: [
+                            _homePoint!,
+                            LatLng(
+                              double.parse(
+                                _missionService
+                                    .currentMissionPoints
+                                    .first
+                                    .latitude,
+                              ),
+                              double.parse(
+                                _missionService
+                                    .currentMissionPoints
+                                    .first
+                                    .longitude,
                               ),
                             ),
                           ],
+                          strokeWidth: 4.0,
+                          strokeCap: StrokeCap.round,
+                          color: Colors.cyanAccent.withOpacity(0.8),
                         ),
-                      );
-                    })
-                    .toList(),
-              ),
-            ],
+                      // Route giữa các mission waypoints
+                      Polyline(
+                        points: _missionService.currentMissionPoints
+                            .map(
+                              (point) => LatLng(
+                                double.parse(point.latitude),
+                                double.parse(point.longitude),
+                              ),
+                            )
+                            .toList(),
+                        strokeWidth: 4.0,
+                        strokeCap: StrokeCap.round,
+                        color: Colors.cyanAccent.withOpacity(0.8),
+                      ),
+                    ],
+                  ),
 
+                  // Waypoint markers
+                  MarkerLayer(
+                    markers: _missionService.currentMissionPoints
+                        .asMap()
+                        .entries
+                        .map((entry) {
+                          final index = entry.key;
+                          final point = entry.value;
+                          return Marker(
+                            point: LatLng(
+                              double.parse(point.latitude),
+                              double.parse(point.longitude),
+                            ),
+                            width: 40,
+                            height: 40,
+                            alignment: Alignment.center,
+                            child: Stack(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  color: Colors.red,
+                                  size: 40,
+                                ),
+                                Positioned.fill(
+                                  child: Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 12,
+                                      ),
+                                      child: Text(
+                                        '${index + 1}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        })
+                        .toList(),
+                  ),
+                ],
+
+                if (_telemetryService.isConnected &&
+                    _telemetryService.hasValidGpsFix)
+                  MarkerLayer(
+                    markers: [
+                      // Main drone marker (smoothed position)
+                      Marker(
+                        point: LatLng(_currentLatitude, _currentLongitude),
+                        width: 40,
+                        height: 40,
+                        alignment: Alignment.center,
+                        child: AnimatedBuilder(
+                          animation: Listenable.merge([
+                            _pulseAnimation,
+                            _rotationAnimation,
+                          ]),
+                          builder: (context, child) {
+                            return Transform.scale(
+                              scale: _pulseAnimation.value,
+                              child: Transform.rotate(
+                                angle: _rotationAnimation.value,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _getGpsStatusColor().withOpacity(
+                                      0.8,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: _getGpsStatusColor().withOpacity(
+                                          0.6,
+                                        ),
+                                        blurRadius: 15,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.flight,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      // Home marker - hiển thị ngay khi có home point
+                      if (_homePoint != null)
+                        Marker(
+                          point: _homePoint!,
+                          width: 30,
+                          height: 30,
+                          alignment: Alignment.center,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.blue,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'H',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+              ],
+            ),
+
+            // Map Controls - Top Left Column (chỉ hiện khi connected và có GPS)
             if (_telemetryService.isConnected &&
                 _telemetryService.hasValidGpsFix)
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: LatLng(_currentLatitude, _currentLongitude),
-                    width: 40,
-                    height: 40,
-                    alignment: Alignment.center,
-                    child: AnimatedBuilder(
-                      animation: Listenable.merge([
-                        _pulseAnimation,
-                        _rotationAnimation,
-                      ]),
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: _pulseAnimation.value,
-                          child: Transform.rotate(
-                            angle: _rotationAnimation.value,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _getGpsStatusColor().withOpacity(0.8),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: _getGpsStatusColor().withOpacity(
-                                      0.6,
-                                    ),
-                                    blurRadius: 15,
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.flight,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  // Home marker - chỉ hiển thị khi có mission và drone đã di chuyển
-                  if (_homePoint != null && _hasMovedFromStart)
-                    Marker(
-                      point: _homePoint!,
-                      width: 30,
-                      height: 30,
-                      alignment: Alignment.center,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'H',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+              Positioned(
+                top: 16,
+                left: 16,
+                child: Column(
+                  children: [
+                    // Follow Mode Toggle
+                    Tooltip(
+                      message: _isFollowModeEnabled
+                          ? 'Disable Follow Mode'
+                          : 'Enable Follow Mode',
+                      child: FloatingActionButton.small(
+                        onPressed: () {
+                          setState(() {
+                            _isFollowModeEnabled = !_isFollowModeEnabled;
+                            if (_isFollowModeEnabled) {
+                              _userInteractedWithMap = false;
+                            }
+                          });
+                        },
+                        backgroundColor: _isFollowModeEnabled
+                            ? Colors.green.withOpacity(0.9)
+                            : Colors.grey.withOpacity(0.9),
+                        child: Icon(
+                          _isFollowModeEnabled
+                              ? Icons.my_location
+                              : Icons.location_disabled,
+                          color: Colors.white,
+                          size: 18,
                         ),
                       ),
                     ),
-                ],
+                    const SizedBox(height: 8),
+                    // Center on Drone
+                    Tooltip(
+                      message: 'Center on Drone',
+                      child: FloatingActionButton.small(
+                        onPressed: () {
+                          LatLng dronePosition = LatLng(
+                            _currentLatitude,
+                            _currentLongitude,
+                          );
+                          _mapController.move(
+                            dronePosition,
+                            _mapController.camera.zoom,
+                          );
+                          setState(() {
+                            _userInteractedWithMap = false;
+                            _isFollowModeEnabled = true;
+                          });
+                        },
+                        backgroundColor: Colors.blue.withOpacity(0.9),
+                        child: const Icon(
+                          Icons.center_focus_strong,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Set/Clear Home Point
+                    Tooltip(
+                      message: _homePoint != null
+                          ? 'Clear Home Point'
+                          : 'Set Home Point Here',
+                      child: FloatingActionButton.small(
+                        onPressed: _toggleHomePoint,
+                        backgroundColor: _homePoint != null
+                            ? Colors.red.withOpacity(0.9)
+                            : Colors.orange.withOpacity(0.9),
+                        child: Icon(
+                          _homePoint != null
+                              ? Icons.home_filled
+                              : Icons.home_outlined,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
           ],
         ),

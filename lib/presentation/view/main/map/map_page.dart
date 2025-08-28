@@ -713,9 +713,9 @@ class _MapPageState extends State<MapPage> {
         final maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
 
         double zoomLevel = 18; // Default zoom - tăng từ 16 lên 18
-        if (maxDiff > 0.01)
+        if (maxDiff > 0.01) {
           zoomLevel = 15; // tăng từ 13 lên 15
-        else if (maxDiff > 0.005)
+        } else if (maxDiff > 0.005)
           zoomLevel = 16; // tăng từ 14 lên 16
         else if (maxDiff > 0.002)
           zoomLevel = 17; // tăng từ 15 lên 17
@@ -751,9 +751,9 @@ class _MapPageState extends State<MapPage> {
         final maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
 
         double zoomLevel = 18; // Default zoom - tăng từ 16 lên 18
-        if (maxDiff > 0.01)
+        if (maxDiff > 0.01) {
           zoomLevel = 15; // tăng từ 13 lên 15
-        else if (maxDiff > 0.005)
+        } else if (maxDiff > 0.005)
           zoomLevel = 16; // tăng từ 14 lên 16
         else if (maxDiff > 0.002)
           zoomLevel = 17; // tăng từ 15 lên 17

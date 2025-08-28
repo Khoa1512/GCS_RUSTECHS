@@ -139,11 +139,11 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
     });
 
     // Bắt đầu timer để cập nhật thanh tiến trình
-    // Tăng 0.2% mỗi 100ms -> full sau 5s
+    // Tăng 0.1% mỗi 100ms -> full sau 10s (tăng từ 5s lên 10s)
     _progressTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
       if (mounted) {
         setState(() {
-          _progressValue += 0.02; // 1/50 để full sau 5s
+          _progressValue += 0.01; // 1/100 để full sau 10s
           if (_progressValue > 1.0) _progressValue = 1.0;
 
           // Nếu đã chạy hết thanh tiến trình

@@ -50,7 +50,7 @@ class _ParamsPageState extends State<ParamsPage> {
   ];
 
   // Track modified parameters
-  Set<String> _modifiedParameters = {};
+  final Set<String> _modifiedParameters = {};
 
   // Loading progress
   int _receivedCount = 0;
@@ -281,7 +281,7 @@ class _ParamsPageState extends State<ParamsPage> {
           child: Row(
             children: [
               // Status Column
-              Container(
+              SizedBox(
                 width: 40,
                 child: Icon(Icons.edit, color: Colors.grey.shade500, size: 16),
               ),
@@ -457,7 +457,7 @@ class _ParamsPageState extends State<ParamsPage> {
             child: Row(
               children: [
                 // Status Indicator Column
-                Container(
+                SizedBox(
                   width: 40,
                   child: Center(
                     child: isModified
@@ -862,8 +862,9 @@ class _ParamsPageState extends State<ParamsPage> {
 
   String _getParameterUnit(String paramName) {
     // Common ArduPilot parameter units
-    if (paramName.contains('RATE') || paramName.contains('TURN'))
+    if (paramName.contains('RATE') || paramName.contains('TURN')) {
       return 'deg/s';
+    }
     if (paramName.contains('ANGLE') || paramName.contains('TRIM')) return 'deg';
     if (paramName.contains('SPEED') || paramName.contains('VEL')) return 'm/s';
     if (paramName.contains('ALT') || paramName.contains('HEIGHT')) return 'm';
@@ -876,8 +877,9 @@ class _ParamsPageState extends State<ParamsPage> {
     if (paramName.contains('GAIN') ||
         paramName.contains('P_') ||
         paramName.contains('I_') ||
-        paramName.contains('D_'))
+        paramName.contains('D_')) {
       return '';
+    }
     return '';
   }
 
@@ -911,8 +913,9 @@ class _ParamsPageState extends State<ParamsPage> {
     // Generic descriptions based on parameter prefix
     if (paramName.startsWith('ARMING_')) return 'Arming safety check parameter';
     if (paramName.startsWith('BATT_')) return 'Battery monitoring parameter';
-    if (paramName.startsWith('COMPASS_'))
+    if (paramName.startsWith('COMPASS_')) {
       return 'Compass configuration parameter';
+    }
     if (paramName.startsWith('GPS_')) return 'GPS receiver parameter';
     if (paramName.startsWith('RC')) return 'Radio control channel parameter';
     if (paramName.startsWith('SERVO')) return 'Servo output parameter';
@@ -961,7 +964,7 @@ class _ParamsPageState extends State<ParamsPage> {
 
                       // Parameter Details Panel
                       if (_selectedParameter != null)
-                        Container(
+                        SizedBox(
                           width: 350,
                           child: _buildParameterDetailsPanel(),
                         ),

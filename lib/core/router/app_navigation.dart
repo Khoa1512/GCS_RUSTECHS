@@ -5,7 +5,6 @@ import 'package:skylink/presentation/view/main/file/file_page.dart';
 import 'package:skylink/presentation/view/main/params/params_page.dart';
 import 'package:skylink/presentation/view/main/home/homepage.dart';
 import 'package:skylink/presentation/view/main/map/map_page.dart';
-import 'package:skylink/presentation/view/main/all_drone/all_drone_page.dart';
 import 'package:skylink/presentation/view/main/route/route_page.dart';
 import 'package:skylink/presentation/view/main_wrapper/main_wrapper.dart';
 

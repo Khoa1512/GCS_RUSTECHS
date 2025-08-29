@@ -23,11 +23,18 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
   double _currentPitch = 0.0;
   double _currentRoll = 0.0;
 
+  // Debouncing for mode and armed status
+  String _lastFlightMode = '';
+  bool _lastArmedState = false;
+  DateTime? _lastModeChange;
+  DateTime? _lastArmedChange;
+  static const Duration _debounceDelay = Duration(milliseconds: 150);
+
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: Duration(milliseconds: 300), // Faster for real-time feel
+      duration: Duration(milliseconds: 100), // Faster for real-time feel
       vsync: this,
     );
 
@@ -45,16 +52,22 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
   }
 
   void _updateAnimations(double newPitch, double newRoll) {
+    // Only animate if there's significant change (reduce jitter)
+    double pitchDiff = (newPitch - _currentPitch).abs();
+    double rollDiff = (newRoll - _currentRoll).abs();
+    
+    if (pitchDiff < 0.5 && rollDiff < 0.5) return; // Skip small changes
+
     _pitchAnimation = Tween<double>(begin: _currentPitch, end: newPitch)
         .animate(
           CurvedAnimation(
             parent: _animationController,
-            curve: Curves.easeInOut,
+            curve: Curves.easeOut, // Faster curve
           ),
         );
 
     _rollAnimation = Tween<double>(begin: _currentRoll, end: newRoll).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
 
     _currentPitch = newPitch;
@@ -62,6 +75,45 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
 
     _animationController.reset();
     _animationController.forward();
+  }
+
+  // Debounced mode and armed status checking
+  bool _shouldUpdateMode(String newMode) {
+    if (newMode == _lastFlightMode) return false;
+    
+    DateTime now = DateTime.now();
+    if (_lastModeChange != null && 
+        now.difference(_lastModeChange!) < _debounceDelay) {
+      return false;
+    }
+    
+    _lastFlightMode = newMode;
+    _lastModeChange = now;
+    return true;
+  }
+
+  bool _shouldUpdateArmedStatus(bool newArmedState) {
+    if (newArmedState == _lastArmedState) return false;
+    
+    DateTime now = DateTime.now();
+    if (_lastArmedChange != null && 
+        now.difference(_lastArmedChange!) < _debounceDelay) {
+      return false;
+    }
+    
+    _lastArmedState = newArmedState;
+    _lastArmedChange = now;
+    return true;
+  }
+
+  // Improved armed status detection with hysteresis
+  bool _getStableArmedStatus(double armedValue) {
+    // Use hysteresis to prevent jitter: 0.3/0.7 instead of 0.5
+    if (_lastArmedState) {
+      return armedValue > 0.3; // Stay armed until clearly disarmed
+    } else {
+      return armedValue > 0.7; // Need clear signal to arm
+    }
   }
 
   @override
@@ -225,7 +277,7 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                 final telemetryData = snapshot.data ?? {};
                 final isConnected = _telemetryService.isConnected;
 
-                // Extract telemetry values
+                // Extract telemetry values with improved stability
                 final pitch = telemetryData['pitch'] ?? 0.0;
                 final roll = telemetryData['roll'] ?? 0.0;
                 final yaw = telemetryData['yaw'] ?? 0.0;
@@ -233,9 +285,13 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                 final compassHeading = telemetryData['compass_heading'] ?? 0.0;
                 final altitude = telemetryData['altitude_rel'] ?? 0.0;
                 final speed = telemetryData['groundspeed'] ?? 0.0;
-                final isArmed = (telemetryData['armed'] ?? 0.0) > 0.5;
+                final armedValue = telemetryData['armed'] ?? 0.0;
+                
+                // Use stable armed status detection
+                final isArmed = _getStableArmedStatus(armedValue);
+                final currentMode = _telemetryService.currentMode;
 
-                // Update animations when data changes
+                // Update animations only when data changes significantly
                 if (snapshot.hasData) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     _updateAnimations(pitch, roll);
@@ -305,8 +361,15 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                 stream: _telemetryService.telemetryStream,
                 builder: (context, snapshot) {
                   final telemetryData = snapshot.data ?? {};
-                  final isArmed = (telemetryData['armed'] ?? 0.0) > 0.5;
+                  final armedValue = telemetryData['armed'] ?? 0.0;
+                  final isArmed = _getStableArmedStatus(armedValue);
                   final flightMode = _telemetryService.currentMode;
+
+                  // Only rebuild if mode or armed status actually changed
+                  if (!_shouldUpdateMode(flightMode) && 
+                      !_shouldUpdateArmedStatus(isArmed)) {
+                    // Return cached widget or previous state
+                  }
 
                   return Container(
                     padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -552,12 +615,16 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
           ),
           if (isArmed) ...[
             SizedBox(width: 6),
-            // Blinking warning for armed status
+            // Slower blinking for less distraction
             AnimatedBuilder(
               animation: _animationController,
               builder: (context, child) {
+                // Slower blinking with longer on-time
+                double blinkValue = (DateTime.now().millisecondsSinceEpoch / 800) % 2;
+                double opacity = blinkValue < 1.5 ? 1.0 : 0.3;
+                
                 return Opacity(
-                  opacity: 0.5 + 0.5 * (0.5 + 0.5 * _animationController.value),
+                  opacity: opacity,
                   child: Container(
                     width: 8,
                     height: 8,

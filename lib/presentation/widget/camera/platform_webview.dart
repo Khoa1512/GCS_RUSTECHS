@@ -103,7 +103,7 @@ class _PlatformWebViewState extends State<PlatformWebView>
         });
       }
     } catch (e) {
-      print('Error initializing Windows WebView: $e');
+      // print('Error initializing Windows WebView: $e');
       if (mounted) {
         setState(() {
           _hasError = true;

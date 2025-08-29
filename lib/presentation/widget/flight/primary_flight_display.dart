@@ -55,7 +55,7 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
     // Only animate if there's significant change (reduce jitter)
     double pitchDiff = (newPitch - _currentPitch).abs();
     double rollDiff = (newRoll - _currentRoll).abs();
-    
+
     if (pitchDiff < 0.5 && rollDiff < 0.5) return; // Skip small changes
 
     _pitchAnimation = Tween<double>(begin: _currentPitch, end: newPitch)
@@ -80,13 +80,13 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
   // Debounced mode and armed status checking
   bool _shouldUpdateMode(String newMode) {
     if (newMode == _lastFlightMode) return false;
-    
+
     DateTime now = DateTime.now();
-    if (_lastModeChange != null && 
+    if (_lastModeChange != null &&
         now.difference(_lastModeChange!) < _debounceDelay) {
       return false;
     }
-    
+
     _lastFlightMode = newMode;
     _lastModeChange = now;
     return true;
@@ -94,13 +94,13 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
 
   bool _shouldUpdateArmedStatus(bool newArmedState) {
     if (newArmedState == _lastArmedState) return false;
-    
+
     DateTime now = DateTime.now();
-    if (_lastArmedChange != null && 
+    if (_lastArmedChange != null &&
         now.difference(_lastArmedChange!) < _debounceDelay) {
       return false;
     }
-    
+
     _lastArmedState = newArmedState;
     _lastArmedChange = now;
     return true;
@@ -286,7 +286,7 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                 final altitude = telemetryData['altitude_rel'] ?? 0.0;
                 final speed = telemetryData['groundspeed'] ?? 0.0;
                 final armedValue = telemetryData['armed'] ?? 0.0;
-                
+
                 // Use stable armed status detection
                 final isArmed = _getStableArmedStatus(armedValue);
                 final currentMode = _telemetryService.currentMode;
@@ -366,7 +366,7 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                   final flightMode = _telemetryService.currentMode;
 
                   // Only rebuild if mode or armed status actually changed
-                  if (!_shouldUpdateMode(flightMode) && 
+                  if (!_shouldUpdateMode(flightMode) &&
                       !_shouldUpdateArmedStatus(isArmed)) {
                     // Return cached widget or previous state
                   }
@@ -620,9 +620,10 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
               animation: _animationController,
               builder: (context, child) {
                 // Slower blinking with longer on-time
-                double blinkValue = (DateTime.now().millisecondsSinceEpoch / 800) % 2;
+                double blinkValue =
+                    (DateTime.now().millisecondsSinceEpoch / 800) % 2;
                 double opacity = blinkValue < 1.5 ? 1.0 : 0.3;
-                
+
                 return Opacity(
                   opacity: opacity,
                   child: Container(

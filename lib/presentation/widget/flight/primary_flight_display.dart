@@ -137,12 +137,12 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
 
   // Get flight mode colors based on the mode type
   List<Color> _getFlightModeColors(String flightMode, bool isArmed) {
-    // Safety modes - Red
+    // Safety modes - Red (ArduPilot & PX4)
     if (['RTL', 'LAND', 'QLAND', 'EMERGENCY'].contains(flightMode)) {
       return [Color(0xFFE53935), Color(0xFFB71C1C)];
     }
 
-    // Autonomous modes - Blue
+    // Autonomous modes - Blue (ArduPilot & PX4)
     if ([
       'AUTO',
       'GUIDED',
@@ -150,14 +150,16 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
       'LOITER',
       'QLOITER',
       'QRTL',
+      'OFFBOARD', // PX4
     ].contains(flightMode)) {
       return [Color(0xFF1976D2), Color(0xFF0D47A1)];
     }
 
-    // Manual/Stabilized modes - Green when armed, Orange when disarmed
+    // Manual/Stabilized modes - Green when armed, Orange when disarmed (ArduPilot & PX4)
     if ([
       'MANUAL',
       'STABILIZE',
+      'STABILIZED', // PX4
       'ACRO',
       'QSTABILIZE',
       'QACRO',
@@ -168,7 +170,7 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
           : [Color(0xFFFF9800), Color(0xFFE65100)];
     }
 
-    // Assisted modes - Purple
+    // Position/Altitude control modes - Purple (ArduPilot & PX4)
     if ([
       'FBWA',
       'FBWB',
@@ -176,6 +178,10 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
       'AUTOTUNE',
       'QAUTOTUNE',
       'CIRCLE',
+      'POSCTL', // PX4 Position Control
+      'ALTCTL', // PX4 Altitude Control
+      'RATTITUDE', // PX4
+      'SIMPLE', // PX4
     ].contains(flightMode)) {
       return [Color(0xFF7B1FA2), Color(0xFF4A148C)];
     }
@@ -196,12 +202,14 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
       'LOITER',
       'QLOITER',
       'QRTL',
+      'OFFBOARD', // PX4
     ].contains(flightMode)) {
       return Colors.blue;
     }
     if ([
       'MANUAL',
       'STABILIZE',
+      'STABILIZED', // PX4
       'ACRO',
       'QSTABILIZE',
       'QACRO',
@@ -216,6 +224,10 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
       'AUTOTUNE',
       'QAUTOTUNE',
       'CIRCLE',
+      'POSCTL', // PX4
+      'ALTCTL', // PX4
+      'RATTITUDE', // PX4
+      'SIMPLE', // PX4
     ].contains(flightMode)) {
       return Colors.purple;
     }
@@ -289,7 +301,6 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
 
                 // Use stable armed status detection
                 final isArmed = _getStableArmedStatus(armedValue);
-                final currentMode = _telemetryService.currentMode;
 
                 // Update animations only when data changes significantly
                 if (snapshot.hasData) {

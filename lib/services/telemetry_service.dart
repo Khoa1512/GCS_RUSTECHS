@@ -237,7 +237,13 @@ class TelemetryService {
         case MAVLinkEventType.heartbeat:
           if (event.data is Map) {
             final m = (event.data as Map);
-            _currentMode = (m['mode'] as String?) ?? _currentMode;
+            final newMode = (m['mode'] as String?) ?? _currentMode;
+            if (newMode != _currentMode) {
+              print(
+                'TelemetryService: Mode changed from $_currentMode to $newMode',
+              );
+              _currentMode = newMode;
+            }
             _armed = (m['armed'] as bool?) ?? _armed;
             _vehicleType = (m['type'] as String?) ?? _vehicleType;
             _currentTelemetry['armed'] = _armed ? 1.0 : 0.0;

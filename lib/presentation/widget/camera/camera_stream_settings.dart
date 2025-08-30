@@ -19,7 +19,6 @@ class CameraStreamSettings extends StatefulWidget {
 class _CameraStreamSettingsState extends State<CameraStreamSettings> {
   late TextEditingController _urlController;
   final List<String> _commonUrls = [
-    "https://mr2v2r37jzqd.connect.remote.it/",
     "https://szx3j7twuwon.connect.remote.it/",
   ];
 

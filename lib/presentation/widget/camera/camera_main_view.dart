@@ -13,7 +13,7 @@ class _CameraMainViewState extends State<CameraMainView>
     with AutomaticKeepAliveClientMixin {
   // Camera stream URL from third-party web service
   // Actual gimbal camera stream URL
-  String cameraStreamUrl = "https://mr2v2r37jzqd.connect.remote.it/";
+  String cameraStreamUrl = "https://szx3j7twuwon.connect.remote.it/";
 
   // Settings overlay
   bool showSettings = false;
@@ -26,8 +26,8 @@ class _CameraMainViewState extends State<CameraMainView>
 
   void _updateStreamUrl(String newUrl) async {
     // Debug info
-    print('Input URL: "$newUrl"');
-    print('URL trimmed: "${newUrl.trim()}"');
+    // print('Input URL: "$newUrl"');
+    // print('URL trimmed: "${newUrl.trim()}"');
 
     // Trim whitespace first
     newUrl = newUrl.trim();
@@ -48,7 +48,7 @@ class _CameraMainViewState extends State<CameraMainView>
     // Small delay to ensure proper rebuild
     await Future.delayed(Duration(milliseconds: 100));
 
-    print('Camera stream URL updated to: $newUrl');
+    // print('Camera stream URL updated to: $newUrl');
   }
 
   void _toggleSettings() {
@@ -61,9 +61,11 @@ class _CameraMainViewState extends State<CameraMainView>
     setState(() {
       _webViewKey = UniqueKey(); // Create new key to force rebuild WebView
     });
-    
-    print('Camera stream refreshed with URL: $cameraStreamUrl');
-  }  @override
+
+    // print('Camera stream refreshed with URL: $cameraStreamUrl');
+  }
+
+  @override
   Widget build(BuildContext context) {
     super.build(context); // Required by AutomaticKeepAliveClientMixin
 

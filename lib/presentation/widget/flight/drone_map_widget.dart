@@ -199,6 +199,12 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
           String gpsFixType = _telemetryService.gpsFixType;
           double threshold = _getDistanceThreshold(gpsFixType);
 
+          // Tối ưu cho mission mode: Giảm threshold khi có mission để responsive hơn
+          if (_missionService.hasMission) {
+            threshold =
+                threshold * 0.6; // Giảm threshold 40% khi đang có mission
+          }
+
           if (distanceFromCurrent > threshold) {
             _processMissionPlannerStyleGPS(newLat, newLon, newAlt);
           }
@@ -449,23 +455,29 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 
   // Helper method để get distance threshold dựa trên GPS quality - CACHED
   static const Map<String, double> _gpsThresholds = {
-    'RTK Fixed': 0.1,
-    'RTK Float': 0.1,
-    'DGPS': 0.1,
+    'RTK Fixed': 0.05, // Giảm threshold cho RTK để responsive hơn
+    'RTK Float': 0.05, // Giảm threshold cho RTK Float
+    'DGPS': 0.05, // Giảm threshold cho DGPS
   };
 
   double _getDistanceThreshold(String gpsFixType) {
-    return _gpsThresholds[gpsFixType] ?? 0.5; // Default 0.5 for standard GPS
+    return _gpsThresholds[gpsFixType] ?? 0.3; // Giảm default từ 0.5 xuống 0.3
   }
 
   int _calculateInterpolationDuration(double distance) {
-    // Mission Planner style: Smoother movement với adaptive duration
-    if (distance < 0.1) return 0; // Không animate cho movement rất nhỏ
-    if (distance < 0.5) return 50; // Rất nhanh cho small movements
-    if (distance < 2.0) return 100; // Medium speed cho normal movements
-    if (distance < 5.0) return 200; // Slower cho longer movements
+    // Mission Planner style: Tối ưu cho Auto mode - giảm delay
+    // Nếu đang trong mission, giảm thêm duration để responsive hơn
+    double multiplier = _missionService.hasMission ? 0.7 : 1.0;
 
-    return 300; // Max duration cho very long movements
+    if (distance < 0.1) return 0; // Không animate cho movement rất nhỏ
+    if (distance < 0.5)
+      return (25 * multiplier).round(); // Rất nhanh cho small movements
+    if (distance < 2.0)
+      return (50 * multiplier).round(); // Medium speed cho normal movements
+    if (distance < 5.0)
+      return (100 * multiplier).round(); // Slower cho longer movements
+
+    return (150 * multiplier).round(); // Max duration cho very long movements
   }
 
   void _updateCurrentPosition() {
@@ -485,7 +497,8 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   void _scheduleUIUpdate() {
     _needsUIUpdate = true;
     _uiUpdateTimer?.cancel();
-    _uiUpdateTimer = Timer(const Duration(milliseconds: 16), () {
+    _uiUpdateTimer = Timer(const Duration(milliseconds: 8), () {
+      // Giảm từ 16ms xuống 8ms
       if (mounted && _needsUIUpdate) {
         setState(() {});
         _needsUIUpdate = false;
@@ -557,6 +570,18 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       _hasSetHomePointOnTakeoff = false;
       // if (kDebugMode) {
       //   print('Disarmed detected. Reset takeoff detection.');
+      // }
+    }
+
+    // Reset takeoff detection khi drone đáp xuống (còn armed nhưng altitude thấp)
+    if (isCurrentlyArmed &&
+        _hasSetHomePointOnTakeoff &&
+        (alt - _groundAltitude) < (_takeoffAltitudeThreshold - 0.5)) {
+      _hasSetHomePointOnTakeoff = false;
+      _groundAltitude = alt; // Cập nhật ground altitude mới
+      // if (kDebugMode) {
+      //   print('Landing detected. Reset takeoff detection for next takeoff.');
+      //   print('New ground altitude: ${_groundAltitude.toStringAsFixed(1)}m');
       // }
     }
 
@@ -798,7 +823,32 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                     _telemetryService.hasValidGpsFix)
                   MarkerLayer(
                     markers: [
-                      // Main drone marker (smoothed position)
+                      // Home marker - render trước để nằm dưới UAV marker
+                      if (_homePoint != null)
+                        Marker(
+                          point: _homePoint!,
+                          width: 30,
+                          height: 30,
+                          alignment: Alignment.center,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.blue,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'H',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      // Main drone marker (smoothed position) - render sau để nằm trên
                       Marker(
                         point: LatLng(_currentLatitude, _currentLongitude),
                         width: 40,
@@ -840,31 +890,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                           },
                         ),
                       ),
-                      // Home marker - hiển thị ngay khi có home point
-                      if (_homePoint != null)
-                        Marker(
-                          point: _homePoint!,
-                          width: 30,
-                          height: 30,
-                          alignment: Alignment.center,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.blue,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                'H',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
                     ],
                   ),
               ],

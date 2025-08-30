@@ -10,17 +10,34 @@ class HeartbeatHandler {
   String _pendingMode = 'Unknown';
   DateTime? _modeChangeTime;
   Timer? _modeDebounceTimer;
-  static const Duration _modeDebounceDelay = Duration(seconds: 1);
+  static const Duration _modeDebounceDelay = Duration(
+    milliseconds: 1500, // Increased to 1.5 seconds to handle unstable FC
+  );
   bool _isArmed = false;
+  int? _primarySystemType; // Cache primary system type
+  int _modeChangeCount = 0; // Debug counter
 
   HeartbeatHandler(this.emit);
 
   void handle(Heartbeat msg) {
-  // Decode mode based on vehicle type (copter vs plane/VTOL hybrid)
-  final newMode = _decodeFlightMode(msg.type, msg.customMode);
+    _modeChangeCount++;
+
+    if (msg.autopilot == 0) {
+      return;
+    }
+    // Debug: Print detailed heartbeat info
+    // Use cached system type if available to avoid system type jumping
+    final systemType = _primarySystemType ?? msg.type;
+    if (_primarySystemType == null && msg.type != 0) {
+      _primarySystemType = msg.type;
+    }
+
+    // Decode mode based on vehicle type (copter vs plane/VTOL hybrid)
+    final newMode = _decodeFlightMode(systemType, msg.customMode);
     _isArmed = (msg.baseMode & 0x80) != 0;
 
     if (newMode != _pendingMode) {
+      _modeChangeCount++;
       _pendingMode = newMode;
       _modeChangeTime = DateTime.now();
       _modeDebounceTimer?.cancel();
@@ -39,16 +56,18 @@ class HeartbeatHandler {
   }
 
   void _emit(Heartbeat hb) {
-    emit(MAVLinkEvent(MAVLinkEventType.heartbeat, {
-      'mode': _currentMode,
-      'armed': _isArmed,
-      'type': _getSystemType(hb.type),
-      'autopilot': _getAutopilotType(hb.autopilot),
-      'baseMode': hb.baseMode,
-      'customMode': hb.customMode,
-      'systemStatus': _getSystemStatus(hb.systemStatus),
-      'mavlinkVersion': hb.mavlinkVersion,
-    }));
+    emit(
+      MAVLinkEvent(MAVLinkEventType.heartbeat, {
+        'mode': _currentMode,
+        'armed': _isArmed,
+        'type': _getSystemType(hb.type),
+        'autopilot': _getAutopilotType(hb.autopilot),
+        'baseMode': hb.baseMode,
+        'customMode': hb.customMode,
+        'systemStatus': _getSystemStatus(hb.systemStatus),
+        'mavlinkVersion': hb.mavlinkVersion,
+      }),
+    );
   }
 
   // Decode ArduPilot flight modes depending on vehicle type.
@@ -114,15 +133,27 @@ class HeartbeatHandler {
       26: 'AUTOLAND',
     };
 
-    // Determine which mapping to use.
-    final bool isPlaneLike = (systemType == 1 /* Fixed Wing */) || (systemType == 19 /* VTOL */);
-    final bool isCopterLike = !isPlaneLike && <int>{2, 3, 4, 13, 14, 15}.contains(systemType);
+    final bool isPlaneLike =
+        (systemType == 1 /* Fixed Wing */ ) || (systemType == 19 /* VTOL */ );
+    final bool isCopterLike = <int>{
+      2,
+      3,
+      4,
+      13,
+      14,
+      15,
+      26,
+      30,
+    }.contains(systemType); // Added 26, 30
 
     final map = isPlaneLike
         ? planeModes
-        : (isCopterLike ? copterModes : planeModes); // default to planeModes if unknown to keep previous behavior with Q modes
+        : (isCopterLike
+              ? copterModes
+              : copterModes); // Default to copterModes for unknown types
 
-    return map[customMode] ?? 'UNKNOWN MODE ($customMode)';
+    final modeName = map[customMode] ?? 'UNKNOWN MODE ($customMode)';
+    return modeName;
   }
 
   String _getSystemType(int type) {

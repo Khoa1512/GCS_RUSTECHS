@@ -7,10 +7,6 @@ import 'package:skylink/services/telemetry_service.dart';
 import 'package:skylink/api/telemetry/mavlink_api.dart';
 import 'dart:async';
 
-// ============================================================================
-// PROFESSIONAL UAV MESSAGE SYSTEM - Mission Planner/QGC Standard
-// ============================================================================
-
 // Class to hold MAVLink status messages
 class MAVLinkStatusMessage {
   final String severity;

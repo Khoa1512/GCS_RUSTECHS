@@ -13,19 +13,14 @@ class VideoMetadataService {
   /// Get actual duration of video file
   Future<Duration> getVideoDuration(String assetPath) async {
     try {
-      print('📹 Getting duration for: $assetPath');
-
       // Create video player controller from asset
       final controller = VideoPlayerController.asset(assetPath);
       await controller.initialize();
 
       final duration = controller.value.duration;
       await controller.dispose();
-
-      print('✅ Duration extracted: ${duration.inMinutes}:${(duration.inSeconds % 60).toString().padLeft(2, '0')}');
       return duration;
     } catch (e) {
-      print('❌ Error getting video duration: $e');
       // Return default duration if error
       return Duration(minutes: 3, seconds: 37);
     }
@@ -34,16 +29,13 @@ class VideoMetadataService {
   /// Get actual file size of video file
   Future<int> getVideoFileSize(String assetPath) async {
     try {
-      print('📦 Getting file size for: $assetPath');
 
       // Load asset as bytes to get size
       final ByteData data = await rootBundle.load(assetPath);
       final int sizeInBytes = data.lengthInBytes;
 
-      print('✅ File size: ${(sizeInBytes / (1024 * 1024)).toStringAsFixed(1)} MB');
       return sizeInBytes;
     } catch (e) {
-      print('❌ Error getting video file size: $e');
       // Return default size if error (12MB)
       return 12 * 1024 * 1024;
     }
@@ -53,7 +45,6 @@ class VideoMetadataService {
   Future<VideoRecord> updateVideoWithRealMetadata(VideoRecord video) async {
     // Check cache first
     if (_metadataCache.containsKey(video.id)) {
-      print('📋 Using cached metadata for video: ${video.title}');
       return _metadataCache[video.id]!;
     }
 
@@ -78,13 +69,9 @@ class VideoMetadataService {
       // Cache the result
       _metadataCache[video.id] = updatedVideo;
 
-      // print('✅ Real metadata extracted for ${video.title}:');
-      // print('   Duration: ${realDuration.inMinutes}:${(realDuration.inSeconds % 60).toString().padLeft(2, '0')}');
-      // print('   File size: ${(realFileSize / (1024 * 1024)).toStringAsFixed(1)} MB');
 
       return updatedVideo;
     } catch (e) {
-      print('❌ Error updating video with real metadata: $e');
       // Return original video if error
       return video;
     }
@@ -93,7 +80,6 @@ class VideoMetadataService {
   /// Clear metadata cache
   void clearCache() {
     _metadataCache.clear();
-    print('🗑️ Metadata cache cleared');
   }
 
   /// Get cache status

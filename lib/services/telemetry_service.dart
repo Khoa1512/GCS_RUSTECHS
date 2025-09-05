@@ -375,6 +375,7 @@ class TelemetryService {
             }
             if (vb != null) {
               _currentTelemetry['voltageBattery'] = vb;
+              _currentTelemetry['voltage'] = vb; // Map to voltage for display
             }
           }
           _emitTelemetry();
@@ -511,10 +512,10 @@ class TelemetryService {
           color: Colors.amber,
         ),
         TelemetryData(
-          label: 'GPS Lat',
+          label: 'Voltage',
           value: '0.0',
-          unit: '°',
-          color: Colors.deepOrange,
+          unit: 'V',
+          color: Colors.teal.shade300,
         ),
         TelemetryData(
           label: 'GPS Lon',
@@ -605,10 +606,10 @@ class TelemetryService {
         color: Colors.amber,
       ),
       TelemetryData(
-        label: 'GPS Lat',
-        value: (_currentTelemetry['gps_latitude'] ?? 0.0).toStringAsFixed(6),
-        unit: '°',
-        color: Colors.deepOrange,
+        label: 'Voltage',
+        value: (_currentTelemetry['voltage'] ?? 0.0).toStringAsFixed(1),
+        unit: 'V',
+        color: Colors.teal.shade300,
       ),
       TelemetryData(
         label: 'GPS Lon',

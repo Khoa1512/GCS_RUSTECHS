@@ -436,8 +436,9 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   void _onPositionAnimationUpdate() {
     if (!mounted ||
         _interpolationStartPos == null ||
-        _interpolationEndPos == null)
+        _interpolationEndPos == null) {
       return;
+    }
 
     double t = _positionAnimation.value;
     _currentInterpolatedPosition = LatLng(
@@ -470,12 +471,15 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     double multiplier = _missionService.hasMission ? 0.7 : 1.0;
 
     if (distance < 0.1) return 0; // Không animate cho movement rất nhỏ
-    if (distance < 0.5)
+    if (distance < 0.5) {
       return (25 * multiplier).round(); // Rất nhanh cho small movements
-    if (distance < 2.0)
+    }
+    if (distance < 2.0) {
       return (50 * multiplier).round(); // Medium speed cho normal movements
-    if (distance < 5.0)
+    }
+    if (distance < 5.0) {
       return (100 * multiplier).round(); // Slower cho longer movements
+    }
 
     return (150 * multiplier).round(); // Max duration cho very long movements
   }

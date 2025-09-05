@@ -62,24 +62,18 @@ class TelemetryConstants {
       color: Colors.teal.shade300,
       unit: '%',
     ),
+    TelemetryData(
+      label: 'Voltage',
+      value: '0V',
+      color: Colors.teal.shade300,
+      unit: 'V',
+    ),
 
     // Additional telemetry options for selection
     TelemetryData(
       label: 'GPS Fix',
       value: 'No GPS',
       color: Colors.indigo.shade300,
-      unit: '',
-    ),
-    TelemetryData(
-      label: 'Flight Mode',
-      value: 'Unknown',
-      color: Colors.lime.shade300,
-      unit: '',
-    ),
-    TelemetryData(
-      label: 'Armed Status',
-      value: 'Disarmed',
-      color: Colors.deepOrange.shade300,
       unit: '',
     ),
 
@@ -227,10 +221,10 @@ class TelemetryConstants {
           unit: '',
         ),
         TelemetryData(
-          label: 'Battery',
+          label: 'Voltage',
           value: '0',
           color: Colors.teal.shade300,
-          unit: '%',
+          unit: 'V',
         ),
       ];
     }
@@ -289,9 +283,9 @@ class TelemetryConstants {
         return item.copyWith(
           value: (telemetryData['satellites'] ?? 0.0).toInt().toString(),
         );
-      case 'battery':
+      case 'voltage':
         return item.copyWith(
-          value: (telemetryData['battery'] ?? 0.0).toInt().toString(),
+          value: (telemetryData['voltage'] ?? 0.0).toInt().toString(),
         );
       case 'gps fix':
         final gpsFixValue = telemetryData['gps_fix'] ?? 0.0;

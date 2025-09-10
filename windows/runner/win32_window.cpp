@@ -187,6 +187,14 @@ Win32Window::MessageHandler(HWND hwnd,
       }
       return 0;
 
+    case WM_GETMINMAXINFO: {
+      // Set minimum window size for VTOL control system
+      MINMAXINFO* minMaxInfo = reinterpret_cast<MINMAXINFO*>(lparam);
+      minMaxInfo->ptMinTrackSize.x = 1200;  // Minimum width
+      minMaxInfo->ptMinTrackSize.y = 800;   // Minimum height
+      return 0;
+    }
+
     case WM_DPICHANGED: {
       auto newRectSize = reinterpret_cast<RECT*>(lparam);
       LONG newWidth = newRectSize->right - newRectSize->left;

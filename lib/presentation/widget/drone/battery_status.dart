@@ -42,9 +42,10 @@ class _BatteryStatusState extends State<BatteryStatus> {
   void _initializeBatteryData() {
     // Get initial battery data from TelemetryService
     if (_telemetryService.isConnected) {
-      _batteryPercentage = _telemetryService.currentTelemetry['battery'] ?? 0.0;
+      var telemetry = _telemetryService.currentTelemetry;
+      _batteryPercentage = (telemetry['battery'] as num?)?.toDouble() ?? 0.0;
       _batteryVoltage =
-          _telemetryService.currentTelemetry['voltageBattery'] ?? 0.0;
+          (telemetry['voltageBattery'] as num?)?.toDouble() ?? 0.0;
     } else {
       // Set to 0 when not connected
       _batteryPercentage = 0.0;
@@ -63,10 +64,11 @@ class _BatteryStatusState extends State<BatteryStatus> {
       setState(() {
         // Get real-time battery data from TelemetryService
         if (_telemetryService.isConnected) {
+          var telemetry = _telemetryService.currentTelemetry;
           _batteryPercentage =
-              _telemetryService.currentTelemetry['battery'] ?? 0.0;
+              (telemetry['battery'] as num?)?.toDouble() ?? 0.0;
           _batteryVoltage =
-              _telemetryService.currentTelemetry['voltageBattery'] ?? 0.0;
+              (telemetry['voltageBattery'] as num?)?.toDouble() ?? 0.0;
         } else {
           // Set to 0 when not connected
           _batteryPercentage = 0.0;
@@ -85,12 +87,14 @@ class _BatteryStatusState extends State<BatteryStatus> {
         bool needsUpdate = false;
 
         if (telemetryData.containsKey('battery')) {
-          _batteryPercentage = telemetryData['battery'] ?? 0.0;
+          _batteryPercentage =
+              (telemetryData['battery'] as num?)?.toDouble() ?? 0.0;
           needsUpdate = true;
         }
 
         if (telemetryData.containsKey('voltageBattery')) {
-          _batteryVoltage = telemetryData['voltageBattery'] ?? 0.0;
+          _batteryVoltage =
+              (telemetryData['voltageBattery'] as num?)?.toDouble() ?? 0.0;
           needsUpdate = true;
         }
 

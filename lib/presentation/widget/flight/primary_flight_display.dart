@@ -4,7 +4,6 @@ import 'package:skylink/presentation/widget/flight/compass_heading_tape.dart';
 import 'package:skylink/services/telemetry_service.dart';
 
 class PrimaryFlightDisplay extends StatefulWidget {
-  // Remove static parameters - now using real-time telemetry
   const PrimaryFlightDisplay({super.key});
 
   @override
@@ -265,12 +264,14 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
           // Fixed height compass heading tape
           SizedBox(
             height: 50,
-            child: StreamBuilder<Map<String, double>>(
+            child: StreamBuilder<Map<String, dynamic>>(
               stream: _telemetryService.telemetryStream,
               builder: (context, snapshot) {
                 final telemetryData = snapshot.data ?? {};
                 // Only use stabilized compass_heading
-                final compassHeading = telemetryData['compass_heading'] ?? 0.0;
+                final compassHeading =
+                    (telemetryData['compass_heading'] as num?)?.toDouble() ??
+                    0.0;
 
                 return CompassHeadingTape(
                   heading: compassHeading < 0
@@ -283,20 +284,25 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
           ),
           // Attitude indicator takes remaining space
           Expanded(
-            child: StreamBuilder<Map<String, double>>(
+            child: StreamBuilder<Map<String, dynamic>>(
               stream: _telemetryService.telemetryStream,
               builder: (context, snapshot) {
                 final telemetryData = snapshot.data ?? {};
                 final isConnected = _telemetryService.isConnected;
 
                 // Extract telemetry values with improved stability
-                final pitch = telemetryData['pitch'] ?? 0.0;
-                final roll = telemetryData['roll'] ?? 0.0;
-                final yaw = telemetryData['yaw'] ?? 0.0;
+                final pitch =
+                    (telemetryData['pitch'] as num?)?.toDouble() ?? 0.0;
+                final roll = (telemetryData['roll'] as num?)?.toDouble() ?? 0.0;
+                final yaw = (telemetryData['yaw'] as num?)?.toDouble() ?? 0.0;
                 // Only use stabilized compass_heading
-                final compassHeading = telemetryData['compass_heading'] ?? 0.0;
-                final altitude = telemetryData['altitude_rel'] ?? 0.0;
-                final speed = telemetryData['groundspeed'] ?? 0.0;
+                final compassHeading =
+                    (telemetryData['compass_heading'] as num?)?.toDouble() ??
+                    0.0;
+                final altitude =
+                    (telemetryData['altitude_rel'] as num?)?.toDouble() ?? 0.0;
+                final speed =
+                    (telemetryData['groundspeed'] as num?)?.toDouble() ?? 0.0;
                 final armedValue = telemetryData['armed'] ?? 0.0;
 
                 // Use stable armed status detection
@@ -333,8 +339,9 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
   Widget _buildHeader() {
     return StreamBuilder<bool>(
       stream: _telemetryService.connectionStream,
+      initialData: _telemetryService.isConnected,
       builder: (context, snapshot) {
-        final isConnected = snapshot.data ?? false;
+        final isConnected = _telemetryService.isConnected;
 
         return Container(
           padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -368,11 +375,12 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                   ),
                 ],
               ),
-              StreamBuilder<Map<String, double>>(
+              StreamBuilder<Map<String, dynamic>>(
                 stream: _telemetryService.telemetryStream,
                 builder: (context, snapshot) {
                   final telemetryData = snapshot.data ?? {};
-                  final armedValue = telemetryData['armed'] ?? 0.0;
+                  final armedValue =
+                      (telemetryData['armed'] as num?)?.toDouble() ?? 0.0;
                   final isArmed = _getStableArmedStatus(armedValue);
                   final flightMode = _telemetryService.currentMode;
 

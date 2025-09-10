@@ -16,8 +16,7 @@ class _AppStatusBarState extends State<AppStatusBar> {
   bool _isHovered = false;
   final TelemetryService _telemetryService = TelemetryService();
   StreamSubscription? _connectionSubscription;
-  bool _isConnected = false;
-  
+
   // Time variables
   String _currentTime = '';
   Timer? _timeTimer;
@@ -25,15 +24,14 @@ class _AppStatusBarState extends State<AppStatusBar> {
   @override
   void initState() {
     super.initState();
-    _isConnected = _telemetryService.isConnected;
 
-    // Listen to connection status changes
+    // Listen to connection status changes for rebuilds
     _connectionSubscription = _telemetryService.connectionStream.listen((
       connected,
     ) {
       if (mounted) {
         setState(() {
-          _isConnected = connected;
+          // Just trigger rebuild, we'll read status directly from service
         });
       }
     });
@@ -92,20 +90,10 @@ class _AppStatusBarState extends State<AppStatusBar> {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeInOut,
-              margin: EdgeInsets.all(
-                context.responsiveSpacing(mobile: 4, tablet: 6, desktop: 8),
-              ),
+              margin: EdgeInsets.all(context.responsiveSpacing(desktop: 8)),
               padding: EdgeInsets.symmetric(
-                horizontal: context.responsiveSpacing(
-                  mobile: 12,
-                  tablet: 16,
-                  desktop: 20,
-                ),
-                vertical: context.responsiveSpacing(
-                  mobile: 8,
-                  tablet: 10,
-                  desktop: 12,
-                ),
+                horizontal: context.responsiveSpacing(desktop: 20),
+                vertical: context.responsiveSpacing(desktop: 12),
               ),
               decoration: BoxDecoration(
                 border: Border.all(
@@ -148,7 +136,9 @@ class _AppStatusBarState extends State<AppStatusBar> {
                     SizedBox(width: ResponsiveDimensions.spacingM),
                     _buildDroneConnection(),
                     SizedBox(width: ResponsiveDimensions.spacingM),
-                    _buildTimeItem(text: _currentTime.isNotEmpty ? _currentTime : '11:43 AM'),
+                    _buildTimeItem(
+                      text: _currentTime.isNotEmpty ? _currentTime : '11:43 AM',
+                    ),
                     SizedBox(width: ResponsiveDimensions.spacingS),
                     _buildBatteryIcon(),
                   ],
@@ -162,12 +152,15 @@ class _AppStatusBarState extends State<AppStatusBar> {
   }
 
   Widget _buildDroneConnection() {
+    final isConnected = _telemetryService.isConnected;
+
+
     return GestureDetector(
       onTap: _showConnectionDialog,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: _isConnected
+          color: isConnected
               ? const Color(0xFF00C896)
               : const Color(0xFFFF6B6B),
           borderRadius: BorderRadius.circular(4),
@@ -176,7 +169,7 @@ class _AppStatusBarState extends State<AppStatusBar> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              _isConnected ? Icons.link : Icons.link_off,
+              isConnected ? Icons.link : Icons.link_off,
               color: Colors.white,
               size: 14,
             ),
@@ -186,7 +179,7 @@ class _AppStatusBarState extends State<AppStatusBar> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  _isConnected ? 'Connected' : 'Disconnected',
+                  isConnected ? 'Connected' : 'Disconnected',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 11,
@@ -194,7 +187,7 @@ class _AppStatusBarState extends State<AppStatusBar> {
                   ),
                 ),
                 Text(
-                  _isConnected ? 'MAVLink' : 'Tap to connect',
+                  isConnected ? 'MAVLink' : 'Tap to connect',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.8),
                     fontSize: 9,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:skylink/presentation/widget/app_bar/app_status_bar.dart';
 import 'package:skylink/presentation/widget/navigation/app_navigation_bar.dart';
 import 'package:skylink/responsive/demension.dart';
@@ -14,23 +15,52 @@ class DesktopAppBar extends StatefulWidget {
 class _DesktopAppBarState extends State<DesktopAppBar> {
   bool _isHovered = false;
 
+  // Desktop-specific constants
+  static const double minWindowWidth = 1200.0;
+  static const double minWindowHeight = 800.0;
+  static const double defaultWindowWidth = 1400.0;
+  static const double defaultWindowHeight = 900.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _setInitialWindowSize();
+  }
+
+  void _setInitialWindowSize() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Set minimum window size constraints
+      SystemChrome.setApplicationSwitcherDescription(
+        ApplicationSwitcherDescription(
+          label: 'VTOL Control System',
+          primaryColor: 0xFF1E1E1E,
+        ),
+      );
+      // Note: Window size constraints would typically be set at the main.dart level
+      // or through platform-specific configurations
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final availableWidth = constraints.maxWidth != double.infinity
-            ? constraints.maxWidth
-            : MediaQuery.of(context).size.width;
+        // Use defined constants for desktop sizing
+        final screenWidth = MediaQuery.of(context).size.width;
+        final effectiveWidth = screenWidth < minWindowWidth
+            ? minWindowWidth
+            : screenWidth;
 
         return ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth: availableWidth,
-            minHeight: context.isMobile ? 110 : 120,
-            maxHeight: context.isMobile ? 110 : 120,
+            minWidth: minWindowWidth,
+            maxWidth: double.infinity,
+            minHeight: 120.0,
+            maxHeight: 120.0,
           ),
           child: Container(
-            width: double.infinity,
-            height: context.isMobile ? 110 : 120,
+            width: effectiveWidth,
+            height: 120.0,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -53,56 +83,14 @@ class _DesktopAppBarState extends State<DesktopAppBar> {
             ),
             child: SafeSizedContainer(
               padding: EdgeInsets.symmetric(
-                horizontal: context.responsiveSpacing(
-                  mobile: 12,
-                  tablet: 20,
-                  desktop: 24,
-                ),
-                vertical: context.responsiveSpacing(
-                  mobile: 8,
-                  tablet: 12,
-                  desktop: 16,
-                ),
+                horizontal: 24.0, // Fixed desktop spacing
+                vertical: 16.0, // Fixed desktop spacing
               ),
-              child: context.isMobile
-                  ? _buildMobileLayout()
-                  : _buildDesktopLayout(),
+              child: _buildDesktopLayout(), // Only desktop layout
             ),
           ),
         );
       },
-    );
-  }
-
-  Widget _buildMobileLayout() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // App name and status in a row for mobile
-        SizedBox(
-          height: 40,
-          child: Row(
-            children: [
-              Expanded(child: _buildAppName()),
-              const Spacer(),
-              ConstrainedSizeWidget(maxWidth: 200, child: AppStatusBar()),
-            ],
-          ),
-        ),
-        SizedBox(height: 8),
-        // Navigation bar below for mobile
-        Expanded(
-          child: ConstrainedSizeWidget(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.02),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: AppNavigationBar(),
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -144,16 +132,8 @@ class _DesktopAppBarState extends State<DesktopAppBar> {
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
         padding: EdgeInsets.symmetric(
-          horizontal: context.responsiveSpacing(
-            mobile: 12,
-            tablet: 16,
-            desktop: 20,
-          ),
-          vertical: context.responsiveSpacing(
-            mobile: 8,
-            tablet: 10,
-            desktop: 12,
-          ),
+          horizontal: 20.0, // Fixed desktop spacing
+          vertical: 12.0, // Fixed desktop spacing
         ),
         decoration: BoxDecoration(
           gradient: _isHovered
@@ -202,20 +182,10 @@ class _DesktopAppBarState extends State<DesktopAppBar> {
               child: Icon(
                 Icons.flight,
                 color: Colors.white,
-                size: context.responsiveSpacing(
-                  mobile: 18,
-                  tablet: 20,
-                  desktop: 22,
-                ),
+                size: context.responsiveSpacing(desktop: 22),
               ),
             ),
-            SizedBox(
-              width: context.responsiveSpacing(
-                mobile: 8,
-                tablet: 10,
-                desktop: 12,
-              ),
-            ),
+            SizedBox(width: context.responsiveSpacing(desktop: 12)),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -226,11 +196,7 @@ class _DesktopAppBarState extends State<DesktopAppBar> {
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                     letterSpacing: 0.5,
-                    fontSize: context.responsiveSpacing(
-                      mobile: 18,
-                      tablet: 20,
-                      desktop: 22,
-                    ),
+                    fontSize: context.responsiveSpacing(desktop: 22),
                   ),
                 ),
                 if (context.isDesktop)

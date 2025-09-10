@@ -50,8 +50,7 @@ class _NavigationButtonState extends State<NavigationButton>
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = context.isMobile;
-    final shouldShowCompact = widget.isCompact || isMobile;
+    final shouldShowCompact = widget.isCompact ;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),

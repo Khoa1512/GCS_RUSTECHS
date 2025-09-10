@@ -61,11 +61,11 @@ class _MapPageState extends State<MapPage> {
   void _setupGpsListener() {
     // Listen để nhận GPS đầu tiên làm home point
     _telemetrySub = TelemetryService().telemetryStream.listen(
-      _onTelemetryUpdate,
+      (telemetry) => _onTelemetryUpdate(telemetry),
     );
   }
 
-  void _onTelemetryUpdate(Map<String, double> telemetry) {
+  void _onTelemetryUpdate(Map<String, dynamic> telemetry) {
     // Kiểm tra trạng thái GPS hiện tại
     final hasValidGps = TelemetryService().hasValidGpsFix;
     final isConnected = TelemetryService().isConnected;
@@ -650,7 +650,6 @@ class _MapPageState extends State<MapPage> {
 
   void _startCreatingPlan(String title, String description) {
     try {
-
       // Tạo plan ngay lập tức khi bấm Create trong dialog
       final newPlan = UserMissionPlan(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -693,7 +692,6 @@ class _MapPageState extends State<MapPage> {
   }
 
   void handleCreatePlan(String title, String description) {
-
     // Update plan đã tồn tại với waypoints (có thể rỗng)
     if (selectedPlan == null) {
       ScaffoldMessenger.of(context).showSnackBar(

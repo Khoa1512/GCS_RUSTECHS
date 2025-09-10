@@ -5,9 +5,6 @@ import 'package:skylink/presentation/widget/custom/real_time_info_widget.dart';
 import 'package:skylink/presentation/widget/flight/drone_map_widget.dart';
 import 'package:skylink/presentation/widget/flight/primary_flight_display.dart';
 import 'package:skylink/presentation/widget/camera/camera_main_view.dart';
-import 'package:skylink/responsive/responsive_layout.dart';
-import 'package:skylink/responsive/mobile_body.dart';
-import 'package:skylink/responsive/tablet_body.dart';
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
@@ -29,35 +26,10 @@ class _HomepageState extends State<Homepage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: ResponsiveLayout(
-        mobile: _buildMobileLayout(),
-        tablet: _buildTabletLayout(),
-        desktop: _buildDesktopLayout(),
-      ),
+      body: _buildDesktopLayout(), // Only desktop layout for VTOL system
     );
   }
 
-  Widget _buildMobileLayout() {
-    return MobileBody(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // TODO: Add mobile layout content
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabletLayout() {
-    return TabletBody(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // TODO: Add tablet layout content
-        ],
-      ),
-    );
-  }
 
   Widget _buildDesktopLayout() {
     final screenWidth = MediaQuery.of(context).size.width;

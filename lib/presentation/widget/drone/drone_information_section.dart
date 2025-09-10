@@ -68,6 +68,18 @@ class _DroneInformationSectionState extends State<DroneInformationSection> {
           image: AppImage.vtol, // Can add coaxial helicopter icon later
           description: 'Dual-rotor coaxial helicopter',
         );
+      case 'hexarotor':
+        return DroneInformationModel(
+          name: 'Hexarotor Drone',
+          image: AppImage.vtol,
+          description: 'Six-rotor multicopter for heavy lifting',
+        );
+      case 'octorotor':
+        return DroneInformationModel(
+          name: 'Octorotor Drone',
+          image: AppImage.vtol,
+          description: 'Eight-rotor multicopter for maximum stability',
+        );
       default:
         return DroneInformationModel(
           name: vehicleType ?? 'Unknown Vehicle',
@@ -94,33 +106,47 @@ class _DroneInformationSectionState extends State<DroneInformationSection> {
         ],
       ),
       child: SingleChildScrollView(
-        child: StreamBuilder<bool>(
-          stream: _telemetryService.connectionStream,
-          initialData: _telemetryService.isConnected,
-          builder: (context, connectionSnapshot) {
-            final isConnected = connectionSnapshot.data ?? false;
-            final vehicleType = _telemetryService.vehicleType;
-            final droneInfo = _getDroneInformation(vehicleType, isConnected);
+        child: StreamBuilder<Map<String, dynamic>>(
+          stream: _telemetryService.telemetryStream,
+          builder: (context, telemetrySnapshot) {
+            return StreamBuilder<bool>(
+              stream: _telemetryService.connectionStream,
+              builder: (context, connectionSnapshot) {
+                // Check all connection sources
+                // final streamConnection = connectionSnapshot.data;
+                final serviceConnection = _telemetryService.isConnected;
+                // final hasStreamData = connectionSnapshot.hasData;
 
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DroneInformationItem(droneInformation: droneInfo),
-                SizedBox(height: 12),
-                BatteryStatus(),
-                SizedBox(height: 12),
-                AltitudeLimitation(
-                  currentAltitude: _telemetryService.isConnected
-                      ? (_telemetryService.gpsAltitude > 10.0
-                            ? _telemetryService.gpsAltitude
-                            : 10.0)
-                      : 10.0, // Default to minimum value when disconnected
-                  maxAltitude: 300.0,
-                  onAltitudeChanged: (value) {
-                    // Handle altitude change
-                  },
-                ),
-              ],
+                // Use service connection as primary source (same as app bar)
+                final isConnected = serviceConnection;
+                final vehicleType = _telemetryService.vehicleType;
+
+                final droneInfo = _getDroneInformation(
+                  vehicleType,
+                  isConnected,
+                );
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DroneInformationItem(droneInformation: droneInfo),
+                    SizedBox(height: 12),
+                    BatteryStatus(),
+                    SizedBox(height: 12),
+                    AltitudeLimitation(
+                      currentAltitude: _telemetryService.isConnected
+                          ? (_telemetryService.gpsAltitude > 10.0
+                                ? _telemetryService.gpsAltitude
+                                : 10.0)
+                          : 10.0, // Default to minimum value when disconnected
+                      maxAltitude: 300.0,
+                      onAltitudeChanged: (value) {
+                        // Handle altitude change
+                      },
+                    ),
+                  ],
+                );
+              },
             );
           },
         ),

@@ -156,8 +156,6 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
                 _isWaitingForData = false;
                 _isConnected = true;
               });
-              // Set connected trong TelemetryService
-              _telemetryService.setConnected(true);
               Navigator.of(context).pop();
             } else {
               _disconnect();

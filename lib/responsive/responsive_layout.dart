@@ -2,33 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:skylink/responsive/demension.dart';
 
 class ResponsiveLayout extends StatelessWidget {
-  final Widget mobile;
-  final Widget? tablet;
   final Widget desktop;
 
-  const ResponsiveLayout({
-    super.key,
-    required this.mobile,
-    this.tablet,
-    required this.desktop,
-  });
+  const ResponsiveLayout({super.key, required this.desktop});
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final deviceType = ResponsiveDimensions.getDeviceType(context);
-
-        switch (deviceType) {
-          case DeviceType.mobile:
-            return mobile;
-          case DeviceType.tablet:
-            return tablet ?? mobile; // Fallback to mobile if no tablet layout
-          case DeviceType.desktop:
-            return desktop;
-        }
-      },
-    );
+    // Always return desktop layout for VTOL control system
+    return desktop;
   }
 }
 
@@ -49,28 +30,14 @@ class ResponsiveBuilder extends StatelessWidget {
   }
 }
 
-// Simple responsive value selector
-class ResponsiveValue<T> {
-  final T mobile;
-  final T? tablet;
-  final T desktop;
+// Simplified responsive widget for desktop-only
+class DesktopLayout extends StatelessWidget {
+  final Widget child;
 
-  const ResponsiveValue({
-    required this.mobile,
-    this.tablet,
-    required this.desktop,
-  });
+  const DesktopLayout({super.key, required this.child});
 
-  T getValue(BuildContext context) {
-    final deviceType = ResponsiveDimensions.getDeviceType(context);
-
-    switch (deviceType) {
-      case DeviceType.mobile:
-        return mobile;
-      case DeviceType.tablet:
-        return tablet ?? mobile;
-      case DeviceType.desktop:
-        return desktop;
-    }
+  @override
+  Widget build(BuildContext context) {
+    return child;
   }
 }

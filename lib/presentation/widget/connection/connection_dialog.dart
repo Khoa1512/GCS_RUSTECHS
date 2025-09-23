@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:skylink/services/telemetry_service.dart';
+import 'package:skylink/services/multi_drone_service.dart';
 import 'package:skylink/core/constant/app_color.dart';
 import 'dart:async';
 
@@ -25,9 +26,10 @@ class _ConnectionDialogWidget extends StatefulWidget {
 
 class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
   final TelemetryService _telemetryService = TelemetryService();
+  final MultiDroneService _multiDroneService = MultiDroneService();
+
   List<String> _availablePorts = [];
   String? _selectedPort;
-  String? _connectedPort;
   int _baudRate = 115200;
   bool _isConnecting = false;
   bool _isConnected = false;
@@ -35,6 +37,11 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
   Timer? _progressTimer;
   double _progressValue = 0.0;
   StreamSubscription? _dataSubscription;
+
+  // Multi-drone support
+  bool _isMultiDroneMode = false;
+  List<String?> _selectedPorts = [null]; // Start with 1 slot for main drone
+  final int _maxDrones = 8;
 
   final List<int> _baudRates = [9600, 57600, 115200, 230400, 460800, 921600];
 
@@ -51,10 +58,62 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
       if (_availablePorts.isNotEmpty && _selectedPort == null) {
         _selectedPort = _availablePorts.first;
       }
+
+      // Auto-assign ports for multi-drone mode
+      if (_isMultiDroneMode) {
+        for (
+          int i = 0;
+          i < _availablePorts.length && i < _selectedPorts.length;
+          i++
+        ) {
+          if (_selectedPorts[i] == null) {
+            _selectedPorts[i] = _availablePorts[i];
+          }
+        }
+      }
     });
   }
 
+  void _toggleMultiDroneMode() {
+    setState(() {
+      _isMultiDroneMode = !_isMultiDroneMode;
+      if (_isMultiDroneMode) {
+        // Initialize with current single selection
+        _selectedPorts = [_selectedPort, null];
+      } else {
+        // Keep only first port
+        _selectedPort = _selectedPorts.isNotEmpty ? _selectedPorts[0] : null;
+        _selectedPorts = [null];
+      }
+    });
+  }
+
+  void _addDroneSlot() {
+    if (_selectedPorts.length < _maxDrones) {
+      setState(() {
+        _selectedPorts.add(null);
+      });
+    }
+  }
+
+  void _removeDroneSlot(int index) {
+    if (_selectedPorts.length > 1 && index > 0) {
+      // Don't remove master drone
+      setState(() {
+        _selectedPorts.removeAt(index);
+      });
+    }
+  }
+
   Future<void> _connect() async {
+    if (!_isMultiDroneMode) {
+      await _connectSingleDrone();
+    } else {
+      await _connectMultiDrones();
+    }
+  }
+
+  Future<void> _connectSingleDrone() async {
     if (_selectedPort == null) {
       return;
     }
@@ -78,9 +137,7 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
       setState(() {
         _isConnecting = false;
         _isConnected = success;
-        if (success) {
-          _connectedPort = _selectedPort;
-        } else {
+        if (!success) {
           // print('Connection failed to $_selectedPort');
         }
       });
@@ -110,6 +167,74 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
     }
   }
 
+  Future<void> _connectMultiDrones() async {
+    final selectedNonNullPorts = _selectedPorts
+        .where((port) => port != null)
+        .toList();
+    if (selectedNonNullPorts.isEmpty) {
+      _showSnackBar('Please select at least one port', isError: true);
+      return;
+    }
+
+    if (selectedNonNullPorts.length != selectedNonNullPorts.toSet().length) {
+      _showSnackBar('Please select unique ports for each drone', isError: true);
+      return;
+    }
+
+    setState(() {
+      _isConnecting = true;
+    });
+
+    try {
+      // First connect master drone (index 0) to TelemetryService
+      if (_selectedPorts[0] != null) {
+        bool masterSuccess = await _telemetryService.connect(
+          _selectedPorts[0]!,
+          baudRate: _baudRate,
+        );
+
+        if (!masterSuccess) {
+          throw Exception('Failed to connect master drone');
+        }
+      }
+
+      // Then connect additional drones to MultiDroneService
+      int successCount = _selectedPorts[0] != null ? 1 : 0;
+      for (int i = 1; i < _selectedPorts.length; i++) {
+        if (_selectedPorts[i] != null) {
+          final success = await _multiDroneService.addDrone(
+            'drone_${i + 1}',
+            _selectedPorts[i]!,
+          );
+          if (success) successCount++;
+        }
+      }
+
+      setState(() {
+        _isConnecting = false;
+        _isConnected = successCount > 0;
+      });
+
+      if (successCount > 0) {
+        _showSnackBar(
+          'Connected $successCount drone(s) successfully',
+          isError: false,
+        );
+        _startProgressBar();
+      } else {
+        _showSnackBar('Failed to connect any drones', isError: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isConnecting = false;
+          _isConnected = false;
+        });
+        _showSnackBar('Connection error: $e', isError: true);
+      }
+    }
+  }
+
   Future<void> _disconnect() async {
     _telemetryService.disconnect();
 
@@ -117,7 +242,6 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
       setState(() {
         _isConnected = false;
         _isConnecting = false;
-        _connectedPort = null;
       });
 
       _showSnackBar('Disconnected', isError: false);
@@ -201,13 +325,34 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
     return AlertDialog(
       backgroundColor: Colors.grey.shade900,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Row(
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.settings_input_antenna, color: AppColors.primaryColor),
-          SizedBox(width: 8),
-          Text(
-            'Drone Connection',
-            style: TextStyle(color: Colors.white, fontSize: 18),
+          Row(
+            children: [
+              Icon(Icons.settings_input_antenna, color: AppColors.primaryColor),
+              SizedBox(width: 8),
+              Text(
+                'Drone Connection',
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
+              Spacer(),
+              // Multi-drone mode toggle
+              Row(
+                children: [
+                  Text(
+                    'Multi-Drone',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                  SizedBox(width: 8),
+                  Switch(
+                    value: _isMultiDroneMode,
+                    onChanged: (value) => _toggleMultiDroneMode(),
+                    activeColor: AppColors.primaryColor,
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),
@@ -296,97 +441,12 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
             if (!_isConnected) ...[
               SizedBox(height: 16),
 
-              // Port Selection
-              Text(
-                'Serial Port:',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade600),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedPort,
-                          hint: Text(
-                            'Select Port',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                          dropdownColor: Colors.grey.shade800,
-                          items: _availablePorts.map((port) {
-                            return DropdownMenuItem<String>(
-                              value: port,
-                              child: Text(
-                                port,
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedPort = value;
-                            });
-                          },
-                          padding: EdgeInsets.symmetric(horizontal: 12),
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.refresh, color: AppColors.primaryColor),
-                      onPressed: _loadAvailablePorts,
-                      tooltip: 'Refresh Ports',
-                    ),
-                  ],
-                ),
-              ),
-
-              SizedBox(height: 16),
-
-              // Baud Rate Selection
-              Text(
-                'Baud Rate:',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade600),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<int>(
-                    value: _baudRate,
-                    dropdownColor: Colors.grey.shade800,
-                    items: _baudRates.map((rate) {
-                      return DropdownMenuItem<int>(
-                        value: rate,
-                        child: Text(
-                          '$rate',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _baudRate = value!;
-                      });
-                    },
-                    padding: EdgeInsets.symmetric(horizontal: 12),
-                    isExpanded: true,
-                  ),
-                ),
-              ),
+              // Single or Multi-drone UI
+              if (!_isMultiDroneMode) ...[
+                _buildSingleDroneUI(),
+              ] else ...[
+                _buildMultiDroneUI(),
+              ],
             ],
           ],
         ),
@@ -450,6 +510,248 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
                 : Text('Connect'),
           ),
       ],
+    );
+  }
+
+  Widget _buildSingleDroneUI() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Port Selection
+        Text(
+          'Serial Port:',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+        ),
+        SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade600),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedPort,
+                    hint: Text(
+                      'Select Port',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                    dropdownColor: Colors.grey.shade800,
+                    items: _availablePorts.map((port) {
+                      return DropdownMenuItem<String>(
+                        value: port,
+                        child: Text(
+                          port,
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedPort = newValue;
+                      });
+                    },
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                ),
+              ),
+              Container(width: 1, height: 30, color: Colors.grey.shade600),
+              IconButton(
+                onPressed: _loadAvailablePorts,
+                icon: Icon(Icons.refresh, color: AppColors.primaryColor),
+                tooltip: 'Refresh Ports',
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 16),
+
+        // Baud Rate Selection
+        Text(
+          'Baud Rate:',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+        ),
+        SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade600),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: _baudRate,
+              dropdownColor: Colors.grey.shade800,
+              items: _baudRates.map((rate) {
+                return DropdownMenuItem<int>(
+                  value: rate,
+                  child: Text('$rate', style: TextStyle(color: Colors.white)),
+                );
+              }).toList(),
+              onChanged: (int? newValue) {
+                setState(() {
+                  _baudRate = newValue ?? 115200;
+                });
+              },
+              padding: EdgeInsets.symmetric(horizontal: 12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMultiDroneUI() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Drone Connections:',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            Spacer(),
+            IconButton(
+              onPressed: _addDroneSlot,
+              icon: Icon(Icons.add, color: AppColors.primaryColor),
+              tooltip: 'Add Drone',
+            ),
+            IconButton(
+              onPressed: _loadAvailablePorts,
+              icon: Icon(Icons.refresh, color: AppColors.primaryColor),
+              tooltip: 'Refresh Ports',
+            ),
+          ],
+        ),
+        SizedBox(height: 8),
+
+        // Multi-drone slots
+        SizedBox(
+          height: 200,
+          child: ListView.builder(
+            itemCount: _selectedPorts.length,
+            itemBuilder: (context, index) {
+              return _buildDroneSlot(index);
+            },
+          ),
+        ),
+
+        SizedBox(height: 16),
+
+        // Baud Rate Selection (applies to all)
+        Text(
+          'Baud Rate (All Drones):',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+        ),
+        SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade600),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: _baudRate,
+              dropdownColor: Colors.grey.shade800,
+              items: _baudRates.map((rate) {
+                return DropdownMenuItem<int>(
+                  value: rate,
+                  child: Text('$rate', style: TextStyle(color: Colors.white)),
+                );
+              }).toList(),
+              onChanged: (int? newValue) {
+                setState(() {
+                  _baudRate = newValue ?? 115200;
+                });
+              },
+              padding: EdgeInsets.symmetric(horizontal: 12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDroneSlot(int index) {
+    final isMaster = index == 0;
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isMaster ? Colors.orange.withOpacity(0.1) : Colors.grey.shade800,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isMaster ? Colors.orange : Colors.grey.shade600,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Drone indicator
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: isMaster ? Colors.orange : AppColors.primaryColor,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Center(
+              child: Text(
+                isMaster ? 'M' : '${index + 1}',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: 12),
+
+          // Port selection
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedPorts[index],
+                hint: Text(
+                  isMaster ? 'Master Drone Port' : 'Drone ${index + 1} Port',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                dropdownColor: Colors.grey.shade700,
+                items: _availablePorts.map((port) {
+                  return DropdownMenuItem<String>(
+                    value: port,
+                    child: Text(
+                      port,
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _selectedPorts[index] = newValue;
+                  });
+                },
+              ),
+            ),
+          ),
+
+          // Remove button (not for master)
+          if (!isMaster) ...[
+            SizedBox(width: 8),
+            IconButton(
+              onPressed: () => _removeDroneSlot(index),
+              icon: Icon(Icons.remove_circle, color: Colors.red, size: 20),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

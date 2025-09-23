@@ -5,7 +5,8 @@ import 'package:skylink/presentation/view/main/file/file_page.dart';
 import 'package:skylink/presentation/view/main/params/params_page.dart';
 import 'package:skylink/presentation/view/main/home/homepage.dart';
 import 'package:skylink/presentation/view/main/map/map_page.dart';
-import 'package:skylink/presentation/view/main/route/route_page.dart';
+import 'package:skylink/presentation/view/main/swarm/swarm_page.dart';
+// import 'package:skylink/presentation/view/main/route/route_page.dart';
 import 'package:skylink/presentation/view/main_wrapper/main_wrapper.dart';
 
 class AppNavigation {
@@ -15,10 +16,12 @@ class AppNavigation {
       GlobalKey<NavigatorState>(debugLabel: 'homeNavigator');
   static final GlobalKey<NavigatorState> _mapNavigatorKey =
       GlobalKey<NavigatorState>(debugLabel: 'mapNavigator');
+  static final GlobalKey<NavigatorState> _swarmNavigatorKey =
+      GlobalKey<NavigatorState>(debugLabel: 'swarmNavigator');
   // static final GlobalKey<NavigatorState> _allDroneNavigatorKey =
   //     GlobalKey<NavigatorState>(debugLabel: 'allDroneNavigator');
-  static final GlobalKey<NavigatorState> _routeNavigatorKey =
-      GlobalKey<NavigatorState>(debugLabel: 'routeNavigator');
+  // static final GlobalKey<NavigatorState> _routeNavigatorKey =
+  //     GlobalKey<NavigatorState>(debugLabel: 'routeNavigator');
   static final GlobalKey<NavigatorState> _fileNavigatorKey =
       GlobalKey<NavigatorState>(debugLabel: 'fileNavigator');
   static final GlobalKey<NavigatorState> _paramsNavigatorKey =
@@ -35,8 +38,9 @@ class AppNavigation {
       branches: [
         _buildHomeBranch(),
         _buildMapBranch(),
+        _buildSwarmBranch(),
         // _buildAllDroneBranch(),
-        _buildRouteBranch(),
+        // _buildRouteBranch(),
         _buildFileBranch(),
         _buildParamsBranch(),
       ],
@@ -69,31 +73,31 @@ class AppNavigation {
     );
   }
 
-  // static StatefulShellBranch _buildAllDroneBranch() {
-  //   return StatefulShellBranch(
-  //     navigatorKey: _allDroneNavigatorKey,
-  //     routes: [
-  //       GoRoute(
-  //         path: AppRoute.allDrone,
-  //         name: AppRoute.allDrone,
-  //         builder: (context, state) => const AllDronePage(),
-  //       ),
-  //     ],
-  //   );
-  // }
-
-  static StatefulShellBranch _buildRouteBranch() {
+  static StatefulShellBranch _buildSwarmBranch() {
     return StatefulShellBranch(
-      navigatorKey: _routeNavigatorKey,
+      navigatorKey: _swarmNavigatorKey,
       routes: [
         GoRoute(
-          path: AppRoute.route,
-          name: AppRoute.route,
-          builder: (context, state) => const RoutePage(),
+          path: AppRoute.swarm,
+          name: AppRoute.swarm,
+          builder: (context, state) => const SwarmPage(),
         ),
       ],
     );
   }
+
+  // static StatefulShellBranch _buildRouteBranch() {
+  //   return StatefulShellBranch(
+  //     navigatorKey: _routeNavigatorKey,
+  //     routes: [
+  //       GoRoute(
+  //         path: AppRoute.route,
+  //         name: AppRoute.route,
+  //         builder: (context, state) => const RoutePage(),
+  //       ),
+  //     ],
+  //   );
+  // }
 
   static StatefulShellBranch _buildFileBranch() {
     return StatefulShellBranch(

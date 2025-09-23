@@ -16,7 +16,6 @@ class _AppNavigationBarState extends State<AppNavigationBar>
   final List<GlobalKey> _buttonKeys = [
     GlobalKey(),
     GlobalKey(),
-    // GlobalKey(),
     GlobalKey(),
     GlobalKey(),
     GlobalKey(),
@@ -37,8 +36,7 @@ class _AppNavigationBarState extends State<AppNavigationBar>
       final routes = [
         AppRoute.home,
         AppRoute.map,
-        // AppRoute.allDrone,
-        AppRoute.route,
+        AppRoute.swarm,
         AppRoute.file,
         AppRoute.params,
       ];
@@ -121,12 +119,8 @@ class _AppNavigationBarState extends State<AppNavigationBar>
           child: Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(
-              horizontal: context.responsiveSpacing(
-                desktop: 16,
-              ),
-              vertical: context.responsiveSpacing(
-                desktop: 10,
-              ),
+              horizontal: context.responsiveSpacing(desktop: 16),
+              vertical: context.responsiveSpacing(desktop: 10),
             ),
             child: Stack(
               clipBehavior: Clip.none,
@@ -155,9 +149,7 @@ class _AppNavigationBarState extends State<AppNavigationBar>
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(
-                           16,
-                        ),
+                        borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
                             color: const Color(0xFF00C896).withOpacity(0.4),
@@ -174,7 +166,7 @@ class _AppNavigationBarState extends State<AppNavigationBar>
                     ),
                   ),
                 // Navigation buttons (render second so they appear on top of indicator)
-                 _buildDesktopLayout(currentRoute),
+                _buildDesktopLayout(currentRoute),
               ],
             ),
           ),
@@ -182,7 +174,6 @@ class _AppNavigationBarState extends State<AppNavigationBar>
       },
     );
   }
-
 
   Widget _buildDesktopLayout(String currentRoute) {
     return Row(children: _buildNavigationButtons(currentRoute));
@@ -195,22 +186,22 @@ class _AppNavigationBarState extends State<AppNavigationBar>
     final routes = [
       AppRoute.home,
       AppRoute.map,
-      // AppRoute.allDrone,
-      AppRoute.route,
+      AppRoute.swarm,
+      // AppRoute.route,
       AppRoute.file,
       AppRoute.params,
     ];
-    // final labels = ['Home', 'Map', 'All Drone', 'Route', 'File', 'Params'];
-    final labels = ['Home', 'Mission', 'Route', 'File', 'Params'];
+    final labels = ['Home', 'Mission', 'Swarm', 'File', 'Params'];
 
     final icons = [
       Icons.home,
       Icons.map,
       Icons.flight,
-      Icons.route,
+      // Icons.route,
       Icons.file_copy,
       Icons.settings,
-    ];    final buttons = <Widget>[];
+    ];
+    final buttons = <Widget>[];
 
     for (int i = 0; i < routes.length; i++) {
       buttons.add(

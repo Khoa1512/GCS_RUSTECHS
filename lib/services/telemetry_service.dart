@@ -88,6 +88,7 @@ class TelemetryService {
 
       final success = _api.isConnected;
       if (success) {
+        _isConnected = true;
         _hasReceivedData = false;
 
         // Setup API listener
@@ -95,7 +96,7 @@ class TelemetryService {
         _setupApiListener();
 
         // Update connection state
-        _connectionController.add(false);
+        _connectionController.add(true);
         _dataReceiveController.add(false);
 
         // Request all data streams for real-time telemetry with delay

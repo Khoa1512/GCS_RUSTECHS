@@ -30,7 +30,6 @@ class _HomepageState extends State<Homepage> {
     );
   }
 
-
   Widget _buildDesktopLayout() {
     final screenWidth = MediaQuery.of(context).size.width;
     final paddingValue = screenWidth > 1600 ? 32.0 : 20.0;

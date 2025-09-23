@@ -7,10 +7,6 @@ import 'package:skylink/services/telemetry_service.dart';
 import 'package:skylink/api/telemetry/mavlink_api.dart';
 import 'dart:async';
 
-// ============================================================================
-// PROFESSIONAL UAV MESSAGE SYSTEM - Mission Planner/QGC Standard
-// ============================================================================
-
 // Class to hold MAVLink status messages
 class MAVLinkStatusMessage {
   final String severity;
@@ -49,9 +45,6 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   // Connection status
   bool _isConnected = false;
 
-  // ============================================================================
-  // PROFESSIONAL STATE TRACKING FOR UAV SYSTEMS
-  // ============================================================================
   String? _lastFlightMode;
   bool _lastArmedStatus = false;
   String? _lastGpsFixType;
@@ -64,6 +57,9 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
     super.initState();
     // Initialize telemetry service
     _telemetryService.initialize();
+
+    // Check initial connection state
+    _isConnected = _telemetryService.isConnected;
 
     // Initialize with default telemetry or real data
     _updateDisplayedTelemetry();
@@ -105,13 +101,13 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   void _initializeStateTracking() {
-  _lastFlightMode = _telemetryService.currentMode;
-  _lastArmedStatus = _telemetryService.isArmed;
-  _lastGpsFixType = _telemetryService.gpsFixType;
-  _lastSatelliteCount =
-    _telemetryService.currentTelemetry['satellites']?.toInt() ?? -1;
-  _lastBatteryPercent =
-    _telemetryService.currentTelemetry['battery']?.toInt() ?? -1;
+    _lastFlightMode = _telemetryService.currentMode;
+    _lastArmedStatus = _telemetryService.isArmed;
+    _lastGpsFixType = _telemetryService.gpsFixType;
+    _lastSatelliteCount =
+        _telemetryService.currentTelemetry['satellites']?.toInt() ?? -1;
+    _lastBatteryPercent =
+        _telemetryService.currentTelemetry['battery']?.toInt() ?? -1;
   }
 
   void _handleDisconnection() {
@@ -131,10 +127,6 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
     if (!mounted) return;
 
     switch (event.type) {
-      // ========================================
-      // PRIORITY 1: SAFETY CRITICAL MESSAGES
-      // ========================================
-
       case MAVLinkEventType.statusText:
         // Real autopilot messages - HIGHEST PRIORITY
         _handleAutopilotStatusText(event);
@@ -208,7 +200,7 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   // ============================================================================
-  // PROFESSIONAL MESSAGE HANDLERS
+  // MESSAGE HANDLERS
   // ============================================================================
 
   void _handleAutopilotStatusText(MAVLinkEvent event) {
@@ -223,8 +215,8 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   void _handleSystemHeartbeat(MAVLinkEvent event) {
-  final currentMode = _telemetryService.currentMode;
-  final isArmed = _telemetryService.isArmed;
+    final currentMode = _telemetryService.currentMode;
+    final isArmed = _telemetryService.isArmed;
 
     // First connection establishment
     if (!_connectionEstablished) {
@@ -293,9 +285,9 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   void _handleGpsStatusChanges(MAVLinkEvent event) {
-  final fixType = _telemetryService.gpsFixType;
-  final satellites =
-    _telemetryService.currentTelemetry['satellites']?.toInt() ?? 0;
+    final fixType = _telemetryService.gpsFixType;
+    final satellites =
+        _telemetryService.currentTelemetry['satellites']?.toInt() ?? 0;
 
     // GPS Fix Type changes
     if (_lastGpsFixType != null && _lastGpsFixType != fixType) {
@@ -346,8 +338,7 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   void _handleBatteryWarnings(MAVLinkEvent event) {
-  final battery =
-    _telemetryService.currentTelemetry['battery']?.toInt() ?? 0;
+    final battery = _telemetryService.currentTelemetry['battery']?.toInt() ?? 0;
 
     // Battery threshold warnings
     if (_lastBatteryPercent != -1) {

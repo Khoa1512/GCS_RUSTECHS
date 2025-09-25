@@ -13,8 +13,15 @@ class MainMapSimple extends StatefulWidget {
   final List<RoutePoint> routePoints;
   final Function(LatLng latLng)? onTap;
   final Function(int index, LatLng newPosition)? onWaypointDrag;
+  final Function(int index, Offset globalPosition, {bool isCtrlPressed})?
+  onWaypointTap;
+  final VoidCallback? onWaypointDragStart;
+  final VoidCallback? onWaypointDragEnd;
   final bool isConfigValid;
   final LatLng? homePoint;
+  final Map<String, LayerLink>? waypointLayerLinks;
+  final RoutePoint? selectedWaypoint;
+  final Set<String>? selectedWaypointIds;
 
   const MainMapSimple({
     super.key,
@@ -23,21 +30,46 @@ class MainMapSimple extends StatefulWidget {
     required this.routePoints,
     this.onTap,
     this.onWaypointDrag,
+    this.onWaypointTap,
+    this.onWaypointDragStart,
+    this.onWaypointDragEnd,
     required this.isConfigValid,
     this.homePoint,
+    this.waypointLayerLinks,
+    this.selectedWaypoint,
+    this.selectedWaypointIds,
   });
 
   @override
-  State<MainMapSimple> createState() => _MainMapSimpleState();
+  State<MainMapSimple> createState() => MainMapSimpleState();
 }
 
 // Waypoint interaction modes:
 // 1. Tap + Pan: Tap trên waypoint và kéo ngay lập tức (chuột)
 // 2. Long Press + Move: Nhấn giữ waypoint (~500ms) rồi kéo (trackpad/touch)
-class _MainMapSimpleState extends State<MainMapSimple> {
+class MainMapSimpleState extends State<MainMapSimple> {
   bool _hasZoomedToHome = false;
   int? _draggedWaypointIndex;
   LatLng? _draggedPosition;
+
+  void clearDragState() {
+    setState(() {
+      _draggedWaypointIndex = null;
+      _draggedPosition = null;
+    });
+  }
+
+  // Public method to clear drag state from outside
+  void clearMapDragState() {
+    print(
+      'DEBUG: Clearing map drag state - before: _draggedWaypointIndex=$_draggedWaypointIndex, _draggedPosition=$_draggedPosition',
+    );
+    clearDragState();
+    print(
+      'DEBUG: Cleared map drag state - after: _draggedWaypointIndex=$_draggedWaypointIndex, _draggedPosition=$_draggedPosition',
+    );
+  }
+
   DateTime? _lastUpdateTime;
 
   @override
@@ -170,13 +202,35 @@ class _MainMapSimpleState extends State<MainMapSimple> {
   }
 
   void _onWaypointLongPressEnd(int index, LongPressEndDetails details) {
-    // Haptic feedback khi hoàn thành việc kéo
-    HapticFeedback.mediumImpact();
+    // Check if this is a drag operation or a static long press
+    if (_draggedWaypointIndex == index && _draggedPosition != null) {
+      // This was a drag operation - apply final position
+      HapticFeedback.mediumImpact();
+      setState(() {
+        _draggedWaypointIndex = null;
+        _draggedPosition = null;
+      });
+    } else {
+      // This was a static long press - show context menu
+      if (widget.onWaypointTap != null) {
+        widget.onWaypointTap!(index, details.globalPosition);
+      }
+    }
+  }
 
-    setState(() {
-      _draggedWaypointIndex = null;
-      _draggedPosition = null;
-    });
+  void _onWaypointLongPressStart(int index, LongPressStartDetails details) {
+    // Start timing - if user starts moving, it becomes drag, otherwise context menu
+    HapticFeedback.lightImpact();
+
+    if (widget.onWaypointDrag != null) {
+      setState(() {
+        _draggedWaypointIndex = index;
+        _draggedPosition = LatLng(
+          double.parse(widget.routePoints[index].latitude),
+          double.parse(widget.routePoints[index].longitude),
+        );
+      });
+    }
   }
 
   @override
@@ -202,6 +256,9 @@ class _MainMapSimpleState extends State<MainMapSimple> {
                   : InteractiveFlag.all,
             ),
             onTap: (tapPosition, latlng) {
+              print(
+                'DEBUG: Map tap - draggedWaypointIndex: $_draggedWaypointIndex',
+              );
               if (widget.isConfigValid && widget.onTap != null) {
                 widget.onTap!(latlng);
               }
@@ -263,12 +320,18 @@ class _MainMapSimpleState extends State<MainMapSimple> {
                 ...latLngPoints.asMap().entries.map((entry) {
                   final index = entry.key;
                   final point = entry.value;
-                  final isDragged = _draggedWaypointIndex == index;
+                  final routePoint = widget.routePoints[index];
+                  final isSingleSelected =
+                      widget.selectedWaypoint?.id == routePoint.id;
+                  final isMultiSelected =
+                      widget.selectedWaypointIds?.contains(routePoint.id) ??
+                      false;
+                  final isHighlighted = isSingleSelected || isMultiSelected;
 
                   return Marker(
                     point: point,
-                    width: isDragged ? 45 : 35, // Kích thước vừa phải
-                    height: isDragged ? 45 : 35,
+                    width: isHighlighted ? 45 : 35, // Kích thước vừa phải
+                    height: isHighlighted ? 45 : 35,
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       // Cải thiện độ nhạy cho trackpad
@@ -283,86 +346,113 @@ class _MainMapSimpleState extends State<MainMapSimple> {
                               });
                             }
                           : null,
-                      onLongPressStart: widget.onWaypointDrag != null
-                          ? (details) {
-                              // Long press để bắt đầu drag (tốt cho trackpad)
-                              setState(() {
-                                _draggedWaypointIndex = index;
-                                _draggedPosition = point;
-                              });
-                              HapticFeedback.mediumImpact();
-                            }
-                          : null,
+                      onLongPressStart: (details) {
+                        // Start timing for long press
+                        _onWaypointLongPressStart(index, details);
+                        widget.onWaypointDragStart?.call();
+                      },
                       onLongPressMoveUpdate: widget.onWaypointDrag != null
                           ? (details) =>
                                 _onWaypointLongPressMoveUpdate(index, details)
                           : null,
-                      onLongPressEnd: widget.onWaypointDrag != null
-                          ? (details) => _onWaypointLongPressEnd(index, details)
-                          : null,
+                      onLongPressEnd: (details) {
+                        _onWaypointLongPressEnd(index, details);
+                        widget.onWaypointDragEnd?.call();
+                      },
                       onPanStart: widget.onWaypointDrag != null
                           ? (details) {
                               setState(() {
                                 _draggedWaypointIndex = index;
                                 _draggedPosition = point;
                               });
+                              widget.onWaypointDragStart?.call();
                             }
                           : null,
                       onPanUpdate: widget.onWaypointDrag != null
                           ? (details) => _onWaypointPanUpdate(index, details)
                           : null,
                       onPanEnd: widget.onWaypointDrag != null
-                          ? (details) => _onWaypointPanEnd(index, details)
+                          ? (details) {
+                              _onWaypointPanEnd(index, details);
+                              widget.onWaypointDragEnd?.call();
+                            }
                           : null,
                       onTap: () {
-                        // Reset khi chỉ tap không kéo
-                        setState(() {
-                          _draggedWaypointIndex = null;
-                          _draggedPosition = null;
-                        });
+                        // Show context menu when clicking on waypoint marker
+                        if (widget.onWaypointTap != null) {
+                          final RenderBox? renderBox =
+                              context.findRenderObject() as RenderBox?;
+                          if (renderBox != null) {
+                            final globalPosition = renderBox.localToGlobal(
+                              const Offset(30, 30), // Offset from marker center
+                            );
+                            // Check for Ctrl/Cmd key
+                            final isCtrlPressed =
+                                HardwareKeyboard.instance.isControlPressed ||
+                                HardwareKeyboard.instance.isMetaPressed;
+                            widget.onWaypointTap!(
+                              index,
+                              globalPosition,
+                              isCtrlPressed: isCtrlPressed,
+                            );
+                          }
+                        }
                       },
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          if (isDragged)
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.blue.withOpacity(0.6),
-                                  width: 3,
+                      child: CompositedTransformTarget(
+                        link:
+                            widget.waypointLayerLinks?[widget
+                                .routePoints[index]
+                                .id] ??
+                            LayerLink(),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            if (isHighlighted)
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isMultiSelected
+                                        ? Colors.orange.withOpacity(0.8)
+                                        : Colors.blue.withOpacity(0.6),
+                                    width: 3,
+                                  ),
+                                ),
+                              ),
+                            Icon(
+                              Icons.location_on,
+                              color: isMultiSelected
+                                  ? Colors.orange
+                                  : isHighlighted
+                                  ? Colors.blue
+                                  : Colors.red,
+                              size: isHighlighted
+                                  ? 40
+                                  : 36, // Kích thước icon lớn hơn
+                            ),
+                            Positioned.fill(
+                              child: Center(
+                                child: Text(
+                                  '${index + 1}',
+                                  style: TextStyle(
+                                    fontSize: isHighlighted ? 16 : 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black.withOpacity(0.8),
+                                        offset: const Offset(1, 1),
+                                        blurRadius: 2,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          Icon(
-                            Icons.location_on,
-                            color: isDragged ? Colors.blue : Colors.red,
-                            size: isDragged
-                                ? 40
-                                : 36, // Kích thước icon lớn hơn
-                          ),
-                          Positioned.fill(
-                            child: Center(
-                              child: Text(
-                                '${index + 1}',
-                                style: TextStyle(
-                                  fontSize: isDragged ? 16 : 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  shadows: [
-                                    Shadow(
-                                      color: Colors.black.withOpacity(0.8),
-                                      offset: const Offset(1, 1),
-                                      blurRadius: 2,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   );

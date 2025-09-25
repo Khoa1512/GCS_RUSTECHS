@@ -36,6 +36,8 @@ class MissionSidebar extends StatefulWidget {
 
 class _MissionSidebarState extends State<MissionSidebar> {
   // Convert RoutePoint to PlanMissionItem
+  // Helper method to convert RoutePoint to PlanMissionItem (for future use)
+  // ignore: unused_element
   PlanMissionItem _routePointToMissionItem(RoutePoint routePoint) {
     return PlanMissionItem(
       seq: routePoint.order - 1, // Convert to 0-based
@@ -293,7 +295,7 @@ class _MissionSidebarState extends State<MissionSidebar> {
                               child: _buildStatCard(
                                 icon: Icons.location_on,
                                 label: 'Waypoints',
-                                value: '${routePoints.length}',
+                                value: '${widget.routePoints.length}',
                                 color: Colors.blue,
                               ),
                             ),
@@ -340,7 +342,7 @@ class _MissionSidebarState extends State<MissionSidebar> {
                         const SizedBox(height: 20),
 
                         // Waypoint List
-                        if (routePoints.isNotEmpty) ...[
+                        if (widget.routePoints.isNotEmpty) ...[
                           Text(
                             'Waypoint List',
                             style: TextStyle(
@@ -352,9 +354,9 @@ class _MissionSidebarState extends State<MissionSidebar> {
                           const SizedBox(height: 8),
                           Expanded(
                             child: ListView.builder(
-                              itemCount: routePoints.length,
+                              itemCount: widget.routePoints.length,
                               itemBuilder: (context, index) {
-                                final wp = routePoints[index];
+                                final wp = widget.routePoints[index];
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 4),
                                   padding: const EdgeInsets.all(8),

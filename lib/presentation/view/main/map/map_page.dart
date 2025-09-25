@@ -148,10 +148,12 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _convertMissionToRoutePoints(List<PlanMissionItem> missionItems) {
+    print('DEBUG: Converting mission to route points. Mission items count: ${missionItems.length}');
     final newRoutePoints = <RoutePoint>[];
 
     for (int i = 0; i < missionItems.length; i++) {
       final item = missionItems[i];
+      print('DEBUG: Processing mission item $i: seq=${item.seq}, command=${item.command}, x=${item.x}, y=${item.y}');
 
       if (item.seq == 0 || !_isGlobalCoordinate(item.x, item.y)) continue;
 

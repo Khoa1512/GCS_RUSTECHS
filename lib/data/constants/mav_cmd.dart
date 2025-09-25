@@ -87,7 +87,7 @@ final Map<String, int> mavCmdMap = {
   'Do Land Start': MavCmd.doLandStart,
   'Rally Land': MavCmd.doRallyLand,
   'Go Pos And Reorient': MavCmd.doGoPosAndReorient,
-  'Set ROI': MavCmd.doSetRoi,
+  'Do Set ROI': MavCmd.doSetRoi,
   'Camera Configure': MavCmd.doDigicamConfigure,
   'Camera Control': MavCmd.doDigicamControl,
   'Mount Configure': MavCmd.doMountConfigure,

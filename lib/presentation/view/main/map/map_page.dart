@@ -1067,6 +1067,69 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
+  // Mission sidebar handlers
+  void _handleReorderWaypoints(List<RoutePoint> reorderedWaypoints) {
+    // Save current state for undo
+    undoRedoManager.addAction(
+      MissionAction(
+        type: ActionType.batchEdit,
+        waypoint: routePoints.first, // Just use the first waypoint as reference
+      ),
+    );
+
+    setState(() {
+      routePoints.clear();
+      routePoints.addAll(reorderedWaypoints);
+    });
+
+    _calculateMissionStats();
+  }
+
+  void _handleEditWaypoint(RoutePoint waypoint) {
+    setState(() {
+      selectedWaypoint = waypoint;
+      isEditMode = true;
+      // Clear other modes
+      isDragging = false;
+      selectedWaypointIds.clear();
+      isSelectingOrbitCenter = false;
+      isSelectingSurveyCenter = false;
+    });
+  }
+
+  void _handleDeleteWaypointFromSidebar(String waypointId) {
+    final waypointToDelete = routePoints.firstWhere(
+      (wp) => wp.id == waypointId,
+      orElse: () => throw StateError('Waypoint not found'),
+    );
+
+    undoRedoManager.addAction(
+      MissionAction(
+        type: ActionType.deleteWaypoint,
+        waypoint: waypointToDelete,
+        index: routePoints.indexOf(waypointToDelete),
+      ),
+    );
+
+    setState(() {
+      routePoints.removeWhere((wp) => wp.id == waypointId);
+      _waypointLayerLinks.remove(waypointId);
+
+      // Clear selection if deleted waypoint was selected
+      if (selectedWaypoint?.id == waypointId) {
+        selectedWaypoint = null;
+        isEditMode = false;
+      }
+
+      // Remove from multi-selection if present
+      selectedWaypointIds.remove(waypointId);
+    });
+
+    // Reorder remaining waypoints
+    _reorderWaypoints();
+    _calculateMissionStats();
+  }
+
   // Mission operations from original code
   void handleReadMission() {
     if (!TelemetryService().mavlinkAPI.isConnected) {
@@ -1478,6 +1541,9 @@ class _MapPageState extends State<MapPage> {
                   ? () => handleSendConfigs(routePoints)
                   : null,
               onImportMission: _handleImport,
+              onReorderWaypoints: _handleReorderWaypoints,
+              onEditWaypoint: _handleEditWaypoint,
+              onDeleteWaypoint: _handleDeleteWaypointFromSidebar,
               isConnected: TelemetryService().mavlinkAPI.isConnected,
             ),
           ),

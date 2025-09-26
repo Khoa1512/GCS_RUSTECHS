@@ -148,12 +148,10 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _convertMissionToRoutePoints(List<PlanMissionItem> missionItems) {
-    print('DEBUG: Converting mission to route points. Mission items count: ${missionItems.length}');
     final newRoutePoints = <RoutePoint>[];
 
     for (int i = 0; i < missionItems.length; i++) {
       final item = missionItems[i];
-      print('DEBUG: Processing mission item $i: seq=${item.seq}, command=${item.command}, x=${item.x}, y=${item.y}');
 
       if (item.seq == 0 || !_isGlobalCoordinate(item.x, item.y)) continue;
 
@@ -187,7 +185,6 @@ class _MapPageState extends State<MapPage> {
       routePoints = newRoutePoints;
     });
 
-    MissionService().updateMission(newRoutePoints);
     _calculateMissionStats();
     _showSuccess('Mission downloaded: ${newRoutePoints.length} waypoints');
   }
@@ -247,7 +244,6 @@ class _MapPageState extends State<MapPage> {
     });
 
     _calculateMissionStats();
-    MissionService().updateMission(routePoints);
   }
 
   void _addWaypointWithAltitude(LatLng latLng, double altitude) {
@@ -272,7 +268,6 @@ class _MapPageState extends State<MapPage> {
     });
 
     _calculateMissionStats();
-    MissionService().updateMission(routePoints);
   }
 
   void _onWaypointDrag(int index, LatLng newPosition) {
@@ -300,7 +295,6 @@ class _MapPageState extends State<MapPage> {
       });
 
       _calculateMissionStats();
-      MissionService().updateMission(routePoints);
     }
   }
 
@@ -476,7 +470,6 @@ class _MapPageState extends State<MapPage> {
           });
 
           _calculateMissionStats();
-          MissionService().updateMission(routePoints);
           _showSuccess(
             'Orbit mission created with ${orbitWaypoints.length} waypoints',
           );
@@ -515,7 +508,6 @@ class _MapPageState extends State<MapPage> {
           });
 
           _calculateMissionStats();
-          MissionService().updateMission(routePoints);
           _showSuccess(
             'Survey mission created with ${surveyWaypoints.length} waypoints',
           );
@@ -595,7 +587,6 @@ class _MapPageState extends State<MapPage> {
     }
 
     _calculateMissionStats();
-    MissionService().updateMission(routePoints);
   }
 
   void _applyRedoAction(MissionAction action) {
@@ -648,7 +639,6 @@ class _MapPageState extends State<MapPage> {
 
     _ensureLayerLinksForWaypoints();
     _calculateMissionStats();
-    MissionService().updateMission(routePoints);
   }
 
   void _handleClearMission() async {
@@ -681,7 +671,6 @@ class _MapPageState extends State<MapPage> {
     });
 
     _calculateMissionStats();
-    MissionService().clearMission();
 
     if (TelemetryService().mavlinkAPI.isConnected) {
       TelemetryService().mavlinkAPI.clearMission();
@@ -702,7 +691,6 @@ class _MapPageState extends State<MapPage> {
 
     // Update mission statistics
     _calculateMissionStats();
-    MissionService().updateMission(routePoints);
   }
 
   // Edit panel handlers
@@ -740,7 +728,6 @@ class _MapPageState extends State<MapPage> {
         });
 
         _calculateMissionStats();
-        MissionService().updateMission(routePoints);
         _showSuccess('Waypoint deleted');
       }
     }
@@ -772,7 +759,6 @@ class _MapPageState extends State<MapPage> {
         });
 
         _calculateMissionStats();
-        MissionService().updateMission(routePoints);
         _showSuccess('Waypoint type changed');
       }
     }
@@ -811,7 +797,6 @@ class _MapPageState extends State<MapPage> {
       );
 
       _calculateMissionStats();
-      MissionService().updateMission(routePoints);
 
       // Clear map drag state
       _mapKey.currentState?.clearMapDragState();
@@ -938,7 +923,6 @@ class _MapPageState extends State<MapPage> {
     );
 
     _calculateMissionStats();
-    MissionService().updateMission(routePoints);
     _showSuccess('${selectedWaypoints.length} waypoints deleted');
   }
 
@@ -1037,7 +1021,6 @@ class _MapPageState extends State<MapPage> {
     });
 
     _calculateMissionStats();
-    MissionService().updateMission(routePoints);
     _showSuccess('Batch edit applied to ${updatedWaypoints.length} waypoints');
   }
 

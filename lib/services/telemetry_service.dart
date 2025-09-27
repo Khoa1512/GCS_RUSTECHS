@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_libserialport/flutter_libserialport.dart';
 import 'package:skylink/api/telemetry/mavlink_api.dart';
@@ -297,9 +296,6 @@ class TelemetryService {
         case MAVLinkEventType.position:
           if (event.data is Map) {
             final m = (event.data as Map);
-            // KHÔNG cập nhật GPS coordinates từ position event nữa
-            // Chỉ ưu tiên gpsInfo event cho GPS coordinates để tránh conflict
-            // Position event chỉ cập nhật altitude và movement data
 
             _currentTelemetry['altitude_msl'] =
                 (m['altMSL'] as num?)?.toDouble() ??
@@ -311,8 +307,6 @@ class TelemetryService {
                 (m['groundSpeed'] as num?)?.toDouble() ??
                 (_currentTelemetry['groundspeed'] ?? 0.0);
 
-            // Don't use GLOBAL_POSITION_INT heading to avoid conflicts
-            // Priority: GPS course > Yaw (handled in other events)
           }
           _emitTelemetry();
           break;
@@ -353,14 +347,6 @@ class TelemetryService {
                 (m['epv'] as num?)?.toDouble() ??
                 (_currentTelemetry['gps_vertical_accuracy'] ?? 0.0);
 
-            // GPS course is for navigation, not compass display
-            // Compass should show FC orientation (IMU yaw), not movement direction
-            // Comment out GPS course override to keep IMU yaw priority
-            // final gpsCourse = _currentTelemetry['gps_course'] ?? 0.0;
-            // if (gpsCourse > 0.0) {
-            //   _updateCompassHeading(gpsCourse);
-            // }
-            // Cache last fix type string in a field for getters
             _lastGpsFixType = fixType;
           }
           _emitTelemetry();
@@ -407,7 +393,8 @@ class TelemetryService {
       final hasPosition =
           ((_currentTelemetry['gps_latitude'] ?? 0.0) != 0.0) ||
           ((_currentTelemetry['gps_longitude'] ?? 0.0) != 0.0);
-      final hasBattery = (_currentTelemetry['battery'] ?? 0.0) > 0.0;
+      final hasBattery = (_currentTelemetry['battery'] ?? 0.0) > 0.0 ||
+          (_currentTelemetry['voltageBattery'] ?? 0.00) > 0.00;
       final hasAttitude =
           (_currentTelemetry['roll'] != null) ||
           (_currentTelemetry['pitch'] != null) ||
@@ -421,15 +408,6 @@ class TelemetryService {
       if (hasPosition || hasBattery || hasAttitude || hasBasicData) {
         _hasReceivedData = true;
         _dataReceiveController.add(true);
-
-        // Debug logging để tracking
-        if (kDebugMode) {
-          print(
-            'TelemetryService: First meaningful data received! '
-            'Position: $hasPosition, Battery: $hasBattery, '
-            'Attitude: $hasAttitude, Basic: $hasBasicData',
-          );
-        }
       }
     }
     _telemetryController.add(Map.from(_currentTelemetry));
@@ -509,6 +487,12 @@ class TelemetryService {
           value: '0',
           unit: '',
           color: Colors.amber,
+        ),
+        TelemetryData(
+          label: 'Voltage',
+          value: '0.00',
+          unit: 'V',
+          color: Colors.teal,
         ),
         TelemetryData(
           label: 'GPS Lat',
@@ -603,6 +587,12 @@ class TelemetryService {
         value: (_currentTelemetry['satellites'] ?? 0.0).toInt().toString(),
         unit: '',
         color: Colors.amber,
+      ),
+            TelemetryData(
+        label: 'Voltage',
+        value: (_currentTelemetry['voltageBattery'] ?? 0.00).toStringAsFixed(2),
+        unit: 'V',
+        color: Colors.teal,
       ),
       TelemetryData(
         label: 'GPS Lat',
@@ -764,6 +754,12 @@ class TelemetryService {
         label: 'Battery',
         value: (_currentTelemetry['battery'] ?? 0.0).toInt().toString(),
         unit: '%',
+        color: Colors.teal,
+      ),
+            TelemetryData(
+        label: 'Voltage',
+        value: (_currentTelemetry['voltageBattery'] ?? 0.00).toStringAsFixed(2),
+        unit: 'V',
         color: Colors.teal,
       ),
 

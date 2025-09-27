@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:skylink/presentation/widget/map/components/mission_tooltip.dart';
 
 class FloatingMissionActions extends StatelessWidget {
   final VoidCallback? onAddWaypoint;
@@ -43,32 +44,60 @@ class FloatingMissionActions extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildActionButton(
+              MissionTooltip(
+                message: 'Thêm Waypoint',
+                description:
+                    'Click để thêm điểm bay mới. Bạn cũng có thể click trực tiếp lên bản đồ.',
                 icon: Icons.add_location,
-                label: 'Add WP',
-                onPressed: onAddWaypoint,
                 color: Colors.green,
+                child: _buildActionButton(
+                  icon: Icons.add_location,
+                  label: 'Thêm Waypoint',
+                  onPressed: onAddWaypoint,
+                  color: Colors.green,
+                ),
               ),
               const Divider(height: 1, color: Colors.grey),
-              _buildActionButton(
+              MissionTooltip(
+                message: 'Orbit Template',
+                description:
+                    'Tạo đường bay vòng tròn quanh một điểm. Phù hợp cho quan sát, chụp ảnh 360°.',
                 icon: Icons.track_changes,
-                label: 'Orbit',
-                onPressed: onOrbitTemplate,
                 color: Colors.blue,
+                child: _buildActionButton(
+                  icon: Icons.track_changes,
+                  label: 'Orbit',
+                  onPressed: onOrbitTemplate,
+                  color: Colors.blue,
+                ),
               ),
               const Divider(height: 1, color: Colors.grey),
-              _buildActionButton(
+              MissionTooltip(
+                message: 'Survey Template',
+                description:
+                    'Tạo đường bay zigzag để chụp ảnh toàn bộ khu vực. Phù hợp cho mapping và khảo sát.',
                 icon: Icons.grid_on,
-                label: 'Survey',
-                onPressed: onSurveyTemplate,
                 color: Colors.purple,
+                child: _buildActionButton(
+                  icon: Icons.grid_on,
+                  label: 'Survey',
+                  onPressed: onSurveyTemplate,
+                  color: Colors.purple,
+                ),
               ),
               const Divider(height: 1, color: Colors.grey),
-              _buildActionButton(
+              MissionTooltip(
+                message: 'Xoá nhiệm vụ',
+                description:
+                    'Xóa toàn bộ điểm bay và bắt đầu mission mới. Sẽ có xác nhận trước khi xóa.',
                 icon: Icons.delete_sweep,
-                label: 'Clear',
-                onPressed: onClearMission,
                 color: Colors.red,
+                child: _buildActionButton(
+                  icon: Icons.delete_sweep,
+                  label: 'Xoá',
+                  onPressed: onClearMission,
+                  color: Colors.red,
+                ),
               ),
             ],
           ),
@@ -95,13 +124,13 @@ class FloatingMissionActions extends StatelessWidget {
               _buildIconButton(
                 icon: Icons.undo,
                 onPressed: canUndo ? onUndo : null,
-                tooltip: 'Undo',
+                tooltip: 'Hoàn tác',
               ),
               const VerticalDivider(width: 1, color: Colors.grey),
               _buildIconButton(
                 icon: Icons.redo,
                 onPressed: canRedo ? onRedo : null,
-                tooltip: 'Redo',
+                tooltip: 'Làm lại',
               ),
             ],
           ),

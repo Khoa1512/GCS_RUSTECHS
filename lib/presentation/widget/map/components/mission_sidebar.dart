@@ -5,6 +5,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:skylink/api/telemetry/mavlink/mission/mission_models.dart';
 import 'package:skylink/data/constants/mav_cmd_params.dart';
+import 'package:skylink/presentation/widget/map/components/mission_help_dialog.dart';
+import 'package:skylink/presentation/widget/map/components/mission_quick_tips.dart';
 
 class MissionSidebar extends StatefulWidget {
   final List<RoutePoint> routePoints;
@@ -214,13 +216,33 @@ class _MissionSidebarState extends State<MissionSidebar> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Mission Plan',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'Mission Plan',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => _showMissionHelp(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.help_outline,
+                          color: Colors.teal,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -262,7 +284,7 @@ class _MissionSidebarState extends State<MissionSidebar> {
               Icon(Icons.analytics_outlined, color: Colors.teal, size: 16),
               const SizedBox(width: 8),
               Text(
-                'Mission Overview',
+                'Tổng quan nhiệm vụ',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 14,
@@ -286,7 +308,7 @@ class _MissionSidebarState extends State<MissionSidebar> {
               Expanded(
                 child: _buildStatCard(
                   icon: Icons.straighten,
-                  label: 'Distance',
+                  label: 'Quãng đường',
                   value: widget.totalDistance != null
                       ? '${(widget.totalDistance! / 1000).toStringAsFixed(1)}km'
                       : 'N/A',
@@ -297,7 +319,7 @@ class _MissionSidebarState extends State<MissionSidebar> {
               Expanded(
                 child: _buildStatCard(
                   icon: Icons.access_time,
-                  label: 'Time',
+                  label: 'Thời gian',
                   value: widget.estimatedTime != null
                       ? '${widget.estimatedTime!.inMinutes}m ${widget.estimatedTime!.inSeconds % 60}s'
                       : 'N/A',
@@ -308,7 +330,7 @@ class _MissionSidebarState extends State<MissionSidebar> {
               Expanded(
                 child: _buildStatCard(
                   icon: Icons.battery_charging_full,
-                  label: 'Battery',
+                  label: 'Pin',
                   value: widget.batteryUsage != null
                       ? '${widget.batteryUsage!.toStringAsFixed(0)}%'
                       : 'N/A',
@@ -332,6 +354,13 @@ class _MissionSidebarState extends State<MissionSidebar> {
       ),
       child: Column(
         children: [
+          // Quick Tips
+          if (widget.routePoints.isNotEmpty)
+            MissionQuickTips(
+              waypointCount: widget.routePoints.length,
+              onShowFullGuide: () => _showMissionHelp(context),
+            ),
+
           // Waypoint List Header
           Container(
             padding: const EdgeInsets.all(16),
@@ -346,7 +375,7 @@ class _MissionSidebarState extends State<MissionSidebar> {
                 Icon(Icons.list_alt, color: Colors.teal, size: 16),
                 const SizedBox(width: 8),
                 Text(
-                  'Waypoint Details',
+                  'Chi tiết các điểm bay',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -356,7 +385,7 @@ class _MissionSidebarState extends State<MissionSidebar> {
                 const Spacer(),
                 if (widget.routePoints.isNotEmpty)
                   Text(
-                    'Long press to reorder',
+                    'Nhấn và giữ để sắp xếp lại',
                     style: TextStyle(
                       color: Colors.white54,
                       fontSize: 11,
@@ -383,21 +412,91 @@ class _MissionSidebarState extends State<MissionSidebar> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.location_off, size: 48, color: Colors.white24),
-          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.teal.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.flight_takeoff, size: 48, color: Colors.teal),
+          ),
+          const SizedBox(height: 24),
           Text(
-            'No waypoints added',
+            'Chưa có waypoint nào',
             style: TextStyle(
-              color: Colors.white54,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Add waypoints to start planning\nyour mission',
+            'Bắt đầu tạo mission của bạn',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white38, fontSize: 12),
+            style: TextStyle(color: Colors.white54, fontSize: 14),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2A2A2A),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.teal.withOpacity(0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.lightbulb_outline,
+                      color: Colors.yellow,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Cách thêm waypoint:',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _buildQuickTip(
+                  'Click nút "Thêm waypoint" bên trái',
+                  Icons.add_location,
+                ),
+                _buildQuickTip('Click trực tiếp lên bản đồ', Icons.touch_app),
+                _buildQuickTip(
+                  'Dùng template Orbit/Survey',
+                  Icons.auto_awesome,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(Icons.help_outline, color: Colors.teal, size: 14),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _showMissionHelp(context),
+                        child: Text(
+                          'Xem hướng dẫn đầy đủ',
+                          style: TextStyle(
+                            color: Colors.teal,
+                            fontSize: 12,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -608,7 +707,7 @@ class _MissionSidebarState extends State<MissionSidebar> {
               Icon(Icons.control_camera, color: Colors.teal, size: 16),
               const SizedBox(width: 8),
               Text(
-                'Mission Controls',
+                'Quản lý nhiệm vụ',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 14,
@@ -621,14 +720,14 @@ class _MissionSidebarState extends State<MissionSidebar> {
 
           // Flight Controller Controls
           _buildControlGroup(
-            title: 'Flight Controller',
+            title: 'Điều khiển',
             icon: Icons.flight,
             children: [
               Row(
                 children: [
                   Expanded(
                     child: _buildControlButton(
-                      label: 'Read Mission',
+                      label: 'Đọc Mission',
                       icon: Icons.download,
                       color: Colors.blue,
                       onPressed: widget.onReadMission,
@@ -638,7 +737,7 @@ class _MissionSidebarState extends State<MissionSidebar> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _buildControlButton(
-                      label: 'Send Mission',
+                      label: 'Gửi Mission',
                       icon: Icons.send,
                       color: Colors.green,
                       onPressed: widget.onSendMission,
@@ -655,14 +754,14 @@ class _MissionSidebarState extends State<MissionSidebar> {
 
           // File Operations
           _buildControlGroup(
-            title: 'File Operations',
+            title: 'Dữ liệu',
             icon: Icons.folder,
             children: [
               Row(
                 children: [
                   Expanded(
                     child: _buildControlButton(
-                      label: 'Import',
+                      label: 'Nhập file Mission',
                       icon: Icons.file_open,
                       color: Colors.orange,
                       onPressed: _handleImportMission,
@@ -671,7 +770,7 @@ class _MissionSidebarState extends State<MissionSidebar> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _buildControlButton(
-                      label: 'Export',
+                      label: 'Xuất file Mission',
                       icon: Icons.save_alt,
                       color: Colors.purple,
                       onPressed: widget.routePoints.isNotEmpty
@@ -857,6 +956,31 @@ class _MissionSidebarState extends State<MissionSidebar> {
         content: Text(message),
         backgroundColor: isError ? Colors.red : Colors.green,
         duration: Duration(seconds: isError ? 3 : 2),
+      ),
+    );
+  }
+
+  void _showMissionHelp(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const MissionHelpDialog(),
+    );
+  }
+
+  Widget _buildQuickTip(String text, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.teal, size: 12),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ),
+        ],
       ),
     );
   }

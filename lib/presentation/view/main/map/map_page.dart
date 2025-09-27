@@ -21,6 +21,8 @@ import 'package:skylink/services/telemetry_service.dart';
 import 'package:skylink/services/mission_service.dart';
 import 'package:skylink/api/telemetry/mavlink/mission/mission_models.dart';
 import 'package:skylink/api/telemetry/mavlink/events.dart';
+import 'package:skylink/presentation/widget/map/components/mission_tutorial_overlay.dart';
+import 'package:skylink/presentation/widget/map/components/mission_help_dialog.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -61,6 +63,10 @@ class _MapPageState extends State<MapPage> {
   Duration? estimatedTime;
   double? batteryUsage;
   String riskLevel = 'Low';
+
+  // Tutorial state
+  bool showTutorial = false;
+  final GlobalKey _helpButtonKey = GlobalKey();
 
   void _ensureLayerLinksForWaypoints() {
     for (final waypoint in routePoints) {
@@ -429,7 +435,7 @@ class _MapPageState extends State<MapPage> {
       isSelectingOrbitCenter = true;
       isSelectingSurveyCenter = false;
     });
-    _showInfo('Click on the map to select orbit center point');
+    _showInfo('Nhấp vào bản đồ để chọn điểm tâm bay vòng');
   }
 
   void _handleSurveyTemplate() {
@@ -437,7 +443,7 @@ class _MapPageState extends State<MapPage> {
       isSelectingSurveyCenter = true;
       isSelectingOrbitCenter = false;
     });
-    _showInfo('Click on the map to select survey center point');
+    _showInfo('Nhấp vào bản đồ để chọn điểm tâm khảo sát');
   }
 
   void _createOrbitAt(LatLng center) {
@@ -509,7 +515,7 @@ class _MapPageState extends State<MapPage> {
 
           _calculateMissionStats();
           _showSuccess(
-            'Survey mission created with ${surveyWaypoints.length} waypoints',
+            'Nhiệm vụ khảo sát đã được tạo với ${surveyWaypoints.length} waypoints',
           );
         },
       ),
@@ -646,9 +652,9 @@ class _MapPageState extends State<MapPage> {
 
     final confirmed = await ConfirmDialog.confirmClear(
       context: context,
-      itemName: 'Mission',
+      itemName: 'các waypoints',
       additionalMessage:
-          'Are you sure you want to clear the entire mission with ${routePoints.length} waypoint(s)? This action can be undone.',
+          'Bạn có chắc chắn muốn xóa toàn bộ nhiệm vụ với ${routePoints.length} waypoints? Hành động này có thể hoàn tác.',
     );
 
     if (!confirmed) return;
@@ -674,7 +680,7 @@ class _MapPageState extends State<MapPage> {
 
     if (TelemetryService().mavlinkAPI.isConnected) {
       TelemetryService().mavlinkAPI.clearMission();
-      _showSuccess('Mission cleared from Flight Controller');
+      _showSuccess('Nhiệm vụ đã được xóa khỏi Flight Controller');
     }
   }
 
@@ -698,9 +704,9 @@ class _MapPageState extends State<MapPage> {
     if (selectedWaypoint != null) {
       final confirmed = await ConfirmDialog.confirmDelete(
         context: context,
-        itemName: 'Waypoint ${selectedWaypoint!.order}',
+        itemName: 'waypoint ${selectedWaypoint!.order}',
         additionalMessage:
-            'Are you sure you want to delete Waypoint ${selectedWaypoint!.order}? This action can be undone using the undo button.',
+            'Bạn có chắc chắn muốn xóa waypoint ${selectedWaypoint!.order}? Hành động này có thể hoàn tác bằng nút Hoàn tác.',
       );
 
       if (!confirmed) return;
@@ -728,7 +734,7 @@ class _MapPageState extends State<MapPage> {
         });
 
         _calculateMissionStats();
-        _showSuccess('Waypoint deleted');
+        _showSuccess('Waypoint đã được xoá ');
       }
     }
   }
@@ -768,11 +774,6 @@ class _MapPageState extends State<MapPage> {
   void _handleSaveWaypoint(RoutePoint updatedWaypoint) {
     final index = routePoints.indexWhere((wp) => wp.id == updatedWaypoint.id);
     if (index != -1) {
-      print('DEBUG: Single edit saved - clearing all states');
-      print(
-        'DEBUG: Before clear - isDragging: $isDragging, isEditMode: $isEditMode, selectedWaypoint: $selectedWaypoint',
-      );
-
       undoRedoManager.addAction(
         MissionAction(
           type: ActionType.editWaypoint,
@@ -792,10 +793,6 @@ class _MapPageState extends State<MapPage> {
         isSelectingSurveyCenter = false;
       });
 
-      print(
-        'DEBUG: After clear - isDragging: $isDragging, isEditMode: $isEditMode, selectedWaypoint: $selectedWaypoint',
-      );
-
       _calculateMissionStats();
 
       // Clear map drag state
@@ -807,16 +804,11 @@ class _MapPageState extends State<MapPage> {
       // Force a rebuild to ensure all states are properly updated
       Future.microtask(() => setState(() {}));
 
-      _showSuccess('Waypoint updated');
+      _showSuccess('Waypoint đã được cập nhật');
     }
   }
 
   void _handleCancelEdit() {
-    print('DEBUG: Single edit cancelled - clearing all states');
-    print(
-      'DEBUG: Before clear - isDragging: $isDragging, isEditMode: $isEditMode, selectedWaypoint: $selectedWaypoint',
-    );
-
     setState(() {
       isEditMode = false;
       selectedWaypoint = null;
@@ -825,10 +817,6 @@ class _MapPageState extends State<MapPage> {
       isSelectingOrbitCenter = false;
       isSelectingSurveyCenter = false;
     });
-
-    print(
-      'DEBUG: After clear - isDragging: $isDragging, isEditMode: $isEditMode, selectedWaypoint: $selectedWaypoint',
-    );
 
     // Clear map drag state
     _mapKey.currentState?.clearMapDragState();
@@ -841,11 +829,6 @@ class _MapPageState extends State<MapPage> {
   }
 
   void _handleBatchEditCancel() {
-    print('DEBUG: Batch edit cancelled - clearing all states');
-    print(
-      'DEBUG: Before clear - isDragging: $isDragging, isEditMode: $isEditMode, selectedWaypoint: $selectedWaypoint',
-    );
-
     setState(() {
       selectedWaypointIds.clear();
       // Clear any other states that might interfere with map interactions
@@ -855,10 +838,6 @@ class _MapPageState extends State<MapPage> {
       isSelectingOrbitCenter = false;
       isSelectingSurveyCenter = false;
     });
-
-    print(
-      'DEBUG: After clear - isDragging: $isDragging, isEditMode: $isEditMode, selectedWaypoint: $selectedWaypoint',
-    );
 
     // Clear map drag state
     _mapKey.currentState?.clearMapDragState();
@@ -870,7 +849,6 @@ class _MapPageState extends State<MapPage> {
     Future.microtask(() {
       if (mounted) {
         setState(() {});
-        print('DEBUG: Map state refreshed');
       }
     });
   }
@@ -1100,7 +1078,7 @@ class _MapPageState extends State<MapPage> {
   void _handleDeleteWaypointFromSidebar(String waypointId) {
     final waypointToDelete = routePoints.firstWhere(
       (wp) => wp.id == waypointId,
-      orElse: () => throw StateError('Waypoint not found'),
+      orElse: () => throw StateError('Waypoint không tìm thấy'),
     );
 
     undoRedoManager.addAction(
@@ -1133,23 +1111,23 @@ class _MapPageState extends State<MapPage> {
   // Mission operations from original code
   void handleReadMission() {
     if (!TelemetryService().mavlinkAPI.isConnected) {
-      _showError('Please connect to Flight Controller first');
+      _showError('Vui lòng kết nối với Flight Controller');
       return;
     }
 
     _isReadingMission = true;
     TelemetryService().mavlinkAPI.requestMissionList();
-    _showProgress('Reading mission from Flight Controller...');
+    _showProgress('Đang đọc kế hoạch bay từ Flight Controller...');
   }
 
   Future<void> handleSendConfigs(List<RoutePoint> points) async {
     if (!TelemetryService().mavlinkAPI.isConnected) {
-      _showError('Please connect to Flight Controller first');
+      _showError('Vui lòng kết nối với Flight Controller');
       return;
     }
 
     if (points.isEmpty) {
-      _showError('No waypoints to send');
+      _showError('Không có waypoint nào để gửi');
       return;
     }
 
@@ -1211,7 +1189,7 @@ class _MapPageState extends State<MapPage> {
 
           case MAVLinkEventType.missionUploadComplete:
             if (!clearAckReceived) break;
-            _showSuccess('Mission plan uploaded successfully');
+            _showSuccess('Kế hoạch bay đã được tải lên thành công');
             MissionService().updateMission(points);
             sub?.cancel();
             if (!completer.isCompleted) completer.complete();
@@ -1222,11 +1200,13 @@ class _MapPageState extends State<MapPage> {
             final errorCode = event.data as int;
             if (_isActualError(errorCode)) {
               final errorMessage = _getMavlinkErrorMessage(errorCode);
-              _showError('Mission failed: $errorMessage');
+              _showError('Tải kế hoạch bay thất bại: $errorMessage');
               sub?.cancel();
               if (!completer.isCompleted) completer.completeError(errorMessage);
             } else {
-              _showSuccess('Mission plan accepted by Flight Controller');
+              _showSuccess(
+                'Kế hoạch bay đã được chấp nhận bởi Flight Controller',
+              );
               MissionService().updateMission(points);
               sub?.cancel();
               if (!completer.isCompleted) completer.complete();
@@ -1473,8 +1453,8 @@ class _MapPageState extends State<MapPage> {
                           const SizedBox(width: 8),
                           Text(
                             isSelectingOrbitCenter
-                                ? 'Tap to set orbit center'
-                                : 'Tap to set survey area center',
+                                ? 'Nhấn chọn tâm bay vòng'
+                                : 'Nhấn chọn tâm vùng khảo sát',
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w500,
@@ -1522,6 +1502,13 @@ class _MapPageState extends State<MapPage> {
                       onModeToggle: (isSimple) =>
                           setState(() => isSimpleMode = isSimple),
                     ),
+                  ),
+
+                // Tutorial overlay
+                if (showTutorial)
+                  MissionTutorialOverlay(
+                    onClose: () => setState(() => showTutorial = false),
+                    targetKey: _helpButtonKey,
                   ),
               ],
             ),

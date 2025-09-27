@@ -44,7 +44,7 @@ class _AddWaypointDialogState extends State<AddWaypointDialog> {
           ),
           const SizedBox(width: 12),
           const Text(
-            'Add Waypoint',
+            'Thêm waypoint',
             style: TextStyle(
               color: Colors.white,
               fontSize: 18,
@@ -60,7 +60,7 @@ class _AddWaypointDialogState extends State<AddWaypointDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Enter waypoint coordinates:',
+              'Nhập tọa độ waypoint:',
               style: TextStyle(color: Colors.white70, fontSize: 14),
             ),
             const SizedBox(height: 20),
@@ -68,8 +68,8 @@ class _AddWaypointDialogState extends State<AddWaypointDialog> {
             // Latitude input
             _buildCoordinateField(
               controller: _latController,
-              label: 'Latitude',
-              hint: 'e.g. 10.762622',
+              label: 'Vĩ độ',
+              hint: 'ví dụ: 10.762622',
               icon: Icons.navigation,
               validator: _validateLatitude,
             ),
@@ -79,8 +79,8 @@ class _AddWaypointDialogState extends State<AddWaypointDialog> {
             // Longitude input
             _buildCoordinateField(
               controller: _lngController,
-              label: 'Longitude',
-              hint: 'e.g. 106.660172',
+              label: 'Kinh độ',
+              hint: 'ví dụ: 106.660172',
               icon: Icons.explore,
               validator: _validateLongitude,
             ),
@@ -90,8 +90,8 @@ class _AddWaypointDialogState extends State<AddWaypointDialog> {
             // Altitude input
             _buildCoordinateField(
               controller: _altController,
-              label: 'Altitude (m)',
-              hint: 'e.g. 50',
+              label: 'Độ cao (m)',
+              hint: 'ví dụ: 50',
               icon: Icons.height,
               validator: _validateAltitude,
             ),
@@ -115,7 +115,7 @@ class _AddWaypointDialogState extends State<AddWaypointDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Tip: You can also click on the map to add waypoints at that location.',
+                      'Mẹo: Bạn cũng có thể click trực tiếp trên bản đồ để thêm waypoint.',
                       style: TextStyle(
                         color: Colors.blue.shade200,
                         fontSize: 12,
@@ -131,12 +131,12 @@ class _AddWaypointDialogState extends State<AddWaypointDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+          child: const Text('Hủy', style: TextStyle(color: Colors.white60)),
         ),
         ElevatedButton.icon(
           onPressed: _addWaypoint,
           icon: const Icon(Icons.add_location, size: 18),
-          label: const Text('Add Waypoint'),
+          label: const Text('Thêm waypoint'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.teal,
             foregroundColor: Colors.white,
@@ -218,42 +218,42 @@ class _AddWaypointDialogState extends State<AddWaypointDialog> {
 
   String? _validateLatitude(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Latitude is required';
+      return 'Vĩ độ là bắt buộc';
     }
     final lat = double.tryParse(value);
     if (lat == null) {
-      return 'Invalid latitude format';
+      return 'Định dạng vĩ độ không hợp lệ';
     }
     if (lat < -90 || lat > 90) {
-      return 'Latitude must be between -90 and 90';
+      return 'Vĩ độ phải từ -90 đến 90';
     }
     return null;
   }
 
   String? _validateLongitude(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Longitude is required';
+      return 'Kinh độ là bắt buộc';
     }
     final lng = double.tryParse(value);
     if (lng == null) {
-      return 'Invalid longitude format';
+      return 'Định dạng kinh độ không hợp lệ';
     }
     if (lng < -180 || lng > 180) {
-      return 'Longitude must be between -180 and 180';
+      return 'Kinh độ phải từ -180 đến 180';
     }
     return null;
   }
 
   String? _validateAltitude(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Altitude is required';
+      return 'Độ cao là bắt buộc';
     }
     final alt = double.tryParse(value);
     if (alt == null) {
-      return 'Invalid altitude format';
+      return 'Định dạng độ cao không hợp lệ';
     }
     if (alt < 0) {
-      return 'Altitude must be positive';
+      return 'Độ cao phải là số dương';
     }
     return null;
   }

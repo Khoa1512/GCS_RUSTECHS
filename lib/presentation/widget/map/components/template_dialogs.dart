@@ -33,7 +33,7 @@ class _OrbitTemplateDialogState extends State<OrbitTemplateDialog> {
     return AlertDialog(
       backgroundColor: const Color(0xFF2D2D2D),
       title: const Text(
-        'Create Orbit Mission',
+        'Tạo nhiệm vụ bay tròn',
         style: TextStyle(color: Colors.white),
       ),
       content: Column(
@@ -52,7 +52,7 @@ class _OrbitTemplateDialogState extends State<OrbitTemplateDialog> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Center: ${widget.centerPoint.latitude.toStringAsFixed(6)}, ${widget.centerPoint.longitude.toStringAsFixed(6)}',
+                    'Tâm: ${widget.centerPoint.latitude.toStringAsFixed(6)}, ${widget.centerPoint.longitude.toStringAsFixed(6)}',
                     style: const TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                 ),
@@ -64,20 +64,20 @@ class _OrbitTemplateDialogState extends State<OrbitTemplateDialog> {
 
           // Radius input
           _buildTextField(
-            label: 'Radius',
+            label: 'Bán kính',
             controller: _radiusController,
             suffix: 'm',
-            hint: 'Orbit radius in meters',
+            hint: 'Bán kính bay tròn theo mét',
           ),
 
           const SizedBox(height: 12),
 
           // Altitude input
           _buildTextField(
-            label: 'Altitude',
+            label: 'Độ cao',
             controller: _altitudeController,
             suffix: 'm',
-            hint: 'Flight altitude',
+            hint: 'Độ cao bay',
           ),
 
           const SizedBox(height: 16),
@@ -87,7 +87,7 @@ class _OrbitTemplateDialogState extends State<OrbitTemplateDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Waypoints: $_points',
+                'Điểm waypoint: $_points',
                 style: const TextStyle(
                   color: Colors.grey,
                   fontSize: 12,
@@ -114,7 +114,7 @@ class _OrbitTemplateDialogState extends State<OrbitTemplateDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
         ),
         ElevatedButton(
           onPressed: _createOrbit,
@@ -122,7 +122,7 @@ class _OrbitTemplateDialogState extends State<OrbitTemplateDialog> {
             backgroundColor: Colors.teal,
             foregroundColor: Colors.white,
           ),
-          child: const Text('Create'),
+          child: const Text('Tạo'),
         ),
       ],
     );
@@ -186,7 +186,7 @@ class _OrbitTemplateDialogState extends State<OrbitTemplateDialog> {
     if (radius <= 0 || altitude <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter valid positive values'),
+          content: Text('Vui lòng nhập các giá trị dương hợp lệ'),
           backgroundColor: Colors.red,
         ),
       );
@@ -238,7 +238,7 @@ class _SurveyTemplateDialogState extends State<SurveyTemplateDialog> {
     return AlertDialog(
       backgroundColor: const Color(0xFF2D2D2D),
       title: const Text(
-        'Create Survey Mission',
+        'Tạo nhiệm vụ khảo sát',
         style: TextStyle(color: Colors.white),
       ),
       content: Column(
@@ -261,7 +261,7 @@ class _SurveyTemplateDialogState extends State<SurveyTemplateDialog> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Center: ${widget.centerPoint.latitude.toStringAsFixed(6)}, ${widget.centerPoint.longitude.toStringAsFixed(6)}',
+                    'Tâm: ${widget.centerPoint.latitude.toStringAsFixed(6)}, ${widget.centerPoint.longitude.toStringAsFixed(6)}',
                     style: const TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                 ),
@@ -276,7 +276,7 @@ class _SurveyTemplateDialogState extends State<SurveyTemplateDialog> {
             children: [
               Expanded(
                 child: _buildTextField(
-                  label: 'Width',
+                  label: 'Chiều rộng',
                   controller: _widthController,
                   suffix: 'm',
                 ),
@@ -284,7 +284,7 @@ class _SurveyTemplateDialogState extends State<SurveyTemplateDialog> {
               const SizedBox(width: 8),
               Expanded(
                 child: _buildTextField(
-                  label: 'Height',
+                  label: 'Chiều dài',
                   controller: _heightController,
                   suffix: 'm',
                 ),
@@ -299,7 +299,7 @@ class _SurveyTemplateDialogState extends State<SurveyTemplateDialog> {
             children: [
               Expanded(
                 child: _buildTextField(
-                  label: 'Altitude',
+                  label: 'Độ cao',
                   controller: _altitudeController,
                   suffix: 'm',
                 ),
@@ -307,7 +307,7 @@ class _SurveyTemplateDialogState extends State<SurveyTemplateDialog> {
               const SizedBox(width: 8),
               Expanded(
                 child: _buildTextField(
-                  label: 'Lane Spacing',
+                  label: 'Khoảng cách làn',
                   controller: _spacingController,
                   suffix: 'm',
                 ),
@@ -319,7 +319,7 @@ class _SurveyTemplateDialogState extends State<SurveyTemplateDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
         ),
         ElevatedButton(
           onPressed: _createSurvey,
@@ -327,7 +327,7 @@ class _SurveyTemplateDialogState extends State<SurveyTemplateDialog> {
             backgroundColor: Colors.purple,
             foregroundColor: Colors.white,
           ),
-          child: const Text('Create'),
+          child: const Text('Tạo'),
         ),
       ],
     );
@@ -390,7 +390,7 @@ class _SurveyTemplateDialogState extends State<SurveyTemplateDialog> {
     if (width <= 0 || height <= 0 || altitude <= 0 || spacing <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter valid positive values'),
+          content: Text('Vui lòng nhập các giá trị dương hợp lệ'),
           backgroundColor: Colors.red,
         ),
       );

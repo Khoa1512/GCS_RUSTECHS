@@ -5,8 +5,8 @@ class ConfirmDialog {
     required BuildContext context,
     required String title,
     required String message,
-    String confirmText = 'Delete',
-    String cancelText = 'Cancel',
+    String confirmText = 'Xoá',
+    String cancelText = 'Huỷ',
     Color? confirmColor,
     IconData? icon,
   }) async {
@@ -76,11 +76,11 @@ class ConfirmDialog {
   }) {
     return show(
       context: context,
-      title: 'Delete $itemName',
+      title: 'Xoá $itemName',
       message:
           additionalMessage ??
-          'Are you sure you want to delete this $itemName? This action cannot be undone.',
-      confirmText: 'Delete',
+          'Bạn có chắc chắn muốn xóa $itemName này không? Hành động này không thể hoàn tác.',
+      confirmText: 'Xoá',
       confirmColor: Colors.red,
       icon: Icons.delete_outline,
     );
@@ -93,11 +93,11 @@ class ConfirmDialog {
   }) {
     return show(
       context: context,
-      title: 'Clear $itemName',
+      title: 'Xoá tất cả $itemName',
       message:
           additionalMessage ??
-          'Are you sure you want to clear all $itemName? This action cannot be undone.',
-      confirmText: 'Clear All',
+          'Bạn có chắc chắn muốn xóa toàn bộ $itemName không? Hành động này không thể hoàn tác.',
+      confirmText: 'Xoá tất cả',
       confirmColor: Colors.orange,
       icon: Icons.clear_all,
     );

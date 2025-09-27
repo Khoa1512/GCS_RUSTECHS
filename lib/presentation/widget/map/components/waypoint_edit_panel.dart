@@ -187,7 +187,7 @@ class _WaypointEditPanelState extends State<WaypointEditPanel> {
                               ),
                               child: const Center(
                                 child: Text(
-                                  'Simple',
+                                  'Cơ bản',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
@@ -209,7 +209,7 @@ class _WaypointEditPanelState extends State<WaypointEditPanel> {
                               ),
                               child: const Center(
                                 child: Text(
-                                  'Advanced',
+                                  'Chi tiết',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
@@ -229,7 +229,7 @@ class _WaypointEditPanelState extends State<WaypointEditPanel> {
                   DropdownButtonFormField<int>(
                     value: _selectedCommand,
                     decoration: InputDecoration(
-                      labelText: 'Command Type',
+                      labelText: 'Lệnh bay',
                       labelStyle: const TextStyle(
                         color: Colors.white60,
                         fontSize: 12,
@@ -281,7 +281,7 @@ class _WaypointEditPanelState extends State<WaypointEditPanel> {
                         ),
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
-                          labelText: 'Altitude (m)',
+                          labelText: 'Độ cao (m)',
                           labelStyle: const TextStyle(
                             color: Colors.white60,
                             fontSize: 12,
@@ -310,7 +310,7 @@ class _WaypointEditPanelState extends State<WaypointEditPanel> {
                   if (!widget.isSimpleMode) ...[
                     const SizedBox(height: 12),
                     const Text(
-                      'Advanced Parameters',
+                      'Tham số',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -321,132 +321,24 @@ class _WaypointEditPanelState extends State<WaypointEditPanel> {
                     // Advanced Parameters
                     Column(
                       children: [
-                        TextFormField(
+                        _buildParameterFieldWithTooltip(
                           controller: _param1Controller,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: _getParamLabel(1),
-                            labelStyle: const TextStyle(
-                              color: Colors.white60,
-                              fontSize: 12,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
+                          paramNumber: 1,
                         ),
                         const SizedBox(height: 8),
-                        TextFormField(
+                        _buildParameterFieldWithTooltip(
                           controller: _param2Controller,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: _getParamLabel(2),
-                            labelStyle: const TextStyle(
-                              color: Colors.white60,
-                              fontSize: 12,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
+                          paramNumber: 2,
                         ),
                         const SizedBox(height: 8),
-                        TextFormField(
+                        _buildParameterFieldWithTooltip(
                           controller: _param3Controller,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: _getParamLabel(3),
-                            labelStyle: const TextStyle(
-                              color: Colors.white60,
-                              fontSize: 12,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
+                          paramNumber: 3,
                         ),
                         const SizedBox(height: 8),
-                        TextFormField(
+                        _buildParameterFieldWithTooltip(
                           controller: _param4Controller,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: _getParamLabel(4),
-                            labelStyle: const TextStyle(
-                              color: Colors.white60,
-                              fontSize: 12,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
+                          paramNumber: 4,
                         ),
                       ],
                     ),
@@ -483,7 +375,7 @@ class _WaypointEditPanelState extends State<WaypointEditPanel> {
                 TextButton(
                   onPressed: widget.onCancel,
                   child: const Text(
-                    'Cancel',
+                    'Huỷ',
                     style: TextStyle(color: Colors.white60),
                   ),
                 ),
@@ -498,7 +390,7 @@ class _WaypointEditPanelState extends State<WaypointEditPanel> {
                       vertical: 8,
                     ),
                   ),
-                  child: const Text('Save'),
+                  child: const Text('Lưu'),
                 ),
               ],
             ),
@@ -506,6 +398,64 @@ class _WaypointEditPanelState extends State<WaypointEditPanel> {
         ],
       ),
     );
+  }
+
+  Widget _buildParameterFieldWithTooltip({
+    required TextEditingController controller,
+    required int paramNumber,
+  }) {
+    final paramDescription = _getParamDescription(paramNumber);
+    final paramLabel = _getParamLabel(paramNumber);
+
+    return Tooltip(
+      message: paramDescription,
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+      ),
+      textStyle: const TextStyle(color: Colors.white, fontSize: 12),
+      preferBelow: false,
+      verticalOffset: 10,
+      child: TextFormField(
+        controller: controller,
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(
+          labelText: paramLabel,
+          labelStyle: const TextStyle(color: Colors.white60, fontSize: 12),
+          suffixIcon: Icon(
+            Icons.help_outline,
+            color: Colors.white.withValues(alpha: 0.5),
+            size: 16,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getParamDescription(int paramNumber) {
+    // Get parameter definitions for the selected command
+    final params = mavCmdParams[_selectedCommand];
+    if (params != null && paramNumber >= 1 && paramNumber <= params.length) {
+      final param = params[paramNumber - 1]; // Convert to 0-based index
+      return param.description.isNotEmpty
+          ? param.description
+          : 'Parameter $paramNumber for this command';
+    }
+    return 'Parameter $paramNumber';
   }
 
   String _getParamLabel(int paramNumber) {

@@ -117,7 +117,7 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
               children: [
                 Expanded(
                   child: Text(
-                    'Batch Edit (${widget.selectedWaypoints.length} waypoints)',
+                    'Chỉnh sửa hàng loạt (${widget.selectedWaypoints.length} điểm định hướng)',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
@@ -169,7 +169,7 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
                               ),
                               child: const Center(
                                 child: Text(
-                                  'Simple',
+                                  'Cơ bản',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
@@ -191,7 +191,7 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
                               ),
                               child: const Center(
                                 child: Text(
-                                  'Advanced',
+                                  'Chi tiết',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
@@ -211,7 +211,7 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
                   DropdownButtonFormField<int>(
                     value: _selectedCommand,
                     decoration: InputDecoration(
-                      labelText: 'Command Type',
+                      labelText: 'Lệnh bay',
                       labelStyle: const TextStyle(
                         color: Colors.white60,
                         fontSize: 12,
@@ -263,7 +263,7 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
                         ),
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
-                          labelText: 'Altitude (m)',
+                          labelText: 'Độ cao (m)',
                           labelStyle: const TextStyle(
                             color: Colors.white60,
                             fontSize: 12,
@@ -292,7 +292,7 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
                   if (!widget.isSimpleMode) ...[
                     const SizedBox(height: 12),
                     const Text(
-                      'Advanced Parameters',
+                      'Tham số',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -303,132 +303,24 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
                     // Advanced Parameters
                     Column(
                       children: [
-                        TextFormField(
+                        _buildParameterFieldWithTooltip(
                           controller: _param1Controller,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: _getParamLabel(1),
-                            labelStyle: const TextStyle(
-                              color: Colors.white60,
-                              fontSize: 12,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
+                          paramNumber: 1,
                         ),
                         const SizedBox(height: 8),
-                        TextFormField(
+                        _buildParameterFieldWithTooltip(
                           controller: _param2Controller,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: _getParamLabel(2),
-                            labelStyle: const TextStyle(
-                              color: Colors.white60,
-                              fontSize: 12,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
+                          paramNumber: 2,
                         ),
                         const SizedBox(height: 8),
-                        TextFormField(
+                        _buildParameterFieldWithTooltip(
                           controller: _param3Controller,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: _getParamLabel(3),
-                            labelStyle: const TextStyle(
-                              color: Colors.white60,
-                              fontSize: 12,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
+                          paramNumber: 3,
                         ),
                         const SizedBox(height: 8),
-                        TextFormField(
+                        _buildParameterFieldWithTooltip(
                           controller: _param4Controller,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: _getParamLabel(4),
-                            labelStyle: const TextStyle(
-                              color: Colors.white60,
-                              fontSize: 12,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
+                          paramNumber: 4,
                         ),
                       ],
                     ),
@@ -472,7 +364,7 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
                 TextButton(
                   onPressed: widget.onCancel,
                   child: const Text(
-                    'Cancel',
+                    'Huỷ',
                     style: TextStyle(color: Colors.white60),
                   ),
                 ),
@@ -487,7 +379,7 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
                       vertical: 8,
                     ),
                   ),
-                  child: const Text('Save'),
+                  child: const Text('Lưu'),
                 ),
               ],
             ),
@@ -495,6 +387,64 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
         ],
       ),
     );
+  }
+
+  Widget _buildParameterFieldWithTooltip({
+    required TextEditingController controller,
+    required int paramNumber,
+  }) {
+    final paramDescription = _getParamDescription(paramNumber);
+    final paramLabel = _getParamLabel(paramNumber);
+
+    return Tooltip(
+      message: paramDescription,
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+      ),
+      textStyle: const TextStyle(color: Colors.white, fontSize: 12),
+      preferBelow: false,
+      verticalOffset: 10,
+      child: TextFormField(
+        controller: controller,
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(
+          labelText: paramLabel,
+          labelStyle: const TextStyle(color: Colors.white60, fontSize: 12),
+          suffixIcon: Icon(
+            Icons.help_outline,
+            color: Colors.white.withValues(alpha: 0.5),
+            size: 16,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getParamDescription(int paramNumber) {
+    // Get parameter definitions for the selected command
+    final params = mavCmdParams[_selectedCommand];
+    if (params != null && paramNumber >= 1 && paramNumber <= params.length) {
+      final param = params[paramNumber - 1]; // Convert to 0-based index
+      return param.description.isNotEmpty
+          ? param.description
+          : 'Tham số $paramNumber cho lệnh này';
+    }
+    return 'Tham số $paramNumber';
   }
 
   String _getParamLabel(int paramNumber) {
@@ -508,7 +458,7 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
         return param.name;
       }
     }
-    return 'Param $paramNumber';
+    return 'Tham số $paramNumber';
   }
 
   void _saveBatchChanges() {
@@ -524,7 +474,7 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
         // Show error for invalid altitude
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Invalid altitude value. Must be a positive number.'),
+            content: Text('Giá trị độ cao không hợp lệ. Phải là số dương.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -580,20 +530,17 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
         return AlertDialog(
           backgroundColor: const Color(0xFF2A2A2A),
           title: const Text(
-            'Delete Waypoints',
+            'Xóa waypoints',
             style: TextStyle(color: Colors.white),
           ),
           content: Text(
-            'Are you sure you want to delete ${widget.selectedWaypoints.length} selected waypoints?\n\nThis action cannot be undone.',
+            'Bạn có chắc chắn muốn xóa ${widget.selectedWaypoints.length} waypoints đã chọn?\n\nHành động này không thể hoàn tác.',
             style: const TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Colors.white60),
-              ),
+              child: const Text('Hủy', style: TextStyle(color: Colors.white60)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -604,7 +551,7 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
               ),
-              child: const Text('Delete'),
+              child: const Text('Xoá'),
             ),
           ],
         );

@@ -18,7 +18,7 @@ class OrbitTemplateDialog extends StatefulWidget {
 
 class _OrbitTemplateDialogState extends State<OrbitTemplateDialog> {
   final _radiusController = TextEditingController(text: '100');
-  final _altitudeController = TextEditingController(text: '50');
+  final _altitudeController = TextEditingController(text: '10');
   int _points = 8;
 
   @override

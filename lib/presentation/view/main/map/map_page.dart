@@ -241,7 +241,7 @@ class _MapPageState extends State<MapPage> {
       order: routePoints.length + 1,
       latitude: latLng.latitude.toString(),
       longitude: latLng.longitude.toString(),
-      altitude: "100", // Default altitude
+      altitude: "10", // Default altitude
       command: 16, // Default to waypoint
     );
 

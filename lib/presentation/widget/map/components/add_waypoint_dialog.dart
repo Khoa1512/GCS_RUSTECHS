@@ -13,7 +13,7 @@ class AddWaypointDialog extends StatefulWidget {
 class _AddWaypointDialogState extends State<AddWaypointDialog> {
   final _latController = TextEditingController();
   final _lngController = TextEditingController();
-  final _altController = TextEditingController(text: '50');
+  final _altController = TextEditingController(text: '10');
   final _formKey = GlobalKey<FormState>();
 
   @override

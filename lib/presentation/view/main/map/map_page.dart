@@ -23,7 +23,6 @@ import 'package:skylink/services/mission_service.dart';
 import 'package:skylink/api/telemetry/mavlink/mission/mission_models.dart';
 import 'package:skylink/api/telemetry/mavlink/events.dart';
 import 'package:skylink/presentation/widget/map/components/mission_tutorial_overlay.dart';
-import 'package:skylink/presentation/widget/map/components/mission_help_dialog.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -193,7 +192,7 @@ class _MapPageState extends State<MapPage> {
     });
 
     _calculateMissionStats();
-    _showSuccess('Mission downloaded: ${newRoutePoints.length} waypoints');
+    _showSuccess('Mission đã tải: ${newRoutePoints.length} waypoints');
   }
 
   bool _isGlobalCoordinate(double lat, double lon) {
@@ -1263,41 +1262,41 @@ class _MapPageState extends State<MapPage> {
   String _getMavlinkErrorMessage(int errorCode) {
     switch (errorCode) {
       case 1:
-        return 'Error: Mission item exceeds storage space';
+        return 'Lỗi: Mục nhiệm vụ vượt quá dung lượng lưu trữ';
       case 2:
-        return 'Error: Mission accepted only partially';
+        return 'Lỗi: Nhiệm vụ chỉ được chấp nhận một phần';
       case 3:
-        return 'Error: Mission operation not supported';
+        return 'Lỗi: Thao tác nhiệm vụ không được hỗ trợ';
       case 4:
-        return 'Error: Mission error - coordinates out of range';
+        return 'Lỗi: Tọa độ nhiệm vụ nằm ngoài phạm vi';
       case 5:
-        return 'Error: Mission item invalid';
+        return 'Lỗi: Mục nhiệm vụ không hợp lệ';
       case 10:
-        return 'Error: Mission item sequence invalid';
+        return 'Lỗi: Thứ tự mục nhiệm vụ không hợp lệ';
       case 11:
-        return 'Error: Mission item not within valid range';
+        return 'Lỗi: Mục nhiệm vụ không nằm trong phạm vi hợp lệ';
       case 12:
-        return 'Error: Mission item count invalid';
+        return 'Lỗi: Số lượng mục nhiệm vụ không hợp lệ';
       case 13:
-        return 'Error: Mission operation currently denied';
+        return 'Lỗi: Thao tác nhiệm vụ hiện bị từ chối';
       case 14:
-        return 'Error: Mission operation already in progress';
+        return 'Lỗi: Thao tác nhiệm vụ đang được thực hiện';
       case 15:
-        return 'Error: Mission system is not ready';
+        return 'Lỗi: Hệ thống chưa sẵn sàng cho nhiệm vụ';
       case 30:
-        return 'Warning: Mission item parameter out of range (but accepted)';
+        return 'Cảnh báo: Tham số mục nhiệm vụ vượt quá phạm vi (nhưng vẫn được chấp nhận)';
       case 128:
-        return 'Error: Mission invalid';
+        return 'Lỗi: Nhiệm vụ không hợp lệ';
       case 129:
-        return 'Error: Mission type not supported';
+        return 'Lỗi: Loại nhiệm vụ không được hỗ trợ';
       case 130:
-        return 'Error: Mission vehicle not ready';
+        return 'Lỗi: Phương tiện chưa sẵn sàng thực hiện nhiệm vụ';
       case 131:
-        return 'Error: Mission waypoint out of bounds';
+        return 'Lỗi: Điểm bay (waypoint) ngoài phạm vi';
       case 132:
-        return 'Error: Mission waypoint count exceeded';
+        return 'Lỗi: Số lượng điểm bay (waypoint) vượt quá giới hạn';
       default:
-        return 'Warning code $errorCode';
+        return 'Cảnh báo: Mã lỗi $errorCode';
     }
   }
 

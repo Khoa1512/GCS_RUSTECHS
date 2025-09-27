@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:skylink/api/telemetry/mavlink/mission/mission_models.dart';
-import 'package:skylink/data/constants/mav_cmd_params.dart';
 import 'package:skylink/presentation/widget/map/components/mission_help_dialog.dart';
 import 'package:skylink/presentation/widget/map/components/mission_quick_tips.dart';
 
@@ -219,7 +218,7 @@ class _MissionSidebarState extends State<MissionSidebar> {
                 Row(
                   children: [
                     Text(
-                      'Mission Plan',
+                      'Kế hoạch bay',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -591,17 +590,17 @@ class _MissionSidebarState extends State<MissionSidebar> {
             children: [
               const SizedBox(height: 4),
               Text(
-                'Lat: ${double.parse(waypoint.latitude).toStringAsFixed(6)}',
+                'Vĩ độ: ${double.parse(waypoint.latitude).toStringAsFixed(6)}',
                 style: const TextStyle(color: Colors.white54, fontSize: 11),
               ),
               Text(
-                'Lng: ${double.parse(waypoint.longitude).toStringAsFixed(6)}',
+                'Kinh độ: ${double.parse(waypoint.longitude).toStringAsFixed(6)}',
                 style: const TextStyle(color: Colors.white54, fontSize: 11),
               ),
-              if (waypoint.commandParams?.isNotEmpty == true) ...[
-                const SizedBox(height: 4),
-                _buildParameterChips(waypoint),
-              ],
+              // if (waypoint.commandParams?.isNotEmpty == true) ...[
+              //   const SizedBox(height: 4),
+              //   _buildParameterChips(waypoint),
+              // ],
             ],
           ),
           trailing: Row(
@@ -648,48 +647,48 @@ class _MissionSidebarState extends State<MissionSidebar> {
     );
   }
 
-  Widget _buildParameterChips(RoutePoint waypoint) {
-    final params = waypoint.commandParams!;
-    final commandParams = mavCmdParams[waypoint.command];
+  // Widget _buildParameterChips(RoutePoint waypoint) {
+  //   final params = waypoint.commandParams!;
+  //   final commandParams = mavCmdParams[waypoint.command];
 
-    return Wrap(
-      spacing: 4,
-      runSpacing: 2,
-      children: params.entries.take(3).map((entry) {
-        // Try to find matching parameter info
-        String label = entry.key;
-        String unit = '';
+  //   return Wrap(
+  //     spacing: 4,
+  //     runSpacing: 2,
+  //     children: params.entries.take(4).map((entry) {
+  //       // Try to find matching parameter info
+  //       String label = entry.key;
+  //       String unit = '';
 
-        if (commandParams != null) {
-          // Try to match by parameter name
-          for (final param in commandParams) {
-            if (param.name.toLowerCase().contains(entry.key.toLowerCase()) ||
-                entry.key.toLowerCase().contains(param.name.toLowerCase())) {
-              label = param.name;
-              unit = param.unit;
-              break;
-            }
-          }
-        }
+  //       if (commandParams != null) {
+  //         // Try to match by parameter name
+  //         for (final param in commandParams) {
+  //           if (param.name.toLowerCase().contains(entry.key.toLowerCase()) ||
+  //               entry.key.toLowerCase().contains(param.name.toLowerCase())) {
+  //             label = param.name;
+  //             unit = param.unit;
+  //             break;
+  //           }
+  //         }
+  //       }
 
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-          decoration: BoxDecoration(
-            color: Colors.teal.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(3),
-          ),
-          child: Text(
-            '$label: ${entry.value}$unit',
-            style: const TextStyle(
-              color: Colors.teal,
-              fontSize: 9,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
+  //       return Container(
+  //         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+  //         decoration: BoxDecoration(
+  //           color: Colors.teal.withValues(alpha: 0.2),
+  //           borderRadius: BorderRadius.circular(3),
+  //         ),
+  //         child: Text(
+  //           '$label: ${entry.value}$unit',
+  //           style: const TextStyle(
+  //             color: Colors.teal,
+  //             fontSize: 9,
+  //             fontWeight: FontWeight.w500,
+  //           ),
+  //         ),
+  //       );
+  //     }).toList(),
+  //   );
+  // }
 
   Widget _buildControlsSection() {
     return Container(
@@ -922,15 +921,15 @@ class _MissionSidebarState extends State<MissionSidebar> {
   String _getCommandName(int command) {
     switch (command) {
       case 16:
-        return 'Waypoint';
+        return 'Điểm định hướng ';
       case 19:
-        return 'Loiter Time';
+        return 'Lượn tại chỗ';
       case 20:
-        return 'Return to Launch';
+        return 'Quay về điểm xuất phát';
       case 21:
-        return 'Land';
+        return 'Hạ cánh';
       case 201:
-        return 'Set ROI';
+        return 'Điểm quan sát (ROI)';
       default:
         return 'Command $command';
     }

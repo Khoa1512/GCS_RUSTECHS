@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:skylink/core/constant/map_type.dart';
 import 'package:skylink/services/telemetry_service.dart';
 import 'package:skylink/services/mission_service.dart';
+import 'package:skylink/presentation/widget/mission/mission_waypoint_helpers.dart';
 
 class DroneMapWidget extends StatefulWidget {
   final double? droneLatitude;
@@ -681,15 +682,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       smoothed.latitude,
       smoothed.longitude,
     );
-
-    // Chỉ log khi có vấn đề đáng kể (>10m)
-    if (difference > 10.0) {
-      print(
-        'WARNING: Large GPS difference: ${difference.toStringAsFixed(2)}m\n'
-        'Raw: (${rawGps.latitude.toStringAsFixed(7)}, ${rawGps.longitude.toStringAsFixed(7)})\n'
-        'Smoothed: (${smoothed.latitude.toStringAsFixed(7)}, ${smoothed.longitude.toStringAsFixed(7)})',
-      );
-    }
   }
 
   @override
@@ -710,7 +702,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                 initialZoom: 18,
                 minZoom: 1,
                 maxZoom: 22,
-                // Professional UX: Detect user interactions
                 onPositionChanged: (position, hasGesture) {
                   if (hasGesture) {
                     _onUserInteraction();
@@ -733,22 +724,22 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                     polylines: [
                       // Route từ home point đến waypoint đầu tiên (nếu có home point)
                       if (_homePoint != null &&
-                          _missionService.currentMissionPoints.isNotEmpty)
+                          MissionWaypointHelpers.getFlightPathPoints(
+                            _missionService.currentMissionPoints,
+                          ).isNotEmpty)
                         Polyline(
                           points: [
                             _homePoint!,
                             LatLng(
                               double.parse(
-                                _missionService
-                                    .currentMissionPoints
-                                    .first
-                                    .latitude,
+                                MissionWaypointHelpers.getFlightPathPoints(
+                                  _missionService.currentMissionPoints,
+                                ).first.latitude,
                               ),
                               double.parse(
-                                _missionService
-                                    .currentMissionPoints
-                                    .first
-                                    .longitude,
+                                MissionWaypointHelpers.getFlightPathPoints(
+                                  _missionService.currentMissionPoints,
+                                ).first.longitude,
                               ),
                             ),
                           ],
@@ -756,69 +747,86 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                           strokeCap: StrokeCap.round,
                           color: Colors.cyanAccent.withOpacity(0.8),
                         ),
-                      // Route giữa các mission waypoints
+                      // Route giữa các mission waypoints (flight path only)
                       Polyline(
-                        points: _missionService.currentMissionPoints
-                            .map(
-                              (point) => LatLng(
-                                double.parse(point.latitude),
-                                double.parse(point.longitude),
-                              ),
-                            )
-                            .toList(),
+                        points:
+                            MissionWaypointHelpers.getFlightPathPoints(
+                                  _missionService.currentMissionPoints,
+                                )
+                                .map(
+                                  (point) => LatLng(
+                                    double.parse(point.latitude),
+                                    double.parse(point.longitude),
+                                  ),
+                                )
+                                .toList(),
                         strokeWidth: 4.0,
                         strokeCap: StrokeCap.round,
                         color: Colors.cyanAccent.withOpacity(0.8),
                       ),
                     ],
-                  ),
-
-                  // Waypoint markers
+                  ), // Waypoint markers
                   MarkerLayer(
                     markers: [
                       // Regular waypoint markers
-                      ..._missionService.currentMissionPoints
-                          .asMap()
-                          .entries
-                          .map((entry) {
-                            final index = entry.key;
-                            final point = entry.value;
-                            return Marker(
-                              point: LatLng(
-                                double.parse(point.latitude),
-                                double.parse(point.longitude),
+                      ..._missionService.currentMissionPoints.asMap().entries.map((
+                        entry,
+                      ) {
+                        final index = entry.key;
+                        final point = entry.value;
+                        return Marker(
+                          point: LatLng(
+                            double.parse(point.latitude),
+                            double.parse(point.longitude),
+                          ),
+                          width: 40,
+                          height: 40,
+                          alignment: Alignment.center,
+                          child: Stack(
+                            children: [
+                              Icon(
+                                MissionWaypointHelpers.getWaypointIcon(point),
+                                color: MissionWaypointHelpers.getWaypointColor(
+                                  point,
+                                ),
+                                size: 40,
                               ),
-                              width: 40,
-                              height: 40,
-                              alignment: Alignment.center,
-                              child: Stack(
-                                children: [
-                                  Icon(
-                                    Icons.location_on,
-                                    color: Colors.red,
-                                    size: 40,
-                                  ),
-                                  Positioned.fill(
-                                    child: Center(
-                                      child: Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 12,
-                                        ),
-                                        child: Text(
-                                          '${index + 1}',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                              if (!MissionWaypointHelpers.isROIPoint(point))
+                                Positioned.fill(
+                                  child: Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 12,
+                                      ),
+                                      child: Text(
+                                        '${index + 1}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ),
                                   ),
-                                ],
-                              ),
-                            );
-                          }),
+                                ),
+                              // ROI indicator - show "ROI" text instead of number
+                              if (MissionWaypointHelpers.isROIPoint(point))
+                                Positioned.fill(
+                                  child: Center(
+                                      child: Text(
+                                        'ROI',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                            ],
+                          ),
+                        );
+                      }),
                     ],
                   ),
                 ],

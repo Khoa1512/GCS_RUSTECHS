@@ -44,9 +44,6 @@ class MainMapSimple extends StatefulWidget {
   State<MainMapSimple> createState() => MainMapSimpleState();
 }
 
-// Waypoint interaction modes:
-// 1. Tap + Pan: Tap trên waypoint và kéo ngay lập tức (chuột)
-// 2. Long Press + Move: Nhấn giữ waypoint (~500ms) rồi kéo (trackpad/touch)
 class MainMapSimpleState extends State<MainMapSimple> {
   bool _hasZoomedToHome = false;
   int? _draggedWaypointIndex;
@@ -61,13 +58,7 @@ class MainMapSimpleState extends State<MainMapSimple> {
 
   // Public method to clear drag state from outside
   void clearMapDragState() {
-    print(
-      'DEBUG: Clearing map drag state - before: _draggedWaypointIndex=$_draggedWaypointIndex, _draggedPosition=$_draggedPosition',
-    );
     clearDragState();
-    print(
-      'DEBUG: Cleared map drag state - after: _draggedWaypointIndex=$_draggedWaypointIndex, _draggedPosition=$_draggedPosition',
-    );
   }
 
   DateTime? _lastUpdateTime;
@@ -256,9 +247,6 @@ class MainMapSimpleState extends State<MainMapSimple> {
                   : InteractiveFlag.all,
             ),
             onTap: (tapPosition, latlng) {
-              print(
-                'DEBUG: Map tap - draggedWaypointIndex: $_draggedWaypointIndex',
-              );
               if (widget.isConfigValid && widget.onTap != null) {
                 widget.onTap!(latlng);
               }

@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:skylink/api/telemetry/mavlink/mission/mission_models.dart';
-import 'package:flutter/foundation.dart';
 import 'package:skylink/data/constants/mav_cmd_params.dart';
 
 class MissionSidebar extends StatefulWidget {
@@ -61,7 +60,7 @@ class _MissionSidebarState extends State<MissionSidebar> {
   // Convert PlanMissionItem to RoutePoint
   RoutePoint _missionItemToRoutePoint(PlanMissionItem item) {
     return RoutePoint(
-      id: DateTime.now().millisecondsSinceEpoch.toString() + '_${item.seq}',
+      id: '${DateTime.now().millisecondsSinceEpoch}_${item.seq}',
       order: item.seq + 1, // Convert from 0-based
       latitude: item.x.toString(),
       longitude: item.y.toString(),

@@ -90,6 +90,13 @@ class _MapPageState extends State<MapPage> {
 
     // Ensure layer links for existing waypoints
     _ensureLayerLinksForWaypoints();
+
+    // Force initial map refresh after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   void _setupConnectionListener() {

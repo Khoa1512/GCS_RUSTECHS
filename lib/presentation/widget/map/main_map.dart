@@ -83,13 +83,17 @@ class MainMapSimpleState extends State<MainMapSimple> {
         !_hasZoomedToHome) {
       _zoomToHomePoint();
     }
+    // Force rebuild if mapType changes
+    if (oldWidget.mapType != widget.mapType) {
+      setState(() {});
+    }
   }
 
   void _initializeMap() {
+    // Since we now use initialCenter in MapOptions, we don't need to move manually
+    // unless homePoint changes after initialization
     if (widget.homePoint != null && !_hasZoomedToHome) {
       _zoomToHomePoint();
-    } else {
-      widget.mapController.move(const LatLng(10.7302, 106.6988), 18);
     }
   }
 
@@ -253,7 +257,14 @@ class MainMapSimpleState extends State<MainMapSimple> {
         FlutterMap(
           mapController: widget.mapController,
           options: MapOptions(
-            initialZoom: 5,
+            initialCenter:
+                widget.homePoint ??
+                const LatLng(10.7302, 106.6988), // Đại học Tôn Đức Thắng
+            initialZoom: widget.homePoint != null
+                ? 18.0
+                : 16.0, // Zoom closer to university when no home point
+            minZoom: 3.0,
+            maxZoom: 20.0,
             interactionOptions: InteractionOptions(
               flags: _draggedWaypointIndex != null
                   ? InteractiveFlag.doubleTapZoom | InteractiveFlag.pinchZoom
@@ -269,6 +280,7 @@ class MainMapSimpleState extends State<MainMapSimple> {
             TileLayer(
               urlTemplate: widget.mapType.urlTemplate,
               userAgentPackageName: "com.example.vtol_rustech",
+              tileProvider: NetworkTileProvider(),
             ),
             if (flightPathPoints.isNotEmpty)
               PolylineLayer(

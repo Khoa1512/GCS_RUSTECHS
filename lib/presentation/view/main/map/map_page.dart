@@ -914,7 +914,7 @@ class _MapPageState extends State<MapPage> {
     );
 
     _calculateMissionStats();
-    _showSuccess('${selectedWaypoints.length} waypoints deleted');
+    _showSuccess('${selectedWaypoints.length} waypoints đã được xoá');
   }
 
   void _handleBatchEditApply(Map<String, dynamic> batchChanges) {
@@ -1012,7 +1012,9 @@ class _MapPageState extends State<MapPage> {
     });
 
     _calculateMissionStats();
-    _showSuccess('Batch edit applied to ${updatedWaypoints.length} waypoints');
+    _showSuccess(
+      'Đã áp dụng chỉnh sửa cho ${updatedWaypoints.length} waypoints',
+    );
   }
 
   void _handleModeToggle(bool simple) {
@@ -1337,7 +1339,7 @@ class _MapPageState extends State<MapPage> {
             Text(message),
           ],
         ),
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 1),
       ),
     );
   }
@@ -1354,6 +1356,7 @@ class _MapPageState extends State<MapPage> {
           ],
         ),
         backgroundColor: Colors.green,
+        duration: const Duration(seconds: 1),
       ),
     );
   }
@@ -1370,6 +1373,7 @@ class _MapPageState extends State<MapPage> {
           ],
         ),
         backgroundColor: Colors.red,
+        duration: const Duration(seconds: 1),
       ),
     );
   }
@@ -1386,6 +1390,7 @@ class _MapPageState extends State<MapPage> {
           ],
         ),
         backgroundColor: Colors.blue,
+        duration: const Duration(seconds: 2),
       ),
     );
   }

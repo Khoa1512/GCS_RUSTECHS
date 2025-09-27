@@ -339,6 +339,9 @@ class _MapPageState extends State<MapPage> {
           // Clear multi-selection when single selecting
           selectedWaypointIds.clear();
         });
+
+        // Clear map drag state to ensure map can be panned during edit
+        _mapKey.currentState?.clearMapDragState();
       }
     }
   }
@@ -1083,6 +1086,9 @@ class _MapPageState extends State<MapPage> {
       isSelectingOrbitCenter = false;
       isSelectingSurveyCenter = false;
     });
+
+    // Clear map drag state to ensure map can be panned during edit
+    _mapKey.currentState?.clearMapDragState();
   }
 
   void _handleDeleteWaypointFromSidebar(String waypointId) {

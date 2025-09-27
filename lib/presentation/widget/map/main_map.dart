@@ -267,7 +267,9 @@ class MainMapSimpleState extends State<MainMapSimple> {
             maxZoom: 20.0,
             interactionOptions: InteractionOptions(
               flags: _draggedWaypointIndex != null
-                  ? InteractiveFlag.doubleTapZoom | InteractiveFlag.pinchZoom
+                  ? InteractiveFlag.doubleTapZoom |
+                        InteractiveFlag.pinchZoom |
+                        InteractiveFlag.drag
                   : InteractiveFlag.all,
             ),
             onTap: (tapPosition, latlng) {

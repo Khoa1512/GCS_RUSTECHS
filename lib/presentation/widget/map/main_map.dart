@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:skylink/core/constant/map_type.dart';
 import 'package:skylink/data/models/route_point_model.dart';
 import 'package:skylink/presentation/widget/mission/mission_visualization_helpers.dart';
+import 'package:skylink/presentation/widget/mission/mission_waypoint_helpers.dart';
 
 class MainMapSimple extends StatefulWidget {
   final MapController mapController;
@@ -226,6 +227,7 @@ class MainMapSimpleState extends State<MainMapSimple> {
 
   @override
   Widget build(BuildContext context) {
+    // All waypoints for rendering markers
     final latLngPoints = widget.routePoints
         .map(
           (point) => LatLng(
@@ -234,6 +236,17 @@ class MainMapSimpleState extends State<MainMapSimple> {
           ),
         )
         .toList();
+
+    // Flight path points (excluding ROI points)
+    final flightPathPoints =
+        MissionWaypointHelpers.getFlightPathPoints(widget.routePoints)
+            .map(
+              (point) => LatLng(
+                double.parse(point.latitude),
+                double.parse(point.longitude),
+              ),
+            )
+            .toList();
 
     return Stack(
       children: [
@@ -257,18 +270,21 @@ class MainMapSimpleState extends State<MainMapSimple> {
               urlTemplate: widget.mapType.urlTemplate,
               userAgentPackageName: "com.example.vtol_rustech",
             ),
-            if (latLngPoints.isNotEmpty)
+            if (flightPathPoints.isNotEmpty)
               PolylineLayer(
                 polylines: [
-                  if (widget.homePoint != null && latLngPoints.isNotEmpty)
+                  if (widget.homePoint != null && flightPathPoints.isNotEmpty)
                     Polyline(
-                      points: [widget.homePoint!, latLngPoints.first],
+                      points: [widget.homePoint!, flightPathPoints.first],
                       color: Colors.cyan,
                       strokeWidth: 4,
                     ),
-                  ...List.generate(latLngPoints.length - 1, (index) {
+                  ...List.generate(flightPathPoints.length - 1, (index) {
                     return Polyline(
-                      points: [latLngPoints[index], latLngPoints[index + 1]],
+                      points: [
+                        flightPathPoints[index],
+                        flightPathPoints[index + 1],
+                      ],
                       color: Colors.cyan,
                       strokeWidth: 4,
                     );
@@ -410,35 +426,59 @@ class MainMapSimpleState extends State<MainMapSimple> {
                                 ),
                               ),
                             Icon(
-                              Icons.location_on,
-                              color: isMultiSelected
-                                  ? Colors.orange
-                                  : isHighlighted
-                                  ? Colors.blue
-                                  : Colors.red,
+                              MissionWaypointHelpers.getWaypointIcon(
+                                routePoint,
+                              ),
+                              color: MissionWaypointHelpers.getWaypointColor(
+                                routePoint,
+                                isSelected: isSingleSelected,
+                                isMultiSelected: isMultiSelected,
+                              ),
                               size: isHighlighted
                                   ? 40
                                   : 36, // Kích thước icon lớn hơn
                             ),
-                            Positioned.fill(
-                              child: Center(
-                                child: Text(
-                                  '${index + 1}',
-                                  style: TextStyle(
-                                    fontSize: isHighlighted ? 16 : 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    shadows: [
-                                      Shadow(
-                                        color: Colors.black.withOpacity(0.8),
-                                        offset: const Offset(1, 1),
-                                        blurRadius: 2,
-                                      ),
-                                    ],
+                            if (!MissionWaypointHelpers.isROIPoint(routePoint))
+                              Positioned.fill(
+                                child: Center(
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: TextStyle(
+                                      fontSize: isHighlighted ? 16 : 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black.withOpacity(0.8),
+                                          offset: const Offset(1, 1),
+                                          blurRadius: 2,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
+                            // ROI indicator - show "ROI" text instead of number
+                            if (MissionWaypointHelpers.isROIPoint(routePoint))
+                              Positioned.fill(
+                                child: Center(
+                                  child: Text(
+                                    'ROI',
+                                    style: TextStyle(
+                                      fontSize: isHighlighted ? 10 : 8,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black.withOpacity(0.8),
+                                          offset: const Offset(1, 1),
+                                          blurRadius: 2,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -475,7 +515,7 @@ class MainMapSimpleState extends State<MainMapSimple> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Lat: ${_draggedPosition!.latitude.toStringAsFixed(7)}',
+                    "Vĩ Độ: ${_draggedPosition!.latitude.toStringAsFixed(7)}",
                     style: const TextStyle(
                       color: Colors.cyan,
                       fontSize: 11,
@@ -483,7 +523,7 @@ class MainMapSimpleState extends State<MainMapSimple> {
                     ),
                   ),
                   Text(
-                    'Lng: ${_draggedPosition!.longitude.toStringAsFixed(7)}',
+                    'Kinh Độ: ${_draggedPosition!.longitude.toStringAsFixed(7)}',
                     style: const TextStyle(
                       color: Colors.cyan,
                       fontSize: 11,

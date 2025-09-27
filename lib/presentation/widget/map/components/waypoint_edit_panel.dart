@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:skylink/data/models/route_point_model.dart';
 import 'package:skylink/data/constants/mav_cmd_params.dart';
+import 'package:skylink/presentation/widget/mission/mission_waypoint_helpers.dart';
 
 class WaypointEditPanel extends StatefulWidget {
   final RoutePoint waypoint;
@@ -45,11 +46,11 @@ class _WaypointEditPanelState extends State<WaypointEditPanel> {
   late TextEditingController _param4Controller;
 
   final Map<int, String> _commandTypes = {
-    16: 'Waypoint',
-    19: 'Loiter Time',
-    201: 'Do Set ROI',
-    20: 'RTL',
-    21: 'Land',
+    16: 'Điểm định hướng',
+    19: 'Lượn tại chỗ',
+    201: 'Điểm quan sát (ROI)',
+    20: 'Quay về điểm xuất phát',
+    21: 'Hạ cánh',
   };
 
   @override
@@ -130,14 +131,30 @@ class _WaypointEditPanelState extends State<WaypointEditPanel> {
                     ),
                   ),
                 Expanded(
-                  child: Text(
-                    'Waypoint ${widget.waypoint.order}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
+                  child: Column(
+                    children: [
+                      Text(
+                        MissionWaypointHelpers.isROIPoint(widget.waypoint)
+                            ? 'Điểm ROI ${widget.waypoint.order}'
+                            : 'Waypoint ${widget.waypoint.order}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (MissionWaypointHelpers.isROIPoint(widget.waypoint))
+                        Text(
+                          'Camera sẽ hướng về điểm này',
+                          style: TextStyle(
+                            color: Colors.purple.shade200,
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                    ],
                   ),
                 ),
                 if (widget.onNextWaypoint != null)
@@ -224,6 +241,53 @@ class _WaypointEditPanelState extends State<WaypointEditPanel> {
                   ),
 
                   const SizedBox(height: 12),
+
+                  // ROI Information Box
+                  if (MissionWaypointHelpers.isROIPoint(widget.waypoint))
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.withOpacity(0.1),
+                        border: Border.all(
+                          color: Colors.purple.withOpacity(0.3),
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.center_focus_strong,
+                            color: Colors.purple.shade300,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Điểm ROI (Region of Interest)',
+                                  style: TextStyle(
+                                    color: Colors.purple.shade200,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Drone sẽ không bay đến điểm này, chỉ hướng camera/gimbal về vị trí này',
+                                  style: TextStyle(
+                                    color: Colors.purple.shade100,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                   // Command Type
                   DropdownButtonFormField<int>(

@@ -35,13 +35,12 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
   late TextEditingController _param4Controller;
 
   final Map<int, String> _commandTypes = {
-    16: 'Waypoint',
-    19: 'Loiter Time',
-    201: 'Do Set ROI',
-    20: 'RTL',
-    21: 'Land',
+    16: 'Điểm định hướng',
+    19: 'Lượn tại chỗ',
+    201: 'Điểm quan sát (ROI)',
+    20: 'Quay về điểm xuất phát',
+    21: 'Hạ cánh',
   };
-
   @override
   void initState() {
     super.initState();

@@ -17,6 +17,7 @@ import 'package:skylink/presentation/widget/common/confirm_dialog.dart';
 import 'package:skylink/presentation/widget/map/components/undo_redo_manager.dart';
 import 'package:skylink/presentation/widget/map/components/template_dialogs.dart';
 import 'package:skylink/presentation/widget/map/utils/mission_templates.dart';
+import 'package:skylink/presentation/widget/mission/mission_waypoint_helpers.dart';
 import 'package:skylink/services/telemetry_service.dart';
 import 'package:skylink/services/mission_service.dart';
 import 'package:skylink/api/telemetry/mavlink/mission/mission_models.dart';
@@ -360,16 +361,19 @@ class _MapPageState extends State<MapPage> {
       return;
     }
 
-    // Calculate total distance
+    // Calculate total distance using only flight path points (excluding ROI)
+    final flightPathPoints = MissionWaypointHelpers.getFlightPathPoints(
+      routePoints,
+    );
     double distance = 0;
-    for (int i = 1; i < routePoints.length; i++) {
+    for (int i = 1; i < flightPathPoints.length; i++) {
       final prev = LatLng(
-        double.parse(routePoints[i - 1].latitude),
-        double.parse(routePoints[i - 1].longitude),
+        double.parse(flightPathPoints[i - 1].latitude),
+        double.parse(flightPathPoints[i - 1].longitude),
       );
       final curr = LatLng(
-        double.parse(routePoints[i].latitude),
-        double.parse(routePoints[i].longitude),
+        double.parse(flightPathPoints[i].latitude),
+        double.parse(flightPathPoints[i].longitude),
       );
       distance += _calculateDistance(prev, curr);
     }

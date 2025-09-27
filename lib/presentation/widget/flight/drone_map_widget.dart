@@ -363,7 +363,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     if (gpsFixType == 'RTK Fixed' ||
         gpsFixType == 'RTK Float' ||
         gpsFixType == 'DGPS') {
-      // Return latest GPS với minimal delay để mượt như Mission Planner
       return _gpsBuffer.last;
     }
 
@@ -467,7 +466,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   }
 
   int _calculateInterpolationDuration(double distance) {
-    // Mission Planner style: Tối ưu cho Auto mode - giảm delay
     // Nếu đang trong mission, giảm thêm duration để responsive hơn
     double multiplier = _missionService.hasMission ? 0.7 : 1.0;
 
@@ -490,9 +488,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 
     _currentLatitude = _currentInterpolatedPosition!.latitude;
     _currentLongitude = _currentInterpolatedPosition!.longitude;
-
-    // Validate coordinate consistency in debug mode
-    _validateCoordinateConsistency();
 
     _updateMapPositionInterpolated();
     _scheduleUIUpdate(); // Use debounced UI update
@@ -562,20 +557,12 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     if (isCurrentlyArmed && !_wasPreviouslyArmed) {
       _groundAltitude = alt;
       _wasPreviouslyArmed = true;
-      // if (kDebugMode) {
-      //   print(
-      //     'Armed detected. Ground altitude: ${_groundAltitude.toStringAsFixed(1)}m',
-      //   );
-      // }
     }
 
     // Reset when disarmed
     if (!isCurrentlyArmed && _wasPreviouslyArmed) {
       _wasPreviouslyArmed = false;
       _hasSetHomePointOnTakeoff = false;
-      // if (kDebugMode) {
-      //   print('Disarmed detected. Reset takeoff detection.');
-      // }
     }
 
     // Reset takeoff detection khi drone đáp xuống (còn armed nhưng altitude thấp)
@@ -584,10 +571,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
         (alt - _groundAltitude) < (_takeoffAltitudeThreshold - 0.5)) {
       _hasSetHomePointOnTakeoff = false;
       _groundAltitude = alt; // Cập nhật ground altitude mới
-      // if (kDebugMode) {
-      //   print('Landing detected. Reset takeoff detection for next takeoff.');
-      //   print('New ground altitude: ${_groundAltitude.toStringAsFixed(1)}m');
-      // }
     }
 
     // Detect takeoff: armed + altitude > threshold + chưa set home point
@@ -599,13 +582,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
         _homePoint = LatLng(lat, lon);
         _hasSetHomePointOnTakeoff = true;
       });
-
-      // if (kDebugMode) {
-      //   print('TAKEOFF DETECTED! Home point set at: ($lat, $lon)');
-      //   print(
-      //     'Takeoff altitude: ${(alt - _groundAltitude).toStringAsFixed(1)}m above ground',
-      //   );
-      // }
     }
   }
 
@@ -666,22 +642,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       // Nếu chưa có home point → Set tại vị trí hiện tại
       setHomePointHere();
     }
-  }
-
-  // Method để kiểm tra sự khác biệt giữa raw GPS và smoothed position - OPTIMIZED
-  void _validateCoordinateConsistency() {
-    // Chỉ validate trong debug mode và khi cần thiết
-    if (!kDebugMode || !_telemetryService.hasValidGpsFix) return;
-
-    LatLng rawGps = _getRawGpsPosition();
-    LatLng smoothed = LatLng(_currentLatitude, _currentLongitude);
-
-    double difference = _calculateRealDistance(
-      rawGps.latitude,
-      rawGps.longitude,
-      smoothed.latitude,
-      smoothed.longitude,
-    );
   }
 
   @override
@@ -789,7 +749,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                                 color: MissionWaypointHelpers.getWaypointColor(
                                   point,
                                 ),
-                                size: 40,
+                                size: 35,
                               ),
                               if (!MissionWaypointHelpers.isROIPoint(point))
                                 Positioned.fill(
@@ -797,6 +757,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                                     child: Padding(
                                       padding: const EdgeInsets.only(
                                         bottom: 12,
+                                        right: 4,
                                       ),
                                       child: Text(
                                         '${index + 1}',
@@ -813,6 +774,11 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                               if (MissionWaypointHelpers.isROIPoint(point))
                                 Positioned.fill(
                                   child: Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 8,
+                                        right: 4,
+                                      ),
                                       child: Text(
                                         'ROI',
                                         style: const TextStyle(
@@ -823,6 +789,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                                       ),
                                     ),
                                   ),
+                                ),
                             ],
                           ),
                         );

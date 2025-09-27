@@ -227,16 +227,4 @@ class MissionSummaryPanel extends StatelessWidget {
     return Colors.green;
   }
 
-  IconData _getRiskIcon() {
-    switch (riskLevel.toLowerCase()) {
-      case 'low':
-        return Icons.check_circle_outline;
-      case 'medium':
-        return Icons.warning_amber_outlined;
-      case 'high':
-        return Icons.error_outline;
-      default:
-        return Icons.help_outline;
-    }
-  }
 }

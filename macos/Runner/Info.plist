@@ -43,5 +43,13 @@
 			</dict>
 		</dict>
 	</dict>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>This app needs access to desktop folder to save mission files.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>This app needs access to documents folder to save and load mission files.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>This app needs access to downloads folder to save mission files.</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>This app needs access to external drives to save mission files.</string>
 </dict>
 </plist>

@@ -38,7 +38,6 @@ class TelemetryItemWidget extends StatelessWidget {
               ? 7.0
               : (isSmall ? 8.0 : (isMedium ? 9.0 : 10.0));
           final spacing = isTiny ? 1.0 : (isSmall ? 2.0 : 4.0);
-          final unitSpacing = isTiny ? 0.5 : (isSmall ? 1.0 : 2.0);
 
           return Container(
             padding: EdgeInsets.all(padding),

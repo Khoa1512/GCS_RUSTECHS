@@ -7,10 +7,6 @@ import 'package:skylink/services/telemetry_service.dart';
 import 'package:skylink/api/telemetry/mavlink_api.dart';
 import 'dart:async';
 
-// ============================================================================
-// PROFESSIONAL UAV MESSAGE SYSTEM - Mission Planner/QGC Standard
-// ============================================================================
-
 // Class to hold MAVLink status messages
 class MAVLinkStatusMessage {
   final String severity;
@@ -36,7 +32,7 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   final TelemetryService _telemetryService = TelemetryService();
 
   // Currently displayed telemetry (9 items)
-  late List<TelemetryData> displayedTelemetry;
+  List<TelemetryData> displayedTelemetry = [];
 
   // Status messages from MAVLink
   List<MAVLinkStatusMessage> _statusMessages = [];
@@ -49,9 +45,6 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   // Connection status
   bool _isConnected = false;
 
-  // ============================================================================
-  // PROFESSIONAL STATE TRACKING FOR UAV SYSTEMS
-  // ============================================================================
   String? _lastFlightMode;
   bool _lastArmedStatus = false;
   String? _lastGpsFixType;
@@ -77,7 +70,8 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
     ) {
       if (mounted) {
         setState(() {
-          _updateDisplayedTelemetry();
+          // Only update values, don't replace user selections
+          _updateTelemetryValues();
         });
       }
     });
@@ -105,13 +99,13 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   void _initializeStateTracking() {
-  _lastFlightMode = _telemetryService.currentMode;
-  _lastArmedStatus = _telemetryService.isArmed;
-  _lastGpsFixType = _telemetryService.gpsFixType;
-  _lastSatelliteCount =
-    _telemetryService.currentTelemetry['satellites']?.toInt() ?? -1;
-  _lastBatteryPercent =
-    _telemetryService.currentTelemetry['battery']?.toInt() ?? -1;
+    _lastFlightMode = _telemetryService.currentMode;
+    _lastArmedStatus = _telemetryService.isArmed;
+    _lastGpsFixType = _telemetryService.gpsFixType;
+    _lastSatelliteCount =
+        _telemetryService.currentTelemetry['satellites']?.toInt() ?? -1;
+    _lastBatteryPercent =
+        _telemetryService.currentTelemetry['battery']?.toInt() ?? -1;
   }
 
   void _handleDisconnection() {
@@ -124,17 +118,10 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
     _lastBatteryPercent = -1;
   }
 
-  // ============================================================================
-  // PROFESSIONAL MAVLINK EVENT HANDLER
-  // ============================================================================
   void _handleProfessionalMAVLinkEvents(MAVLinkEvent event) {
     if (!mounted) return;
 
     switch (event.type) {
-      // ========================================
-      // PRIORITY 1: SAFETY CRITICAL MESSAGES
-      // ========================================
-
       case MAVLinkEventType.statusText:
         // Real autopilot messages - HIGHEST PRIORITY
         _handleAutopilotStatusText(event);
@@ -149,10 +136,6 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
         // Connection status changes
         _handleConnectionChanges(event);
         break;
-
-      // ========================================
-      // PRIORITY 2: OPERATIONAL MESSAGES
-      // ========================================
 
       case MAVLinkEventType.gpsInfo:
         // GPS status changes only (not every update)
@@ -173,9 +156,6 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
         );
         break;
 
-      // ========================================
-      // SKIP HIGH-FREQUENCY DATA
-      // ========================================
       case MAVLinkEventType.attitude:
       case MAVLinkEventType.position:
       case MAVLinkEventType.vfrHud:
@@ -188,9 +168,6 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
       case MAVLinkEventType.commandAck:
         // Could add command feedback later
         break;
-      // ========================================
-      // MISSION EVENTS (ignored here for status panel)
-      // ========================================
       case MAVLinkEventType.missionCount:
       case MAVLinkEventType.missionItem:
       case MAVLinkEventType.missionCurrent:
@@ -207,10 +184,6 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
     }
   }
 
-  // ============================================================================
-  // PROFESSIONAL MESSAGE HANDLERS
-  // ============================================================================
-
   void _handleAutopilotStatusText(MAVLinkEvent event) {
     // Real autopilot messages are HIGHEST priority
     final data = event.data as Map<String, dynamic>;
@@ -223,8 +196,8 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   void _handleSystemHeartbeat(MAVLinkEvent event) {
-  final currentMode = _telemetryService.currentMode;
-  final isArmed = _telemetryService.isArmed;
+    final currentMode = _telemetryService.currentMode;
+    final isArmed = _telemetryService.isArmed;
 
     // First connection establishment
     if (!_connectionEstablished) {
@@ -293,9 +266,9 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   void _handleGpsStatusChanges(MAVLinkEvent event) {
-  final fixType = _telemetryService.gpsFixType;
-  final satellites =
-    _telemetryService.currentTelemetry['satellites']?.toInt() ?? 0;
+    final fixType = _telemetryService.gpsFixType;
+    final satellites =
+        _telemetryService.currentTelemetry['satellites']?.toInt() ?? 0;
 
     // GPS Fix Type changes
     if (_lastGpsFixType != null && _lastGpsFixType != fixType) {
@@ -346,8 +319,7 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   void _handleBatteryWarnings(MAVLinkEvent event) {
-  final battery =
-    _telemetryService.currentTelemetry['battery']?.toInt() ?? 0;
+    final battery = _telemetryService.currentTelemetry['battery']?.toInt() ?? 0;
 
     // Battery threshold warnings
     if (_lastBatteryPercent != -1) {
@@ -418,8 +390,32 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   }
 
   void _updateDisplayedTelemetry() {
-    // Always use real telemetry data from service
-    displayedTelemetry = _telemetryService.getTelemetryDataList();
+    // Initialize with default telemetry data only if list is empty
+    if (displayedTelemetry.isEmpty) {
+      displayedTelemetry = List.from(_telemetryService.getTelemetryDataList());
+    } else {
+      // Update existing telemetry values without changing user selections
+      _updateTelemetryValues();
+    }
+  }
+
+  void _updateTelemetryValues() {
+    // Get latest telemetry data from service
+    final latestTelemetryMap = <String, TelemetryData>{};
+    for (final telemetry in _telemetryService.getTelemetryDataList()) {
+      latestTelemetryMap[telemetry.label] = telemetry;
+    }
+
+    // Update values while preserving user-selected telemetry types
+    for (int i = 0; i < displayedTelemetry.length; i++) {
+      final currentTelemetry = displayedTelemetry[i];
+      final latestData = latestTelemetryMap[currentTelemetry.label];
+
+      if (latestData != null) {
+        // Update with fresh values but keep the same telemetry type
+        displayedTelemetry[i] = latestData;
+      }
+    }
   }
 
   void _onTelemetrySelected(int index, TelemetryData newTelemetry) {
@@ -473,7 +469,7 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
   Widget _buildHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [_buildLiveIndicator(), _buildConnectionStatus()],
+      children: [_buildLiveIndicator()],
     );
   }
 
@@ -507,30 +503,6 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildConnectionStatus() {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: _isConnected
-            ? Colors.green.withValues(alpha: 0.2)
-            : Colors.red.withValues(alpha: 0.2),
-        border: Border.all(
-          color: _isConnected ? Colors.green : Colors.red,
-          width: 1,
-        ),
-      ),
-      child: Text(
-        _isConnected ? 'Connected' : 'Disconnected',
-        style: TextStyle(
-          color: _isConnected ? Colors.green : Colors.red,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
     );
   }
 

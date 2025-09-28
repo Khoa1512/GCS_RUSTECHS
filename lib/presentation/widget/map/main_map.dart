@@ -455,19 +455,24 @@ class MainMapSimpleState extends State<MainMapSimple> {
                             if (!MissionWaypointHelpers.isROIPoint(routePoint))
                               Positioned.fill(
                                 child: Center(
-                                  child: Text(
-                                    '${index + 1}',
-                                    style: TextStyle(
-                                      fontSize: isHighlighted ? 16 : 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                      shadows: [
-                                        Shadow(
-                                          color: Colors.black.withOpacity(0.8),
-                                          offset: const Offset(1, 1),
-                                          blurRadius: 2,
-                                        ),
-                                      ],
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: 4.0,
+                                    ),
+                                    child: Text(
+                                      '${index + 1}',
+                                      style: TextStyle(
+                                        fontSize: isHighlighted ? 16 : 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        shadows: [
+                                          Shadow(
+                                            color: Colors.black.withOpacity(0.8),
+                                            offset: const Offset(1, 1),
+                                            blurRadius: 2,
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),

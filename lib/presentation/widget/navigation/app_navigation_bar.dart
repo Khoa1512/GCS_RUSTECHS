@@ -121,16 +121,8 @@ class _AppNavigationBarState extends State<AppNavigationBar>
           child: Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(
-              horizontal: context.responsiveSpacing(
-                mobile: 8,
-                tablet: 12,
-                desktop: 16,
-              ),
-              vertical: context.responsiveSpacing(
-                mobile: 4,
-                tablet: 6,
-                desktop: 10,
-              ),
+              horizontal: context.responsiveSpacing(desktop: 16),
+              vertical: context.responsiveSpacing(desktop: 10),
             ),
             child: Stack(
               clipBehavior: Clip.none,
@@ -149,7 +141,7 @@ class _AppNavigationBarState extends State<AppNavigationBar>
                       duration: const Duration(milliseconds: 400),
                       curve: Curves.easeInOutCubic,
                       width: _indicatorWidth,
-                      height: context.isMobile ? 36 : 50,
+                      height: 50,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
@@ -159,9 +151,7 @@ class _AppNavigationBarState extends State<AppNavigationBar>
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(
-                          context.isMobile ? 12 : 16,
-                        ),
+                        borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
                             color: const Color(0xFF00C896).withOpacity(0.4),
@@ -178,9 +168,7 @@ class _AppNavigationBarState extends State<AppNavigationBar>
                     ),
                   ),
                 // Navigation buttons (render second so they appear on top of indicator)
-                context.isMobile
-                    ? _buildMobileLayout(currentRoute)
-                    : _buildDesktopLayout(currentRoute),
+                _buildDesktopLayout(currentRoute),
               ],
             ),
           ),
@@ -189,15 +177,7 @@ class _AppNavigationBarState extends State<AppNavigationBar>
     );
   }
 
-  Widget _buildMobileLayout(String currentRoute) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: _buildNavigationButtons(currentRoute, isCompact: true),
-      ),
-    );
-  }
+
 
   Widget _buildDesktopLayout(String currentRoute) {
     return Row(children: _buildNavigationButtons(currentRoute));
@@ -225,7 +205,8 @@ class _AppNavigationBarState extends State<AppNavigationBar>
       Icons.route,
       Icons.file_copy,
       Icons.settings,
-    ];    final buttons = <Widget>[];
+    ];
+    final buttons = <Widget>[];
 
     for (int i = 0; i < routes.length; i++) {
       buttons.add(

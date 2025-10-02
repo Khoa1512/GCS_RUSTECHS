@@ -145,16 +145,22 @@ class SafeSizedContainer extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        // Enforce minimum sizes for VTOL desktop app
+        final screenSize = MediaQuery.of(context).size;
+        final minWidth = 1200.0;
+        final minHeight = 800.0;
+
         final safeWidth =
             width ??
             (constraints.maxWidth != double.infinity
-                ? constraints.maxWidth
-                : null);
+                ? constraints.maxWidth.clamp(minWidth, double.infinity)
+                : screenSize.width.clamp(minWidth, double.infinity));
+
         final safeHeight =
             height ??
             (constraints.maxHeight != double.infinity
-                ? constraints.maxHeight
-                : null);
+                ? constraints.maxHeight.clamp(minHeight, double.infinity)
+                : screenSize.height.clamp(minHeight, double.infinity));
 
         return Container(
           width: safeWidth,
@@ -163,6 +169,7 @@ class SafeSizedContainer extends StatelessWidget {
           margin: margin,
           color: color,
           decoration: decoration,
+          constraints: BoxConstraints(minWidth: minWidth, minHeight: minHeight),
           child: child,
         );
       },

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skylink/presentation/widget/app_bar/desktop_app_bar.dart';
-import 'package:skylink/responsive/demension.dart';
 import 'package:skylink/responsive/responsive_scaffold.dart';
 import 'package:skylink/core/router/app_route.dart';
 
@@ -33,28 +32,7 @@ class _MainWrapperState extends State<MainWrapper>
 
   @override
   Widget build(BuildContext context) {
-    if (context.isMobile) {
-      return _buildMobileLayout();
-    } else {
       return _buildDesktopLayout();
-    }
-  }
-
-  Widget _buildMobileLayout() {
-    return ResponsiveScaffold(
-      body: SafeSizedContainer(child: widget.navigationShell),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: widget.navigationShell.currentIndex,
-        onDestinationSelected: (index) => _onTap(index),
-        destinations: _navigationItems.map((item) {
-          return NavigationDestination(
-            icon: Icon(item.icon),
-            selectedIcon: Icon(item.selectedIcon),
-            label: item.label,
-          );
-        }).toList(),
-      ),
-    );
   }
 
   Widget _buildDesktopLayout() {

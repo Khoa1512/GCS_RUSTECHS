@@ -1,9 +1,7 @@
-// Responsive Widgets Library
-// This file exports all responsive components and provides utility widgets
+// Responsive Widgets Library - Desktop Only
+// This file exports all responsive components for desktop VTOL control system
 
 export 'responsive_layout.dart';
-export 'mobile_body.dart';
-export 'tablet_body.dart';
 export 'desktop_body.dart';
 export 'demension.dart';
 
@@ -13,195 +11,166 @@ import 'demension.dart';
 /// A responsive container that adapts its properties based on screen size
 class ResponsiveContainer extends StatelessWidget {
   final Widget child;
-  final EdgeInsets? mobilePadding;
-  final EdgeInsets? tabletPadding;
-  final EdgeInsets? desktopPadding;
-  final double? mobileMaxWidth;
-  final double? tabletMaxWidth;
-  final double? desktopMaxWidth;
+  final EdgeInsets? padding;
+  final double? maxWidth;
   final Color? backgroundColor;
 
   const ResponsiveContainer({
     super.key,
     required this.child,
-    this.mobilePadding,
-    this.tabletPadding,
-    this.desktopPadding,
-    this.mobileMaxWidth,
-    this.tabletMaxWidth,
-    this.desktopMaxWidth,
+    this.padding,
+    this.maxWidth,
     this.backgroundColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final deviceType = ResponsiveDimensions.getDeviceType(context);
+    final desktopPadding =
+        padding ?? const EdgeInsets.all(ResponsiveDimensions.spacingXL);
 
-    EdgeInsets padding;
-    double? maxWidth;
-
-    switch (deviceType) {
-      case DeviceType.mobile:
-        padding =
-            mobilePadding ??
-            const EdgeInsets.all(ResponsiveDimensions.spacingM);
-        maxWidth = mobileMaxWidth;
-        break;
-      case DeviceType.tablet:
-        padding =
-            tabletPadding ??
-            const EdgeInsets.all(ResponsiveDimensions.spacingL);
-        maxWidth = tabletMaxWidth ?? 800;
-        break;
-      case DeviceType.desktop:
-        padding =
-            desktopPadding ??
-            const EdgeInsets.all(ResponsiveDimensions.spacingXL);
-        maxWidth = desktopMaxWidth ?? 1200;
-        break;
-    }
-
-    return Center(
-      child: Container(
-        constraints: maxWidth != null
-            ? BoxConstraints(maxWidth: maxWidth)
-            : null,
-        padding: padding,
-        color: backgroundColor,
-        child: child,
+    return Container(
+      constraints: BoxConstraints(
+        minWidth: ResponsiveDimensions.minDesktopWidth,
+        maxWidth: maxWidth ?? double.infinity,
       ),
+      padding: desktopPadding,
+      color: backgroundColor,
+      child: child,
     );
   }
 }
 
-/// A responsive text widget that adapts its style based on screen size
+/// A responsive text widget for desktop applications
 class ResponsiveText extends StatelessWidget {
   final String text;
-  final TextStyle? mobileStyle;
-  final TextStyle? tabletStyle;
-  final TextStyle? desktopStyle;
-  final TextAlign? textAlign;
-  final int? maxLines;
-  final TextOverflow? overflow;
+  final TextStyle? style;
+  final double? fontSize;
 
-  const ResponsiveText(
-    this.text, {
+  const ResponsiveText({
     super.key,
-    this.mobileStyle,
-    this.tabletStyle,
-    this.desktopStyle,
-    this.textAlign,
-    this.maxLines,
-    this.overflow,
+    required this.text,
+    this.style,
+    this.fontSize,
   });
 
   @override
   Widget build(BuildContext context) {
-    final deviceType = ResponsiveDimensions.getDeviceType(context);
-
-    TextStyle? style;
-    switch (deviceType) {
-      case DeviceType.mobile:
-        style = mobileStyle;
-        break;
-      case DeviceType.tablet:
-        style = tabletStyle ?? mobileStyle;
-        break;
-      case DeviceType.desktop:
-        style = desktopStyle ?? tabletStyle ?? mobileStyle;
-        break;
-    }
+    final defaultFontSize = fontSize ?? 16.0;
 
     return Text(
       text,
-      style: style,
-      textAlign: textAlign,
-      maxLines: maxLines,
-      overflow: overflow,
+      style: (style ?? const TextStyle()).copyWith(fontSize: defaultFontSize),
     );
   }
 }
 
 /// A responsive gap (SizedBox) that adapts its size based on screen size
-class ResponsiveGap extends StatelessWidget {
-  final double? mobileSize;
-  final double? tabletSize;
-  final double? desktopSize;
-  final bool isVertical;
+/// A responsive grid for desktop layouts
+class ResponsiveGrid extends StatelessWidget {
+  final List<Widget> children;
+  final int? columns;
+  final double mainAxisSpacing;
+  final double crossAxisSpacing;
 
-  const ResponsiveGap({
+
+  const ResponsiveGrid({
     super.key,
-    this.mobileSize,
-    this.tabletSize,
-    this.desktopSize,
-    this.isVertical = true,
+    required this.children,
+    this.columns,
+    this.mainAxisSpacing = ResponsiveDimensions.spacingM,
+    this.crossAxisSpacing = ResponsiveDimensions.spacingM,
   });
 
-  const ResponsiveGap.horizontal({
-    super.key,
-    this.mobileSize,
-    this.tabletSize,
-    this.desktopSize,
-  }) : isVertical = false;
 
-  @override
+@override
   Widget build(BuildContext context) {
-    final size = context.responsiveSpacing(
-      mobile: mobileSize ?? ResponsiveDimensions.spacingM,
-      tablet: tabletSize ?? ResponsiveDimensions.spacingL,
-      desktop: desktopSize ?? ResponsiveDimensions.spacingXL,
-    );
+    final columnCount = columns ?? context.gridColumns();
 
-    return SizedBox(
-      width: isVertical ? null : size,
-      height: isVertical ? size : null,
+    return GridView.count(
+      crossAxisCount: columnCount,
+      mainAxisSpacing: mainAxisSpacing,
+      crossAxisSpacing: crossAxisSpacing,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      children: children,
     );
   }
 }
 
-/// A responsive flex widget (Row or Column) that adapts based on screen size
-class ResponsiveFlex extends StatelessWidget {
+/// A responsive row for desktop layouts
+class ResponsiveRow extends StatelessWidget {
   final List<Widget> children;
   final MainAxisAlignment mainAxisAlignment;
   final CrossAxisAlignment crossAxisAlignment;
-  final bool forceVerticalOnMobile;
   final double spacing;
 
-  const ResponsiveFlex({
+  const ResponsiveRow({
     super.key,
     required this.children,
     this.mainAxisAlignment = MainAxisAlignment.start,
-    this.crossAxisAlignment = CrossAxisAlignment.start,
-    this.forceVerticalOnMobile = true,
+    this.crossAxisAlignment = CrossAxisAlignment.center,
     this.spacing = ResponsiveDimensions.spacingM,
   });
 
   @override
   Widget build(BuildContext context) {
-    final useVertical = forceVerticalOnMobile && context.isMobile;
+    return Row(
+      mainAxisAlignment: mainAxisAlignment,
+      crossAxisAlignment: crossAxisAlignment,
+      children: _addSpacing(children, spacing),
+    );
+  }
+
+  List<Widget> _addSpacing(List<Widget> children, double spacing) {
+    if (children.isEmpty) return children;
 
     final spacedChildren = <Widget>[];
     for (int i = 0; i < children.length; i++) {
       spacedChildren.add(children[i]);
       if (i < children.length - 1) {
-        spacedChildren.add(
-          useVertical ? SizedBox(height: spacing) : SizedBox(width: spacing),
-        );
+        spacedChildren.add(SizedBox(width: spacing));
+      }
+    }
+    return spacedChildren;
+  }
+}
+
+/// A responsive flex widget (Row or Column) that adapts based on screen size
+class ResponsiveColumn extends StatelessWidget {
+  final List<Widget> children;
+  final MainAxisAlignment mainAxisAlignment;
+  final CrossAxisAlignment crossAxisAlignment;
+  final double spacing;
+
+  const ResponsiveColumn({
+    super.key,
+    required this.children,
+    this.mainAxisAlignment = MainAxisAlignment.start,
+    this.crossAxisAlignment = CrossAxisAlignment.center,
+    this.spacing = ResponsiveDimensions.spacingM,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: mainAxisAlignment,
+      crossAxisAlignment: crossAxisAlignment,
+      children: _addSpacing(children, spacing),
+    );
+  }
+
+  List<Widget> _addSpacing(List<Widget> children, double spacing) {
+    if (children.isEmpty) return children;
+
+    final spacedChildren = <Widget>[];
+    for (int i = 0; i < children.length; i++) {
+      spacedChildren.add(children[i]);
+      if (i < children.length - 1) {
+        spacedChildren.add(SizedBox(height: spacing));
       }
     }
 
-    if (useVertical) {
-      return Column(
-        mainAxisAlignment: mainAxisAlignment,
-        crossAxisAlignment: crossAxisAlignment,
-        children: spacedChildren,
-      );
-    } else {
-      return Row(
-        mainAxisAlignment: mainAxisAlignment,
-        crossAxisAlignment: crossAxisAlignment,
-        children: spacedChildren,
-      );
-    }
+    return spacedChildren;
   }
 }
+

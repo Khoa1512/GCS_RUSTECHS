@@ -17,7 +17,7 @@ class _AppStatusBarState extends State<AppStatusBar> {
   final TelemetryService _telemetryService = TelemetryService();
   StreamSubscription? _connectionSubscription;
   bool _isConnected = false;
-  
+
   // Time variables
   String _currentTime = '';
   Timer? _timeTimer;
@@ -92,20 +92,10 @@ class _AppStatusBarState extends State<AppStatusBar> {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeInOut,
-              margin: EdgeInsets.all(
-                context.responsiveSpacing(mobile: 4, tablet: 6, desktop: 8),
-              ),
+              margin: EdgeInsets.all(context.responsiveSpacing(desktop: 8)),
               padding: EdgeInsets.symmetric(
-                horizontal: context.responsiveSpacing(
-                  mobile: 12,
-                  tablet: 16,
-                  desktop: 20,
-                ),
-                vertical: context.responsiveSpacing(
-                  mobile: 8,
-                  tablet: 10,
-                  desktop: 12,
-                ),
+                horizontal: context.responsiveSpacing(desktop: 20),
+                vertical: context.responsiveSpacing(desktop: 12),
               ),
               decoration: BoxDecoration(
                 border: Border.all(
@@ -148,7 +138,9 @@ class _AppStatusBarState extends State<AppStatusBar> {
                     SizedBox(width: ResponsiveDimensions.spacingM),
                     _buildDroneConnection(),
                     SizedBox(width: ResponsiveDimensions.spacingM),
-                    _buildTimeItem(text: _currentTime.isNotEmpty ? _currentTime : '11:43 AM'),
+                    _buildTimeItem(
+                      text: _currentTime.isNotEmpty ? _currentTime : '11:43 AM',
+                    ),
                     SizedBox(width: ResponsiveDimensions.spacingS),
                     _buildBatteryIcon(),
                   ],

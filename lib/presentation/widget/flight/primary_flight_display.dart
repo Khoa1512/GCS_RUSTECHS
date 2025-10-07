@@ -56,7 +56,7 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
     double pitchDiff = (newPitch - _currentPitch).abs();
     double rollDiff = (newRoll - _currentRoll).abs();
 
-    if (pitchDiff < 0.5 && rollDiff < 0.5) return; // Skip small changes
+    if (pitchDiff < 0.1 && rollDiff < 0.1) return; 
 
     _pitchAnimation = Tween<double>(begin: _currentPitch, end: newPitch)
         .animate(

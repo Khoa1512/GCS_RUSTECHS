@@ -466,7 +466,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   }
 
   int _calculateInterpolationDuration(double distance) {
-    // Nếu đang trong mission, giảm thêm duration để responsive hơn
     double multiplier = _missionService.hasMission ? 0.7 : 1.0;
 
     if (distance < 0.1) return 0; // Không animate cho movement rất nhỏ
@@ -516,7 +515,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       return;
     }
 
-    // Professional UX: Only follow drone if enabled and no recent user interaction
     if (_isFollowModeEnabled && _shouldResumeFollowing()) {
       // Auto-resume follow mode after timeout
       if (_userInteractedWithMap && _shouldResumeFollowing()) {

@@ -149,7 +149,7 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
 
       case MAVLinkEventType.allParametersReceived:
         // Parameter loading complete
-        _addProfessionalMessage(
+        _addMessage(
           'Info',
           'Parameters loaded successfully',
           event.timestamp,
@@ -191,7 +191,7 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
     final text = data['text'] ?? '';
 
     if (text.isNotEmpty) {
-      _addProfessionalMessage(severity, text, event.timestamp);
+      _addMessage(severity, text, event.timestamp);
     }
   }
 
@@ -201,12 +201,12 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
 
     // First connection establishment
     if (!_connectionEstablished) {
-      _addProfessionalMessage(
+      _addMessage(
         'Info',
         'MAVLink heartbeat received',
         event.timestamp,
       );
-      _addProfessionalMessage(
+      _addMessage(
         'Info',
         'System online: $currentMode mode',
         event.timestamp,
@@ -216,7 +216,7 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
 
     // Flight mode changes
     if (_lastFlightMode != null && _lastFlightMode != currentMode) {
-      _addProfessionalMessage(
+      _addMessage(
         'Notice',
         'Mode: $_lastFlightMode → $currentMode',
         event.timestamp,
@@ -228,11 +228,11 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
     if (_lastArmedStatus != isArmed) {
       final severity = isArmed ? 'Warning' : 'Info';
       final status = isArmed ? 'ARMED' : 'DISARMED';
-      _addProfessionalMessage(severity, 'Vehicle $status', event.timestamp);
+      _addMessage(severity, 'Vehicle $status', event.timestamp);
 
       // Additional safety message for arming
       if (isArmed) {
-        _addProfessionalMessage(
+        _addMessage(
           'Warning',
           'Motors are now live - Exercise caution',
           event.timestamp,
@@ -262,7 +262,7 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
         return;
     }
 
-    _addProfessionalMessage(severity, message, event.timestamp);
+    _addMessage(severity, message, event.timestamp);
   }
 
   void _handleGpsStatusChanges(MAVLinkEvent event) {
@@ -289,26 +289,26 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
         message += ' - High precision active';
       }
 
-      _addProfessionalMessage(severity, message, event.timestamp);
+      _addMessage(severity, message, event.timestamp);
     }
     _lastGpsFixType = fixType;
 
     // Significant satellite count changes
     if (_lastSatelliteCount != -1) {
       if (_lastSatelliteCount < 6 && satellites >= 6) {
-        _addProfessionalMessage(
+        _addMessage(
           'Info',
           'GPS lock acquired: $satellites satellites',
           event.timestamp,
         );
       } else if (_lastSatelliteCount >= 6 && satellites < 6) {
-        _addProfessionalMessage(
+        _addMessage(
           'Warning',
           'GPS lock degraded: $satellites satellites',
           event.timestamp,
         );
       } else if (_lastSatelliteCount > 0 && satellites == 0) {
-        _addProfessionalMessage(
+        _addMessage(
           'Error',
           'GPS signal lost - No satellites visible',
           event.timestamp,
@@ -325,7 +325,7 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
     if (_lastBatteryPercent != -1) {
       // Critical levels
       if (_lastBatteryPercent > 15 && battery <= 15) {
-        _addProfessionalMessage(
+        _addMessage(
           'Critical',
           'BATTERY CRITICAL: $battery% - LAND IMMEDIATELY',
           event.timestamp,
@@ -333,7 +333,7 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
       }
       // Low levels
       else if (_lastBatteryPercent > 25 && battery <= 25) {
-        _addProfessionalMessage(
+        _addMessage(
           'Warning',
           'Battery low: $battery% - Consider landing soon',
           event.timestamp,
@@ -341,7 +341,7 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
       }
       // Very low levels
       else if (_lastBatteryPercent > 10 && battery <= 10) {
-        _addProfessionalMessage(
+        _addMessage(
           'Critical',
           'BATTERY FAILSAFE: $battery% - EMERGENCY LANDING REQUIRED',
           event.timestamp,
@@ -349,7 +349,7 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
       }
       // Recovery
       else if (_lastBatteryPercent <= 25 && battery > 30) {
-        _addProfessionalMessage(
+        _addMessage(
           'Info',
           'Battery level restored: $battery%',
           event.timestamp,
@@ -359,7 +359,7 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
     _lastBatteryPercent = battery;
   }
 
-  void _addProfessionalMessage(
+  void _addMessage(
     String severity,
     String text,
     DateTime timestamp,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:skylink/responsive/demension.dart';
+import 'package:get/get.dart';
 import 'package:skylink/services/telemetry_service.dart';
+import 'package:skylink/services/connection_manager.dart';
 import 'package:skylink/presentation/widget/connection/connection_dialog.dart';
 import 'dart:async';
 import 'package:intl/intl.dart';
@@ -52,6 +54,39 @@ class _AppStatusBarState extends State<AppStatusBar> {
 
   void _showConnectionDialog() {
     ConnectionDialog.show(context);
+  }
+
+  void _startMqttTest() async {
+    try {
+      final connectionManager = Get.find<ConnectionManager>();
+      await connectionManager.startMqttOnlyMode();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.science, color: Colors.white),
+                SizedBox(width: 8),
+                Text('MQTT Test Mode - Receiving telemetry data'),
+              ],
+            ),
+            backgroundColor: Colors.purple,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('MQTT Test Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _updateTime() {
@@ -156,6 +191,7 @@ class _AppStatusBarState extends State<AppStatusBar> {
   Widget _buildDroneConnection() {
     return GestureDetector(
       onTap: _showConnectionDialog,
+      onLongPress: _startMqttTest,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(

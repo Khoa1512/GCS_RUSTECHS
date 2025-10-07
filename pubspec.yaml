@@ -57,6 +57,11 @@ dependencies:
   intl: ^0.19.0
   file_picker: ^8.1.4
   window_manager: ^0.5.1
+  flutter_dotenv: ^6.0.0
+  get: ^4.7.2
+  dio: ^5.9.0
+  flutter_secure_storage: ^9.2.4
+  mqtt_client: ^10.11.1
 
 dev_dependencies:
   flutter_test:
@@ -85,6 +90,7 @@ flutter:
 
     # - assets/videos/
     - assets/thumbnails/
+    - .env
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

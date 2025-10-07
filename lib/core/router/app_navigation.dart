@@ -7,6 +7,7 @@ import 'package:skylink/presentation/view/main/home/homepage.dart';
 import 'package:skylink/presentation/view/main/map/map_page.dart';
 import 'package:skylink/presentation/view/main/route/route_page.dart';
 import 'package:skylink/presentation/view/main_wrapper/main_wrapper.dart';
+import 'package:skylink/presentation/view/playround/playround.dart';
 
 class AppNavigation {
   static final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -23,6 +24,8 @@ class AppNavigation {
       GlobalKey<NavigatorState>(debugLabel: 'fileNavigator');
   static final GlobalKey<NavigatorState> _paramsNavigatorKey =
       GlobalKey<NavigatorState>(debugLabel: 'paramsNavigator');
+  static final GlobalKey<NavigatorState> _playroundNavigatorKey =
+      GlobalKey<NavigatorState>(debugLabel: 'playroundNavigator');
 
   static final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
@@ -39,6 +42,20 @@ class AppNavigation {
         _buildRouteBranch(),
         _buildFileBranch(),
         _buildParamsBranch(),
+        _buildPlayroundBranch(),
+      ],
+    );
+  }
+
+  static StatefulShellBranch _buildPlayroundBranch() {
+    return StatefulShellBranch(
+      navigatorKey: _playroundNavigatorKey,
+      routes: [
+        GoRoute(
+          path: AppRoute.playround,
+          name: AppRoute.playround,
+          builder: (context, state) => const PlayroundPage(),
+        ),
       ],
     );
   }

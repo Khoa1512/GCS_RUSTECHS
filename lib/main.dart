@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:skylink/core/constant/app_color.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:skylink/core/controller/app_binding.dart';
 import 'package:skylink/core/router/app_navigation.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:skylink/core/theme/app_theme.dart';
@@ -9,6 +11,9 @@ import 'package:skylink/responsive/responsive_scaffold.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
     // Configure window for desktop
+
+  await dotenv.load(fileName: '.env');
+  AppBinding().dependencies();
   await windowManager.ensureInitialized();
 
   WindowOptions windowOptions = const WindowOptions(

@@ -6,4 +6,5 @@ class AppRoute {
   static const String route = '/route';
   static const String file = '/file';
   static const String params = '/params';
+    static const String playround = '/playround';
 }

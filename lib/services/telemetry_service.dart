@@ -64,6 +64,24 @@ class TelemetryService {
     _connectionController.add(connected);
   }
 
+    /// Update telemetry data from MQTT source (ULTRA-FAST 10ms rendering)
+  void updateTelemetryFromMqtt(Map<String, double> mqttData) {
+    if (mqttData.isEmpty) return;
+
+    // INSTANT update - zero overhead for 10ms rendering
+    _currentTelemetry.addAll(mqttData);
+
+    // One-time flag set
+    if (!_hasReceivedData) {
+      _hasReceivedData = true;
+      _dataReceiveController.add(true);
+    }
+
+    // INSTANT UI notification - direct stream for 10ms real-time
+    _telemetryController.add(_currentTelemetry);
+  }
+
+
   // Expose MAVLink API for accessing other event types (like statusText)
   DroneMAVLinkAPI get mavlinkAPI => _api;
 
@@ -135,16 +153,12 @@ class TelemetryService {
 
   /// Connect to drone via specified port
   Future<bool> connect(String port, {int baudRate = 115200}) async {
-    // print('TelemetryService: Attempting to connect to $port at $baudRate baud');
-
     try {
-      // Check if port is available
       final availablePorts = getAvailablePorts();
       if (!availablePorts.contains(port)) {
         return false;
       }
 
-      // print('TelemetryService: Calling API connect');
       await _api.connect(port, baudRate: baudRate);
 
       final success = _api.isConnected;
@@ -162,29 +176,19 @@ class TelemetryService {
         // Request all data streams for real-time telemetry với delay
         Timer(const Duration(milliseconds: 1000), () {
           if (_isConnected) {
-            // if (kDebugMode) {
-            //   print('TelemetryService: Requesting data streams...');
-            // }
             _api.requestAllDataStreams();
 
             // Send again after delay để ensure FC receives
             Timer(const Duration(milliseconds: 500), () {
               if (_isConnected) {
                 _api.requestAllDataStreams();
-                // if (kDebugMode) {
-                //   print('TelemetryService: Data streams requested (retry)');
-                // }
               }
             });
           }
         });
-      } else {
-        // print('TelemetryService: Connection failed');
       }
-
       return success;
     } catch (e) {
-      // print('TelemetryService: Connect error: $e');
       _isConnected = false;
       _connectionController.add(false);
       return false;
@@ -193,7 +197,6 @@ class TelemetryService {
 
   /// Disconnect from drone
   void disconnect() {
-    // print('TelemetryService: Disconnecting');
     try {
       // Hủy subscription
       _apiSubscription?.cancel();
@@ -238,9 +241,6 @@ class TelemetryService {
             final m = (event.data as Map);
             final newMode = (m['mode'] as String?) ?? _currentMode;
             if (newMode != _currentMode) {
-              print(
-                'TelemetryService: Mode changed from $_currentMode to $newMode',
-              );
               _currentMode = newMode;
             }
             _armed = (m['armed'] as bool?) ?? _armed;
@@ -316,10 +316,6 @@ class TelemetryService {
             _currentTelemetry['satellites'] =
                 ((m['satellites'] as num?)?.toDouble() ?? 0.0);
             _currentTelemetry['gps_fix'] = _getGpsFixValue(fixType);
-            // also store the string fix type for UI when needed
-            // store separately in a special bucket using a sentinel negative value is messy; keep outside map for strings
-            // However, some UI expects 'gps_fix_type' string
-            // We can't store string in Map<String,double>, so expose via getter only
 
             final newLat =
                 (m['lat'] as num?)?.toDouble() ??

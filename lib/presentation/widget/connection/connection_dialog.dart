@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:skylink/services/telemetry_service.dart';
+import 'package:skylink/services/connection_manager.dart';
+import 'package:skylink/api/5G/services/mqtt_service.dart';
+import 'package:skylink/services/mqtt_data_adapter.dart';
 import 'package:skylink/core/constant/app_color.dart';
 import 'dart:async';
+import 'dart:convert';
 
 class ConnectionDialog {
   static Future<void> show(BuildContext context) async {
@@ -25,6 +30,8 @@ class _ConnectionDialogWidget extends StatefulWidget {
 
 class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
   final TelemetryService _telemetryService = TelemetryService();
+  final MqttService _mqttService = MqttService();
+
   List<String> _availablePorts = [];
   String? _selectedPort;
   String? _connectedPort;
@@ -32,9 +39,16 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
   bool _isConnecting = false;
   bool _isConnected = false;
   bool _isWaitingForData = false;
+  bool _isCheckingMqttFallback = false;
+  bool _showConnectionLossDialog = false;
+
   Timer? _progressTimer;
+  Timer? _connectionMonitorTimer;
+  Timer? _mqttFallbackTimer;
   double _progressValue = 0.0;
   StreamSubscription? _dataSubscription;
+  StreamSubscription? _mqttSubscription;
+  StreamSubscription? _connectionSubscription;
 
   final List<int> _baudRates = [9600, 57600, 115200, 230400, 460800, 921600];
 
@@ -43,6 +57,7 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
     super.initState();
     _isConnected = _telemetryService.isConnected;
     _loadAvailablePorts();
+    _startConnectionMonitoring();
   }
 
   void _loadAvailablePorts() {
@@ -111,17 +126,150 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
   }
 
   Future<void> _disconnect() async {
+    // Cleanup all connections
     _telemetryService.disconnect();
+    await _mqttService.disconnect();
+
+    // Cancel all timers and subscriptions
+    _connectionMonitorTimer?.cancel();
+    _mqttFallbackTimer?.cancel();
+    _mqttSubscription?.cancel();
+    _connectionSubscription?.cancel();
 
     if (mounted) {
       setState(() {
         _isConnected = false;
         _isConnecting = false;
         _connectedPort = null;
+        _isCheckingMqttFallback = false;
+        _showConnectionLossDialog = false;
       });
 
       _showSnackBar('Disconnected', isError: false);
       Navigator.of(context).pop();
+    }
+  }
+
+  /// Start monitoring connection state for automatic fallback
+  void _startConnectionMonitoring() {
+    _connectionSubscription = _telemetryService.connectionStream.listen((
+      isConnected,
+    ) {
+      if (!isConnected && _isConnected && !_isCheckingMqttFallback) {
+        // MAVLink connection lost, check MQTT fallback
+        _handleConnectionLoss();
+      }
+    });
+  }
+
+  /// Handle connection loss with smart MQTT fallback
+  Future<void> _handleConnectionLoss() async {
+    if (_showConnectionLossDialog) return; // Prevent multiple dialogs
+
+    setState(() {
+      _showConnectionLossDialog = true;
+      _isCheckingMqttFallback = true;
+    });
+
+    // Show connection loss dialog with spinner
+    _showConnectionLossDialog = true;
+    final shouldFallback = await _showConnectionLossDialogWidget();
+
+    if (shouldFallback) {
+      await _attemptMqttFallback();
+    } else {
+      // User chose to disconnect
+      await _disconnect();
+    }
+
+    setState(() {
+      _showConnectionLossDialog = false;
+      _isCheckingMqttFallback = false;
+    });
+  }
+
+  /// Show dialog asking user about MQTT fallback
+  Future<bool> _showConnectionLossDialogWidget() async {
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Row(
+                children: [
+                  CircularProgressIndicator(strokeWidth: 2),
+                  SizedBox(width: 16),
+                  Text('Mất kết nối telemetry'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Kết nối MAVLink đã bị mất.'),
+                  SizedBox(height: 16),
+                  Text('Đang kiểm tra kết nối MQTT để fallback...'),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('Ngắt kết nối'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text('Thử MQTT'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+  }
+
+  /// Attempt MQTT fallback connection
+  Future<void> _attemptMqttFallback() async {
+    try {
+      await _mqttService.connect();
+      await _mqttService.subscribeAllDevices();
+
+      if (_mqttService.isConnected) {
+        // Start listening to MQTT data
+        _mqttSubscription = _mqttService.listenTelemetryData().listen(
+          (data) {
+            // Check if data contains 'connected: true' field
+            final isEraConnected = data['connected'] == true;
+
+            if (isEraConnected) {
+              // Convert and update telemetry
+              final telemetryData = MqttDataAdapter.convertMqttToTelemetry(
+                jsonEncode(data),
+              );
+
+              if (telemetryData.isNotEmpty) {
+                _telemetryService.updateTelemetryFromMqtt(telemetryData);
+              }
+            }
+          },
+          onError: (error) {
+            _showSnackBar('MQTT fallback failed: $error', isError: true);
+          },
+        );
+
+        setState(() {
+          _isConnected = true;
+          _connectedPort = 'MQTT Fallback';
+        });
+
+        _showSnackBar(
+          'Đã chuyển sang MQTT fallback thành công',
+          isError: false,
+        );
+      } else {
+        throw Exception('MQTT connection failed');
+      }
+    } catch (e) {
+      _showSnackBar('MQTT fallback thất bại: $e', isError: true);
+      await _disconnect();
     }
   }
 
@@ -181,8 +329,16 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
 
   @override
   void dispose() {
+    // Cancel all timers
     _progressTimer?.cancel();
+    _connectionMonitorTimer?.cancel();
+    _mqttFallbackTimer?.cancel();
+
+    // Cancel all subscriptions
     _dataSubscription?.cancel();
+    _mqttSubscription?.cancel();
+    _connectionSubscription?.cancel();
+
     super.dispose();
   }
 
@@ -397,6 +553,42 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text('Cancel', style: TextStyle(color: Colors.grey)),
+        ),
+        // MQTT Test Button
+        TextButton.icon(
+          onPressed: () async {
+            try {
+              final connectionManager = Get.find<ConnectionManager>();
+              Navigator.of(context).pop(); // Close dialog
+
+              // Start MQTT-only mode
+              await connectionManager.startMqttOnlyMode();
+
+              // Show success snackbar
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(Icons.science, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text('MQTT Test Mode Started - Bypassed MAVLink'),
+                    ],
+                  ),
+                  backgroundColor: Colors.purple,
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error starting MQTT test: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          },
+          icon: Icon(Icons.science, color: Colors.purple),
+          label: Text('MQTT Test', style: TextStyle(color: Colors.purple)),
         ),
 
         if (_isConnected)

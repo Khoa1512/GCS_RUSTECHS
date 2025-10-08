@@ -1,6 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:flutter_libserialport/flutter_libserialport.dart';
 import 'package:skylink/api/telemetry/mavlink_api.dart';
+import 'package:skylink/api/5G/services/mqtt_service.dart';
+import 'package:skylink/services/mqtt_data_adapter.dart';
 import 'package:skylink/data/telemetry_data.dart';
 import 'package:skylink/data/constants/telemetry_constants.dart';
 
@@ -19,6 +23,12 @@ class TelemetryService {
 
   final DroneMAVLinkAPI _api = DroneMAVLinkAPI();
   StreamSubscription? _apiSubscription;
+
+  // MQTT fallback services
+  final MqttService _mqttService = MqttService();
+  StreamSubscription? _mqttSubscription;
+  bool _isMqttFallbackActive = false;
+  Timer? _connectionMonitor;
 
   // Stream controllers for real-time data
   final _telemetryController =
@@ -64,7 +74,7 @@ class TelemetryService {
     _connectionController.add(connected);
   }
 
-    /// Update telemetry data from MQTT source (ULTRA-FAST 10ms rendering)
+  /// Update telemetry data from MQTT source (ULTRA-FAST 10ms rendering)
   void updateTelemetryFromMqtt(Map<String, double> mqttData) {
     if (mqttData.isEmpty) return;
 
@@ -80,7 +90,6 @@ class TelemetryService {
     // INSTANT UI notification - direct stream for 10ms real-time
     _telemetryController.add(_currentTelemetry);
   }
-
 
   // Expose MAVLink API for accessing other event types (like statusText)
   DroneMAVLinkAPI get mavlinkAPI => _api;
@@ -375,10 +384,168 @@ class TelemetryService {
       _connectionController.add(connected);
 
       if (!connected) {
+        _showFallbackDialog();
+
         _currentTelemetry.clear();
         _telemetryController.add(_currentTelemetry);
+      } else {
+        if (_isMqttFallbackActive) {
+          _stopMqttFallback();
+        }
       }
     }
+  }
+
+  void _showFallbackDialog() async {
+
+    try {
+      final context =
+          WidgetsBinding.instance.focusManager.primaryFocus?.context;
+      if (context == null) {
+        await _attemptMqttFallback();
+        return;
+      }
+
+      // Show dialog using Flutter's native showDialog
+      final result = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: Colors.grey.shade900,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.wifi_off, color: Colors.red, size: 24),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    'Mất kết nối MAVLink',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.orange,
+                      size: 20,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Kết nối MAVLink đã bị mất',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(Icons.router, color: Colors.blue, size: 16),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Bạn có muốn chuyển sang MQTT để tiếp tục nhận dữ liệu?',
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(false); // User cancelled
+                },
+                child: Text('Hủy', style: TextStyle(color: Colors.white70)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(true); // User confirmed
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                child: Text(
+                  'Chuyển MQTT',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+
+
+      // Only proceed with MQTT fallback if user confirmed
+      if (result == true) {
+        await _attemptMqttFallback();
+      }
+    } catch (e) {
+      await _attemptMqttFallback();
+    }
+  }
+
+  /// Automatically attempt MQTT fallback when MAVLink is lost
+  Future<void> _attemptMqttFallback() async {
+    if (_isMqttFallbackActive) return; // Already in fallback mode
+
+    try {
+      await _mqttService.connect();
+      await _mqttService.subscribeAllDevices();
+
+      if (_mqttService.isConnected) {
+        _isMqttFallbackActive = true;
+
+        // Use the SAME logic as ConnectionManager._listenToMqttData()
+        _mqttSubscription = _mqttService.listenTelemetryData().listen(
+          (data) {
+            // Instant convert and render - no delays for 10ms intervals
+            final telemetryData = MqttDataAdapter.convertMqttToTelemetry(
+              jsonEncode(data),
+            );
+
+            if (telemetryData.isNotEmpty) {
+              updateTelemetryFromMqtt(telemetryData);
+            }
+          },
+          onError: (error) {
+            _stopMqttFallback();
+          },
+        );
+
+      } else {
+        throw Exception('MQTT connection failed');
+      }
+    } catch (e) {
+      _isMqttFallbackActive = false;
+    }
+  }
+
+  void _stopMqttFallback() {
+    if (!_isMqttFallbackActive) return;
+
+    _mqttSubscription?.cancel();
+    _mqttService.disconnect();
+    _isMqttFallbackActive = false;
+
   }
 
   /// Emit current telemetry map and mark data received when first meaningful data arrives
@@ -500,6 +667,13 @@ class TelemetryService {
   void dispose() {
     // Hủy tất cả subscription và timer
     _apiSubscription?.cancel();
+    _mqttSubscription?.cancel();
+    _connectionMonitor?.cancel();
+
+    // Stop MQTT fallback if active
+    if (_isMqttFallbackActive) {
+      _stopMqttFallback();
+    }
 
     // Dispose API
     _api.dispose();

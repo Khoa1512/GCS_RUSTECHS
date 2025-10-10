@@ -208,7 +208,7 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
 
                   // Command Type
                   DropdownButtonFormField<int>(
-                    value: _selectedCommand,
+                    initialValue: _selectedCommand,
                     decoration: InputDecoration(
                       labelText: 'Lệnh bay',
                       labelStyle: const TextStyle(

@@ -180,17 +180,17 @@ class _SimpleDualDroneWidgetState extends State<SimpleDualDroneWidget> {
   }
 
   Future<void> _disconnectAll() async {
-    await _multiDroneService.disconnectAll();
+    await _multiDroneService.disconnectAllOptimized();
     _showSnackBar('All drones disconnected');
   }
 
   Future<void> _armAll() async {
-    await _multiDroneService.sendCommandToAll('arm');
+    await _multiDroneService.sendCommandToAllParallel('arm');
     _showSnackBar('Arm command sent to all drones');
   }
 
   Future<void> _disarmAll() async {
-    await _multiDroneService.sendCommandToAll('disarm');
+    await _multiDroneService.sendCommandToAllParallel('disarm');
     _showSnackBar('Disarm command sent to all drones');
   }
 

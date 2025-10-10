@@ -4,6 +4,8 @@ class AppImage {
   static const String seaImage = 'assets/images/sea.jpeg';
 
   static const String vtol = 'assets/images/vtol.png';
+  static const String copter = 'assets/images/copter.png';
+  static const String quadrotor = 'assets/images/quadrotorcopter.png';
 
   static const String satelliteMap = 'assets/images/sateliteMap.jpeg';
 

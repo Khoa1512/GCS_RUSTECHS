@@ -35,7 +35,7 @@ class _DroneInformationSectionState extends State<DroneInformationSection> {
       case 'fixed wing':
         return DroneInformationModel(
           name: 'Fixed Wing Aircraft',
-          image: AppImage.vtol, // Can add plane icon later
+          image: AppImage.vtol,
           description: 'Fixed wing aircraft for long range missions',
         );
       case 'vtol':
@@ -47,26 +47,14 @@ class _DroneInformationSectionState extends State<DroneInformationSection> {
       case 'quadrotor':
         return DroneInformationModel(
           name: 'Quadrotor Drone',
-          image: AppImage.vtol, // Can add quadrotor icon later
+          image: AppImage.quadrotor,
           description: 'Four-rotor multicopter for precision flying',
         );
       case 'tricopter':
         return DroneInformationModel(
           name: 'Tricopter Drone',
-          image: AppImage.vtol, // Can add tricopter icon later
+          image: AppImage.quadrotor,
           description: 'Three-rotor multicopter',
-        );
-      case 'helicopter':
-        return DroneInformationModel(
-          name: 'Helicopter',
-          image: AppImage.vtol, // Can add helicopter icon later
-          description: 'Traditional helicopter',
-        );
-      case 'coaxial helicopter':
-        return DroneInformationModel(
-          name: 'Coaxial Helicopter',
-          image: AppImage.vtol, // Can add coaxial helicopter icon later
-          description: 'Dual-rotor coaxial helicopter',
         );
       default:
         return DroneInformationModel(

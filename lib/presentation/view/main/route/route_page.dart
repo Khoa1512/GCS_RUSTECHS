@@ -466,7 +466,7 @@ class _RoutePageState extends State<RoutePage> {
           children: [
             Expanded(
               child: DropdownButtonFormField<String>(
-                initialValue: _selectedPort.isEmpty ? null : _selectedPort,
+                value: _selectedPort.isEmpty ? null : _selectedPort,
                 items: _ports
                     .map((p) => DropdownMenuItem(value: p, child: Text(p)))
                     .toList(),

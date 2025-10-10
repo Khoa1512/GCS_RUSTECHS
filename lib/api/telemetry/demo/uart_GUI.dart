@@ -1042,7 +1042,7 @@ class _UartDisplayState extends State<UartDisplay>
                           vertical: 8,
                         ),
                       ),
-                      initialValue: _availablePorts.contains(_selectedPort)
+                      value: _availablePorts.contains(_selectedPort)
                           ? _selectedPort
                           : null,
                       items: _availablePorts.map((port) {
@@ -1076,7 +1076,7 @@ class _UartDisplayState extends State<UartDisplay>
                           vertical: 8,
                         ),
                       ),
-                      initialValue: _baudRate,
+                      value: _baudRate,
                       items:
                           [
                             9600,

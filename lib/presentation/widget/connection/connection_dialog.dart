@@ -196,6 +196,9 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
         if (!masterSuccess) {
           throw Exception('Failed to connect master drone');
         }
+
+        // Add master drone to MultiDroneService for swarm display
+        await _multiDroneService.addPrimaryDroneFromTelemetryService();
       }
 
       // Then connect additional drones to MultiDroneService

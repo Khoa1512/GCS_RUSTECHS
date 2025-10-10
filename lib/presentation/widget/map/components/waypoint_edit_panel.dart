@@ -291,7 +291,7 @@ class _WaypointEditPanelState extends State<WaypointEditPanel> {
 
                   // Command Type
                   DropdownButtonFormField<int>(
-                    value: _selectedCommand,
+                    initialValue: _selectedCommand,
                     decoration: InputDecoration(
                       labelText: 'Lệnh bay',
                       labelStyle: const TextStyle(

@@ -170,7 +170,7 @@ class _MultiDroneWidgetState extends State<MultiDroneWidget> {
   }
 
   Future<void> _disconnectAllDrones() async {
-    await _multiDroneService.disconnectAll();
+    await _multiDroneService.disconnectAllOptimized();
     _showSnackBar('All drones disconnected');
   }
 

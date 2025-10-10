@@ -240,7 +240,7 @@ class _MissionParameterEditorState extends State<MissionParameterEditor> {
         if (paramDef.enumValues != null) ...[
           // Dropdown for enum values
           DropdownButtonFormField<String>(
-            value: controller.text,
+            initialValue: controller.text,
             decoration: InputDecoration(
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),

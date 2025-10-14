@@ -16,7 +16,6 @@ class Homepage extends StatefulWidget {
 }
 
 class _HomepageState extends State<Homepage> {
-  // State to track whether we're showing map or camera view
   bool _isMapView = true;
 
   void _toggleView() {

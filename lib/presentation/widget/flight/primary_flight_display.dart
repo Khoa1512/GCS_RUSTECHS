@@ -25,6 +25,8 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
 
   // Debouncing for mode and armed status
   String _lastFlightMode = '';
+  String _lastKnownFlightMode =
+      'Unknown'; // Keep track of last known mode when connected
   bool _lastArmedState = false;
   DateTime? _lastModeChange;
   DateTime? _lastArmedChange;
@@ -334,8 +336,7 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
     return StreamBuilder<bool>(
       stream: _telemetryService.connectionStream,
       builder: (context, snapshot) {
-        final isConnected = snapshot.data ?? false;
-
+        // Connection status không cần ở đây vì chúng ta sẽ lấy từ telemetryStream
         return Container(
           padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           decoration: BoxDecoration(
@@ -375,9 +376,22 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                   final armedValue = telemetryData['armed'] ?? 0.0;
                   final isArmed = _getStableArmedStatus(armedValue);
                   final flightMode = _telemetryService.currentMode;
+                  final isConnected = _telemetryService.isConnected;
+
+                  // Update last known flight mode when connected
+                  if (isConnected &&
+                      flightMode != 'Unknown' &&
+                      flightMode.isNotEmpty) {
+                    _lastKnownFlightMode = flightMode;
+                  }
+
+                  // Choose what to display
+                  final displayMode = isConnected
+                      ? flightMode
+                      : _lastKnownFlightMode;
 
                   // Only rebuild if mode or armed status actually changed
-                  if (!_shouldUpdateMode(flightMode) &&
+                  if (!_shouldUpdateMode(displayMode) &&
                       !_shouldUpdateArmedStatus(isArmed)) {
                     // Return cached widget or previous state
                   }
@@ -387,16 +401,22 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: isConnected
-                            ? _getFlightModeColors(flightMode, isArmed)
-                            : [Color(0xFFE53935), Color(0xFFB71C1C)],
+                            ? _getFlightModeColors(displayMode, isArmed)
+                            : [
+                                Color(0xFF757575),
+                                Color(0xFF424242),
+                              ], // Gray when disconnected
                       ),
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
                           color:
                               (isConnected
-                                      ? _getFlightModeColor(flightMode, isArmed)
-                                      : Colors.red)
+                                      ? _getFlightModeColor(
+                                          displayMode,
+                                          isArmed,
+                                        )
+                                      : Colors.grey)
                                   .withOpacity(0.3),
                           blurRadius: 8,
                           offset: Offset(0, 2),
@@ -413,9 +433,7 @@ class _PrimaryFlightDisplayState extends State<PrimaryFlightDisplay>
                         ),
                         SizedBox(width: 6),
                         Text(
-                          isConnected
-                              ? flightMode.toUpperCase()
-                              : 'DISCONNECTED',
+                          displayMode.toUpperCase(),
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 12,

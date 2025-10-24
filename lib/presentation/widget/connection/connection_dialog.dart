@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:skylink/services/telemetry_service.dart';
+import 'package:skylink/api/5G/websocket.dart';
 import 'package:skylink/core/constant/app_color.dart';
 import 'dart:async';
 
@@ -25,10 +26,24 @@ class _ConnectionDialogWidget extends StatefulWidget {
 
 class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
   final TelemetryService _telemetryService = TelemetryService();
+  final WebSocketTelemetryService _webSocketService =
+      WebSocketTelemetryService();
+
+  // Connection type
+  String _connectionType = 'serial'; // 'serial' or 'websocket'
+
+  // Serial connection
   List<String> _availablePorts = [];
   String? _selectedPort;
   String? _connectedPort;
   int _baudRate = 115200;
+
+  // WebSocket connection
+  final TextEditingController _webSocketUrlController = TextEditingController(
+    text: 'ws://localhost:8765',
+  );
+
+  // Connection state
   bool _isConnecting = false;
   bool _isConnected = false;
   bool _isWaitingForData = false;
@@ -45,6 +60,14 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
     _loadAvailablePorts();
   }
 
+  @override
+  void dispose() {
+    _webSocketUrlController.dispose();
+    _progressTimer?.cancel();
+    _dataSubscription?.cancel();
+    super.dispose();
+  }
+
   void _loadAvailablePorts() {
     setState(() {
       _availablePorts = _telemetryService.getAvailablePorts();
@@ -55,6 +78,14 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
   }
 
   Future<void> _connect() async {
+    if (_connectionType == 'serial') {
+      await _connectSerial();
+    } else {
+      await _connectWebSocket();
+    }
+  }
+
+  Future<void> _connectSerial() async {
     if (_selectedPort == null) {
       return;
     }
@@ -80,15 +111,12 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
         _isConnected = success;
         if (success) {
           _connectedPort = _selectedPort;
-        } else {
-          // print('Connection failed to $_selectedPort');
         }
       });
 
       if (success) {
         setState(() {
           _isConnecting = false;
-          // Chưa set _isConnected = true ngay, đợi progress bar chạy hết
         });
         _showSnackBar('Port connected, waiting for data...', isError: false);
         _startProgressBar();
@@ -110,8 +138,49 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
     }
   }
 
+  Future<void> _connectWebSocket() async {
+    final url = _webSocketUrlController.text.trim();
+    if (url.isEmpty) {
+      _showSnackBar('Please enter WebSocket URL', isError: true);
+      return;
+    }
+
+    setState(() {
+      _isConnecting = true;
+    });
+
+    try {
+      await _webSocketService.connect(url);
+
+      setState(() {
+        _isConnecting = false;
+        _isConnected = true;
+      });
+
+      _showSnackBar('WebSocket connected successfully!', isError: false);
+
+      // Đợi một chút để đảm bảo connection ổn định rồi close dialog
+      await Future.delayed(Duration(milliseconds: 500));
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isConnecting = false;
+          _isConnected = false;
+        });
+        _showSnackBar('WebSocket connection failed: $e', isError: true);
+      }
+    }
+  }
+
   Future<void> _disconnect() async {
-    _telemetryService.disconnect();
+    if (_connectionType == 'serial') {
+      _telemetryService.disconnect();
+    } else {
+      _webSocketService.disconnect();
+    }
 
     if (mounted) {
       setState(() {
@@ -177,13 +246,6 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
         hasReceivedData = true;
       }
     });
-  }
-
-  @override
-  void dispose() {
-    _progressTimer?.cancel();
-    _dataSubscription?.cancel();
-    super.dispose();
   }
 
   void _showSnackBar(String message, {required bool isError}) {
@@ -298,9 +360,9 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
             if (!_isConnected) ...[
               SizedBox(height: 16),
 
-              // Port Selection
+              // Connection Type Selector
               Text(
-                'Serial Port:',
+                'Connection Type:',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w500,
@@ -315,36 +377,38 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedPort,
-                          hint: Text(
-                            'Select Port',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                          dropdownColor: Colors.grey.shade800,
-                          items: _availablePorts.map((port) {
-                            return DropdownMenuItem<String>(
-                              value: port,
-                              child: Text(
-                                port,
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedPort = value;
-                            });
-                          },
-                          padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: RadioListTile<String>(
+                        title: Text(
+                          'Serial Port',
+                          style: TextStyle(color: Colors.white, fontSize: 14),
                         ),
+                        value: 'serial',
+                        groupValue: _connectionType,
+                        onChanged: (value) {
+                          setState(() {
+                            _connectionType = value!;
+                          });
+                        },
+                        activeColor: AppColors.primaryColor,
+                        dense: true,
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(Icons.refresh, color: AppColors.primaryColor),
-                      onPressed: _loadAvailablePorts,
-                      tooltip: 'Refresh Ports',
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: Text(
+                          'WebSocket',
+                          style: TextStyle(color: Colors.white, fontSize: 14),
+                        ),
+                        value: 'websocket',
+                        groupValue: _connectionType,
+                        onChanged: (value) {
+                          setState(() {
+                            _connectionType = value!;
+                          });
+                        },
+                        activeColor: AppColors.primaryColor,
+                        dense: true,
+                      ),
                     ),
                   ],
                 ),
@@ -352,43 +416,140 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
 
               SizedBox(height: 16),
 
-              // Baud Rate Selection
-              Text(
-                'Baud Rate:',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade600),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<int>(
-                    value: _baudRate,
-                    dropdownColor: Colors.grey.shade800,
-                    items: _baudRates.map((rate) {
-                      return DropdownMenuItem<int>(
-                        value: rate,
-                        child: Text(
-                          '$rate',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _baudRate = value!;
-                      });
-                    },
-                    padding: EdgeInsets.symmetric(horizontal: 12),
-                    isExpanded: true,
+              // Serial Port Configuration
+              if (_connectionType == 'serial') ...[
+                // Port Selection
+                Text(
+                  'Serial Port:',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-              ),
+                SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade600),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedPort,
+                            hint: Text(
+                              'Select Port',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                            dropdownColor: Colors.grey.shade800,
+                            items: _availablePorts.map((port) {
+                              return DropdownMenuItem<String>(
+                                value: port,
+                                child: Text(
+                                  port,
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedPort = value;
+                              });
+                            },
+                            padding: EdgeInsets.symmetric(horizontal: 12),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.refresh,
+                          color: AppColors.primaryColor,
+                        ),
+                        onPressed: _loadAvailablePorts,
+                        tooltip: 'Refresh Ports',
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: 16),
+
+                // Baud Rate Selection
+                Text(
+                  'Baud Rate:',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade600),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int>(
+                      value: _baudRate,
+                      dropdownColor: Colors.grey.shade800,
+                      items: _baudRates.map((rate) {
+                        return DropdownMenuItem<int>(
+                          value: rate,
+                          child: Text(
+                            '$rate',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _baudRate = value!;
+                        });
+                      },
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      isExpanded: true,
+                    ),
+                  ),
+                ),
+              ],
+
+              // WebSocket Configuration
+              if (_connectionType == 'websocket') ...[
+                // WebSocket URL Input
+                Text(
+                  'WebSocket URL:',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade600),
+                  ),
+                  child: TextField(
+                    controller: _webSocketUrlController,
+                    style: TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'ws://localhost:8765',
+                      hintStyle: TextStyle(color: Colors.grey),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Enter WebSocket server URL for telemetry data',
+                  style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                ),
+              ],
             ],
           ],
         ),
@@ -428,7 +589,13 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
           )
         else
           ElevatedButton(
-            onPressed: _isConnecting || _selectedPort == null ? null : _connect,
+            onPressed:
+                _isConnecting ||
+                    (_connectionType == 'serial' && _selectedPort == null) ||
+                    (_connectionType == 'websocket' &&
+                        _webSocketUrlController.text.trim().isEmpty)
+                ? null
+                : _connect,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryColor,
               foregroundColor: Colors.white,
@@ -449,7 +616,11 @@ class _ConnectionDialogWidgetState extends State<_ConnectionDialogWidget> {
                       Text('Connecting...'),
                     ],
                   )
-                : Text('Connect'),
+                : Text(
+                    _connectionType == 'serial'
+                        ? 'Connect to Port'
+                        : 'Connect to WebSocket',
+                  ),
           ),
       ],
     );

@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter_libserialport/flutter_libserialport.dart';
 import 'package:skylink/api/telemetry/mavlink_api.dart';
+import 'package:skylink/api/5G/websocket.dart';
 import 'package:skylink/data/telemetry_data.dart';
 import 'package:skylink/data/constants/telemetry_constants.dart';
 
-/// Service for managing telemetry data from MAVLink API
 class TelemetryService {
   static final TelemetryService _instance = TelemetryService._internal();
   factory TelemetryService() => _instance;
@@ -15,6 +15,211 @@ class TelemetryService {
   TelemetryService._internal() {
     // Khởi tạo service
     initialize();
+    _setupWebSocketListener();
+  }
+
+  /// Setup WebSocket listener for fallback data
+  void _setupWebSocketListener() {
+    final wsService = WebSocketTelemetryService();
+
+    // Listen to WebSocket data and update TelemetryConstants cache
+    wsService.dataStream.listen((data) {
+      if (data['type'] == 'telemetry_update' && data['data'] != null) {
+        // Only use WebSocket data if MAVLink is not connected (WebSocket as fallback)
+        if (!_api.isConnected) {
+          _updateCurrentTelemetryFromWebSocket(data['data']);
+
+          // Emit updated telemetry
+          _telemetryController.add(_currentTelemetry);
+        }
+      }
+    });
+
+    // Listen to WebSocket connection status
+    wsService.connectionStream.listen((isConnected) {
+      if (!isConnected) {
+        // WebSocket disconnected - reset to default state if no MAVLink connection
+        if (!_api.isConnected) {
+          _handleWebSocketDisconnect();
+        }
+      }
+    });
+  }
+
+  /// Handle WebSocket disconnect - reset telemetry to default state
+  void _handleWebSocketDisconnect() {
+    // Reset connection state
+    _isConnected = false;
+    _hasReceivedData = false;
+
+    // Reset flight mode and armed status to defaults
+    _currentMode = 'Unknown';
+    _armed = false;
+    _lastGpsFixType = 'No GPS';
+    _vehicleType = 'Unknown';
+
+    // Clear telemetry data
+    _currentTelemetry.clear();
+
+    // Notify listeners
+    _connectionController.add(false);
+    _dataReceiveController.add(false);
+    _telemetryController.add(_currentTelemetry);
+  }
+
+  /// Simple method to update _currentTelemetry from WebSocket data
+  void _updateCurrentTelemetryFromWebSocket(
+    Map<String, dynamic> telemetryData,
+  ) {
+    try {
+      // Mapping từ WebSocket JSON path -> _currentTelemetry key
+      final Map<String, String> telemetryMapping = {
+        // Attitude data
+        'telemetry.attitude.roll': 'roll',
+        'telemetry.attitude.pitch': 'pitch',
+        'telemetry.attitude.yaw': 'yaw',
+
+        'telemetry.position.alt': 'altitude_msl',
+        'telemetry.position.relative_alt': 'altitude_rel',
+        'telemetry.position.hdg': 'compass_heading',
+        // Speed data
+        'telemetry.velocity.airspeed': 'airspeed',
+        'telemetry.velocity.groundspeed': 'groundspeed',
+
+        // Altitude data
+        'telemetry.altitude.msl': 'altitude_msl',
+        'telemetry.altitude.relative': 'altitude_rel',
+
+        // GPS data
+        'telemetry.gps.lat': 'gps_latitude',
+        'telemetry.gps.long': 'gps_longitude',
+        'telemetry.gps.alt': 'gps_altitude',
+        'telemetry.gps.speed': 'gps_speed',
+        'telemetry.gps.course': 'gps_course',
+        'telemetry.gps.horizontal_accuracy': 'gps_horizontal_accuracy',
+
+        // Battery data
+        'telemetry.battery.voltage': 'voltageBattery',
+        'telemetry.battery.remaining': 'battery',
+
+        // Other
+        'telemetry.gps.satellites_visible': 'satellites',
+      };
+
+      // Update all mapped parameters
+      for (String webSocketPath in telemetryMapping.keys) {
+        final telemetryKey = telemetryMapping[webSocketPath]!;
+        final value = _getValueFromPath(telemetryData, webSocketPath);
+
+        if (value != null) {
+          _currentTelemetry[telemetryKey] = value;
+        }
+      }
+
+      // Handle special non-double parameters separately
+      _handleSpecialParameters(telemetryData);
+
+      // Set connection status if we received valid WebSocket data and no MAVLink connection
+      if (!_api.isConnected && !_isConnected) {
+        _isConnected = true;
+        _connectionController.add(true);
+      }
+    } catch (e) {
+      print('❌ Error updating _currentTelemetry: $e');
+    }
+  }
+
+  /// Handle special parameters that are not double values
+  void _handleSpecialParameters(Map<String, dynamic> telemetryData) {
+    try {
+      // Handle flight mode (String)
+      final flightMode = _getStringFromPath(
+        telemetryData,
+        'telemetry.flight_mode',
+      );
+      if (flightMode != null) {
+        _currentMode = flightMode;
+      }
+
+      // Handle armed status (bool -> double for _currentTelemetry)
+      final armed = _getBoolFromPath(telemetryData, 'telemetry.armed');
+      if (armed != null) {
+        _armed = armed;
+        _currentTelemetry['armed'] = armed ? 1.0 : 0.0;
+      }
+
+      // Handle connection status (bool)
+      final connected = _getBoolFromPath(telemetryData, 'telemetry.connected');
+      if (connected != null) {
+        _isConnected = connected;
+        // Note: connection status is handled via connectionController, not _currentTelemetry
+      }
+    } catch (e) {
+      print('❌ Error handling special parameters: $e');
+    }
+  }
+
+  /// Helper: Get value from nested JSON path (e.g., "attitude.roll")
+  double? _getValueFromPath(Map<String, dynamic> data, String path) {
+    try {
+      dynamic current = data;
+      for (String key in path.split('.')) {
+        if (current is Map && current.containsKey(key)) {
+          current = current[key];
+        } else {
+          return null;
+        }
+      }
+
+      if (current is num && !current.isNaN && current.isFinite) {
+        return current.toDouble();
+      }
+    } catch (e) {
+      // Silent fail
+    }
+    return null;
+  }
+
+  /// Helper: Get string value from nested JSON path
+  String? _getStringFromPath(Map<String, dynamic> data, String path) {
+    try {
+      dynamic current = data;
+      for (String key in path.split('.')) {
+        if (current is Map && current.containsKey(key)) {
+          current = current[key];
+        } else {
+          return null;
+        }
+      }
+
+      if (current is String) {
+        return current;
+      }
+    } catch (e) {
+      // Silent fail
+    }
+    return null;
+  }
+
+  /// Helper: Get bool value from nested JSON path
+  bool? _getBoolFromPath(Map<String, dynamic> data, String path) {
+    try {
+      dynamic current = data;
+      for (String key in path.split('.')) {
+        if (current is Map && current.containsKey(key)) {
+          current = current[key];
+        } else {
+          return null;
+        }
+      }
+
+      if (current is bool) {
+        return current;
+      }
+    } catch (e) {
+      // Silent fail
+    }
+    return null;
   }
 
   final DroneMAVLinkAPI _api = DroneMAVLinkAPI();
@@ -162,29 +367,20 @@ class TelemetryService {
         // Request all data streams for real-time telemetry với delay
         Timer(const Duration(milliseconds: 1000), () {
           if (_isConnected) {
-            // if (kDebugMode) {
-            //   print('TelemetryService: Requesting data streams...');
-            // }
             _api.requestAllDataStreams();
 
             // Send again after delay để ensure FC receives
             Timer(const Duration(milliseconds: 500), () {
               if (_isConnected) {
                 _api.requestAllDataStreams();
-                // if (kDebugMode) {
-                //   print('TelemetryService: Data streams requested (retry)');
-                // }
               }
             });
           }
         });
-      } else {
-        // print('TelemetryService: Connection failed');
       }
 
       return success;
     } catch (e) {
-      // print('TelemetryService: Connect error: $e');
       _isConnected = false;
       _connectionController.add(false);
       return false;
@@ -193,25 +389,26 @@ class TelemetryService {
 
   /// Disconnect from drone
   void disconnect() {
-    // print('TelemetryService: Disconnecting');
     try {
-      // Hủy subscription
       _apiSubscription?.cancel();
 
-      // Disconnect từ API
       _api.disconnect();
 
-      // Reset tất cả trạng thái
+      // Reset all state
       _isConnected = false;
       _hasReceivedData = false;
+      _currentMode = 'Unknown';
+      _armed = false;
+      _lastGpsFixType = 'No GPS';
+      _vehicleType = 'Unknown';
 
-      // Thông báo cho các listener
       _connectionController.add(false);
       _dataReceiveController.add(false);
 
-      // Xóa dữ liệu telemetry
       _currentTelemetry.clear();
       _telemetryController.add(_currentTelemetry);
+
+      print('🔌 MAVLink disconnected - all telemetry reset');
     } catch (e) {
       _isConnected = false;
       _hasReceivedData = false;
@@ -238,9 +435,6 @@ class TelemetryService {
             final m = (event.data as Map);
             final newMode = (m['mode'] as String?) ?? _currentMode;
             if (newMode != _currentMode) {
-              print(
-                'TelemetryService: Mode changed from $_currentMode to $newMode',
-              );
               _currentMode = newMode;
             }
             _armed = (m['armed'] as bool?) ?? _armed;
@@ -378,9 +572,18 @@ class TelemetryService {
       _isConnected = connected;
       _connectionController.add(connected);
 
-      if (!connected) {
+      if (connected) {
+        // MAVLink connected - this takes priority over WebSocket
+        print(
+          '🔗 MAVLink connection established - prioritizing over WebSocket',
+        );
+      } else {
+        // MAVLink disconnected - clear data and potentially fall back to WebSocket
         _currentTelemetry.clear();
         _telemetryController.add(_currentTelemetry);
+        print(
+          '🔌 MAVLink disconnected - may fall back to WebSocket if available',
+        );
       }
     }
   }

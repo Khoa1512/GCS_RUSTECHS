@@ -152,6 +152,10 @@ class WaypointTooltip extends StatelessWidget {
         return 'Spline Waypoint';
       case 178:
         return 'Change Speed';
+      case 183:
+        return 'Set Servo';
+      case 184:
+        return 'Repeat Servo';
       case 201:
         return 'Set ROI';
       default:
@@ -192,6 +196,28 @@ class WaypointTooltip extends StatelessWidget {
         }
         if (params['param4'] != null && params['param4'] != 0.0) {
           relevantParams['Yaw'] = '${params['param4']}°';
+        }
+        break;
+      case 183: // Set Servo
+        if (params['param1'] != null && params['param1'] != 0.0) {
+          relevantParams['Servo #'] = params['param1'].toInt().toString();
+        }
+        if (params['param2'] != null && params['param2'] != 0.0) {
+          relevantParams['PWM'] = '${params['param2'].toInt()}us';
+        }
+        break;
+      case 184: // Repeat Servo
+        if (params['param1'] != null && params['param1'] != 0.0) {
+          relevantParams['Servo #'] = params['param1'].toInt().toString();
+        }
+        if (params['param2'] != null && params['param2'] != 0.0) {
+          relevantParams['PWM'] = '${params['param2'].toInt()}us';
+        }
+        if (params['param3'] != null && params['param3'] != 0.0) {
+          relevantParams['Count'] = params['param3'].toInt().toString();
+        }
+        if (params['param4'] != null && params['param4'] != 0.0) {
+          relevantParams['Cycle Time'] = '${params['param4']}s';
         }
         break;
     }

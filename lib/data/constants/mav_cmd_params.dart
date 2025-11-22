@@ -280,39 +280,6 @@ final Map<int, List<MavCmdParam>> mavCmdParams = {
     ),
   ],
 
-  // MAV_CMD_CONDITION_YAW (115)
-  115: [
-    MavCmdParam(
-      name: 'Góc mục tiêu',
-      description: 'Góc yaw mục tiêu',
-      unit: 'độ',
-      min: -180,
-      max: 180,
-      defaultValue: 0,
-    ),
-    MavCmdParam(
-      name: 'Tốc độ góc',
-      description: 'Tốc độ xoay',
-      unit: 'độ/giây',
-      min: 0,
-      defaultValue: 10,
-    ),
-    MavCmdParam(
-      name: 'Hướng',
-      description: 'Hướng xoay: -1=Ngược kim đồng hồ, 1=Thuận kim đồng hồ',
-      unit: '',
-      defaultValue: 1,
-      enumValues: ['-1: Ngược kim đồng hồ', '1: Thuận kim đồng hồ'],
-    ),
-    MavCmdParam(
-      name: 'Tương đối',
-      description: 'Tương đối (1) hoặc tuyệt đối (0)',
-      unit: '',
-      defaultValue: 1,
-      enumValues: ['0: Tuyệt đối', '1: Tương đối'],
-    ),
-  ],
-
   // MAV_CMD_NAV_VTOL_TAKEOFF (84)
   84: [
     MavCmdParam(
@@ -551,6 +518,72 @@ final Map<int, List<MavCmdParam>> mavCmdParams = {
       name: 'Trống',
       description: 'Tham số không sử dụng',
       unit: '',
+      defaultValue: 0,
+    ),
+  ],
+
+  // MAV_CMD_DO_SET_SERVO (183)
+  183: [
+    MavCmdParam(
+      name: 'Số hiệu servo',
+      description: 'Số hiệu servo (instance number)',
+      unit: '',
+      min: 0,
+      max: 15,
+      defaultValue: 1,
+    ),
+    MavCmdParam(
+      name: 'PWM',
+      description: 'Giá trị PWM (Pulse Width Modulation)',
+      unit: 'us',
+      min: 0,
+      max: 2500,
+      defaultValue: 1500,
+    ),
+    MavCmdParam(
+      name: 'Trống',
+      description: 'Tham số không sử dụng',
+      unit: '',
+      defaultValue: 0,
+    ),
+    MavCmdParam(
+      name: 'Trống',
+      description: 'Tham số không sử dụng',
+      unit: '',
+      defaultValue: 0,
+    ),
+  ],
+
+  // MAV_CMD_DO_REPEAT_SERVO (184)
+  184: [
+    MavCmdParam(
+      name: 'Số hiệu servo',
+      description: 'Số hiệu servo (instance number)',
+      unit: '',
+      min: 0,
+      max: 15,
+      defaultValue: 1,
+    ),
+    MavCmdParam(
+      name: 'PWM',
+      description: 'Giá trị PWM (Pulse Width Modulation)',
+      unit: 'us',
+      min: 0,
+      max: 2500,
+      defaultValue: 1500,
+    ),
+    MavCmdParam(
+      name: 'Số lần lặp',
+      description: 'Số lần lặp lại (cycle count)',
+      unit: '',
+      min: 1,
+      defaultValue: 1,
+    ),
+    MavCmdParam(
+      name: 'Thời gian chu kỳ',
+      description: 'Thời gian chu kỳ (cycle time)',
+      unit: 's',
+      min: 0,
       defaultValue: 0,
     ),
   ],

@@ -197,7 +197,6 @@ class _MissionSidebarState extends State<MissionSidebar> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF2A2A2A),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
         border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
       ),
       child: Row(
@@ -244,21 +243,6 @@ class _MissionSidebarState extends State<MissionSidebar> {
                   ],
                 ),
               ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: _getRiskColor(),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              widget.riskLevel.toUpperCase(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
             ),
           ),
         ],
@@ -353,12 +337,12 @@ class _MissionSidebarState extends State<MissionSidebar> {
       ),
       child: Column(
         children: [
-          // Quick Tips
-          if (widget.routePoints.isNotEmpty)
-            MissionQuickTips(
-              waypointCount: widget.routePoints.length,
-              onShowFullGuide: () => _showMissionHelp(context),
-            ),
+          // // Quick Tips
+          // if (widget.routePoints.isNotEmpty)
+          //   MissionQuickTips(
+          //     waypointCount: widget.routePoints.length,
+          //     onShowFullGuide: () => _showMissionHelp(context),
+          //   ),
 
           // Waypoint List Header
           Container(
@@ -430,73 +414,73 @@ class _MissionSidebarState extends State<MissionSidebar> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Bắt đầu tạo mission của bạn',
+            'Bắt đầu tạo kế hoạch bay của bạn',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white54, fontSize: 14),
           ),
           const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF2A2A2A),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.teal.withOpacity(0.3)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.lightbulb_outline,
-                      color: Colors.yellow,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Cách thêm waypoint:',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildQuickTip(
-                  'Click nút "Thêm waypoint" bên trái',
-                  Icons.add_location,
-                ),
-                _buildQuickTip('Click trực tiếp lên bản đồ', Icons.touch_app),
-                _buildQuickTip(
-                  'Dùng template Orbit/Survey',
-                  Icons.auto_awesome,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(Icons.help_outline, color: Colors.teal, size: 14),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => _showMissionHelp(context),
-                        child: Text(
-                          'Xem hướng dẫn đầy đủ',
-                          style: TextStyle(
-                            color: Colors.teal,
-                            fontSize: 12,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          // Container(
+          //   padding: const EdgeInsets.all(16),
+          //   margin: const EdgeInsets.symmetric(horizontal: 16),
+          //   decoration: BoxDecoration(
+          //     color: const Color(0xFF2A2A2A),
+          //     borderRadius: BorderRadius.circular(12),
+          //     border: Border.all(color: Colors.teal.withOpacity(0.3)),
+          //   ),
+          //   child: Column(
+          //     crossAxisAlignment: CrossAxisAlignment.start,
+          //     children: [
+          //       Row(
+          //         children: [
+          //           Icon(
+          //             Icons.lightbulb_outline,
+          //             color: Colors.yellow,
+          //             size: 16,
+          //           ),
+          //           const SizedBox(width: 8),
+          //           Text(
+          //             'Cách thêm waypoint:',
+          //             style: TextStyle(
+          //               color: Colors.white,
+          //               fontSize: 14,
+          //               fontWeight: FontWeight.w600,
+          //             ),
+          //           ),
+          //         ],
+          //       ),
+          //       const SizedBox(height: 12),
+          //       _buildQuickTip(
+          //         'Click nút "Thêm waypoint" bên trái',
+          //         Icons.add_location,
+          //       ),
+          //       _buildQuickTip('Click trực tiếp lên bản đồ', Icons.touch_app),
+          //       _buildQuickTip(
+          //         'Dùng template Orbit/Survey',
+          //         Icons.auto_awesome,
+          //       ),
+          //       const SizedBox(height: 12),
+          //       Row(
+          //         children: [
+          //           Icon(Icons.help_outline, color: Colors.teal, size: 14),
+          //           const SizedBox(width: 8),
+          //           Expanded(
+          //             child: GestureDetector(
+          //               onTap: () => _showMissionHelp(context),
+          //               child: Text(
+          //                 'Xem hướng dẫn đầy đủ',
+          //                 style: TextStyle(
+          //                   color: Colors.teal,
+          //                   fontSize: 12,
+          //                   decoration: TextDecoration.underline,
+          //                 ),
+          //               ),
+          //             ),
+          //           ),
+          //         ],
+          //       ),
+          //     ],
+          //   ),
+          // ),
         ],
       ),
     );
@@ -883,17 +867,21 @@ class _MissionSidebarState extends State<MissionSidebar> {
   IconData _getCommandIcon(int command) {
     switch (command) {
       case 16:
-        return Icons.location_on; // Waypoint
+        return Icons.location_on;
       case 19:
-        return Icons.loop; // Loiter Time
+        return Icons.loop;
       case 20:
-        return Icons.home; // RTL
+        return Icons.home;
       case 21:
-        return Icons.flight_land; // Land
+        return Icons.flight_land;
       case 201:
-        return Icons.camera_alt; // Do Set ROI
+        return Icons.camera_alt;
       case 22:
-        return Icons.flight_takeoff; // Takeoff
+        return Icons.flight_takeoff;
+      case 183:
+        return Icons.settings_remote;
+      case 184:
+        return Icons.repeat;
       default:
         return Icons.place;
     }
@@ -913,6 +901,10 @@ class _MissionSidebarState extends State<MissionSidebar> {
         return Colors.purple; // Do Set ROI
       case 22:
         return Colors.cyan; // Takeoff
+      case 183:
+        return Colors.amber; // Set Servo
+      case 184:
+        return Colors.deepOrange; // Repeat Servo
       default:
         return Colors.grey;
     }
@@ -930,6 +922,10 @@ class _MissionSidebarState extends State<MissionSidebar> {
         return 'Hạ cánh';
       case 201:
         return 'Điểm quan sát (ROI)';
+      case 183:
+        return 'Đặt Servo';
+      case 184:
+        return 'Lặp Servo';
       default:
         return 'Command $command';
     }
@@ -954,7 +950,7 @@ class _MissionSidebarState extends State<MissionSidebar> {
       SnackBar(
         content: Text(message),
         backgroundColor: isError ? Colors.red : Colors.green,
-        duration: Duration(seconds: isError ? 3 : 2),
+        duration: Duration(seconds: isError ? 2 : 1),
       ),
     );
   }

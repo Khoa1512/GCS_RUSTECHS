@@ -270,6 +270,10 @@ class _WaypointMiniInspectorState extends State<WaypointMiniInspector> {
         return 'Land';
       case 22:
         return 'Takeoff';
+      case 183:
+        return 'Set Servo';
+      case 184:
+        return 'Repeat Servo';
       default:
         return 'Command $command';
     }

@@ -53,6 +53,10 @@ class MissionWaypointHelpers {
         return 'Quay về điểm xuất phát';
       case 21:
         return 'Hạ cánh';
+      case 183:
+        return 'Đặt Servo';
+      case 184:
+        return 'Lặp Servo';
       default:
         return 'Điểm định hướng';
     }

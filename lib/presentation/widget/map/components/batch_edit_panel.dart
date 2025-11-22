@@ -40,6 +40,8 @@ class _BatchEditPanelState extends State<BatchEditPanel> {
     201: 'Điểm quan sát (ROI)',
     20: 'Quay về điểm xuất phát',
     21: 'Hạ cánh',
+    183: 'Đặt Servo',
+    184: 'Lặp Servo',
   };
   @override
   void initState() {

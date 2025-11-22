@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:skylink/core/constant/app_color.dart';
 import 'package:skylink/data/telemetry_data.dart';
 import 'package:skylink/presentation/widget/telemetry/telemetry_selector_dialog.dart';
-import 'package:skylink/presentation/widget/telemetry/telemetry_item_widget.dart';
+// import 'package:skylink/presentation/widget/telemetry/telemetry_item_widget.dart';
 import 'package:skylink/services/telemetry_service.dart';
 import 'package:skylink/api/telemetry/mavlink_api.dart';
 import 'dart:async';
@@ -829,12 +829,12 @@ class _RealTimeInfoWidgetState extends State<RealTimeInfoWidget> {
         return Row(
           children: [
             for (int i = 0; i < indices.length; i++) ...[
-              Expanded(
-                child: TelemetryItemWidget(
-                  telemetry: displayedTelemetry[indices[i]],
-                  onTap: () => _showTelemetrySelector(indices[i]),
-                ),
-              ),
+              // Expanded(
+              //   child: TelemetryItemWidget(
+              //     telemetry: displayedTelemetry[indices[i]],
+              //     onTap: () => _showTelemetrySelector(indices[i]),
+              //   ),
+              // ),
               if (i < indices.length - 1) SizedBox(width: spacing),
             ],
           ],

@@ -7,8 +7,6 @@ import 'package:skylink/presentation/view/main/map/controllers/map_page_mission_
 import 'package:skylink/presentation/view/main/map/controllers/map_page_ui_helpers.dart';
 import 'package:skylink/presentation/widget/common/app_bar.dart';
 import 'package:skylink/presentation/widget/map/components/floating_mission_actions.dart';
-import 'package:skylink/presentation/widget/map/components/polygon_drawing_controls.dart';
-import 'package:skylink/presentation/widget/map/components/bounding_box_drawing_controls.dart';
 import 'package:skylink/presentation/widget/map/main_map.dart';
 import 'package:skylink/presentation/widget/map/components/waypoint_edit_panel.dart';
 import 'package:skylink/presentation/widget/map/components/batch_edit_panel.dart';
@@ -19,6 +17,13 @@ import 'package:skylink/presentation/widget/camera/map_camera_overlay.dart';
 import 'package:skylink/presentation/widget/flight/pdf.dart';
 import 'package:skylink/services/telemetry_service.dart';
 
+/// Refactored MapPage - Clean and modular
+/// Uses mixins to separate concerns:
+/// - MapPageState: State management
+/// - MapPageHandlers: Event handlers
+/// - MapPageEditHandlers: Edit operations
+/// - MapPageMissionOps: Mission upload/download
+/// - MapPageUIHelpers: UI feedback
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
 
@@ -63,6 +68,10 @@ class _MapPageState extends State<MapPage>
     super.dispose();
   }
 
+  // ============================================================================
+  // MISSION STATS CALCULATION
+  // ============================================================================
+
   @override
   void calculateMissionStats() {
     final stats = MissionStatsCalculator.calculate(state.routePoints);
@@ -72,6 +81,10 @@ class _MapPageState extends State<MapPage>
       state.batteryUsage = stats.batteryUsage;
     });
   }
+
+  // ============================================================================
+  // UI SETTINGS HANDLERS
+  // ============================================================================
 
   void _handleSettingsChanged(String setting) {
     switch (setting) {
@@ -105,6 +118,10 @@ class _MapPageState extends State<MapPage>
     });
   }
 
+  // ============================================================================
+  // MAP WIDGET BUILDER
+  // ============================================================================
+
   Widget _buildCurrentMap() {
     if (state.isMissionPlanningMode) {
       return MainMapSimple(
@@ -126,13 +143,15 @@ class _MapPageState extends State<MapPage>
         isDrawingBoundingBox: state.isDrawingBoundingBox,
         boundingBoxStart: state.boundingBoxStart,
         boundingBoxEnd: state.boundingBoxEnd,
-        isDrawingPolygon: state.isDrawingPolygon,
-        polygonPoints: state.polygonPoints,
       );
     } else {
       return const DroneMapWidget();
     }
   }
+
+  // ============================================================================
+  // BUILD METHOD
+  // ============================================================================
 
   @override
   Widget build(BuildContext context) {
@@ -193,6 +212,10 @@ class _MapPageState extends State<MapPage>
     );
   }
 
+  // ============================================================================
+  // UI COMPONENT BUILDERS
+  // ============================================================================
+
   Widget _buildFloatingActions() {
     return Positioned(
       left: 16,
@@ -201,34 +224,33 @@ class _MapPageState extends State<MapPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Show drawing controls OR mission actions (not both)
-          if (state.isDrawingPolygon)
-            // Polygon drawing controls replace mission actions
-            PolygonDrawingControls(
-              pointCount: state.polygonPoints.length,
-              onUndo: state.polygonPoints.isNotEmpty
-                  ? undoLastPolygonPoint
-                  : null,
-              onFinish: finishPolygonDrawing,
-              onCancel: cancelPolygonDrawing,
-              canFinish: state.polygonPoints.length >= 3,
-            )
-          else if (state.isDrawingBoundingBox)
-            // Bounding box drawing control replaces mission actions
-            BoundingBoxDrawingControls(onCancel: cancelBoundingBoxDrawing)
-          else
-            // Normal mission actions (when not drawing)
-            FloatingMissionActions(
-              onAddWaypoint: handleAddWaypoint,
-              onOrbitTemplate: handleOrbitTemplate,
-              onSurveyTemplate: handleBoundingBoxSurvey,
-              onPolygonSurvey: handlePolygonSurvey,
-              onUndo: handleUndo,
-              onRedo: handleRedo,
-              onClearMission: handleClearMission,
-              canUndo: state.undoRedoManager.canUndo,
-              canRedo: state.undoRedoManager.canRedo,
+          // Cancel bounding box button (when drawing)
+          if (state.isDrawingBoundingBox)
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: FloatingActionButton.extended(
+                onPressed: cancelBoundingBoxDrawing,
+                backgroundColor: Colors.red,
+                icon: const Icon(Icons.close, size: 20),
+                label: const Text(
+                  'Hủy vẽ vùng',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
             ),
+
+          // Floating actions (Survey button now triggers bounding box)
+          FloatingMissionActions(
+            onAddWaypoint: handleAddWaypoint,
+            onOrbitTemplate: handleOrbitTemplate,
+            onSurveyTemplate:
+                handleBoundingBoxSurvey, // Changed: Use bounding box survey
+            onUndo: handleUndo,
+            onRedo: handleRedo,
+            onClearMission: handleClearMission,
+            canUndo: state.undoRedoManager.canUndo,
+            canRedo: state.undoRedoManager.canRedo,
+          ),
         ],
       ),
     );

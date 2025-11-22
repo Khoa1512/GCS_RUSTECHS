@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 
-// Import packages for different platforms
 import 'package:webview_flutter/webview_flutter.dart' as webview;
 import 'package:webview_windows/webview_windows.dart' as windows;
 
@@ -33,7 +32,7 @@ class _PlatformWebViewState extends State<PlatformWebView>
   final windows.WebviewController _windowsController = windows.WebviewController();
 
   @override
-  bool get wantKeepAlive => true; // Keep widget alive
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -94,7 +93,6 @@ class _PlatformWebViewState extends State<PlatformWebView>
       });
 
       _windowsController.url.listen((url) {
-        // Handle URL changes if needed
       });
 
       if (mounted) {
@@ -115,7 +113,7 @@ class _PlatformWebViewState extends State<PlatformWebView>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required by AutomaticKeepAliveClientMixin
+    super.build(context);
 
     return Container(
       width: widget.width ?? double.infinity,

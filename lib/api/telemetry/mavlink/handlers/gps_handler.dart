@@ -6,25 +6,8 @@ class GpsHandler {
   final void Function(MAVLinkEvent) emit;
   GpsHandler(this.emit);
 
-  // Debug tracking (commented out)
-  // static DateTime? _lastGpsTime;
-  // static int _gpsMessageCount = 0;
 
   void handle(GpsRawInt msg) {
-    // Debug: Track GPS message frequency
-    // if (kDebugMode) {
-    //   DateTime now = DateTime.now();
-    //   _gpsMessageCount++;
-    //
-    //   if (_lastGpsTime != null) {
-    //     int intervalMs = now.difference(_lastGpsTime!).inMilliseconds;
-    //     if (_gpsMessageCount % 20 == 0) { // Log every 20 messages
-    //       double frequency = 1000.0 / intervalMs;
-    //       print('GPS_RAW_INT frequency: ${frequency.toStringAsFixed(1)}Hz (interval: ${intervalMs}ms)');
-    //     }
-    //   }
-    //   _lastGpsTime = now;
-    // }
 
     emit(
       MAVLinkEvent(MAVLinkEventType.gpsInfo, {

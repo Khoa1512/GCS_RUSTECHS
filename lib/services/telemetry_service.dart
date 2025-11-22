@@ -1,10 +1,10 @@
 import 'dart:async';
+import 'dart:math' as math; // Import thư viện toán học
 import 'package:flutter_libserialport/flutter_libserialport.dart';
 import 'package:skylink/api/telemetry/mavlink_api.dart';
 import 'package:skylink/data/telemetry_data.dart';
 import 'package:skylink/data/constants/telemetry_constants.dart';
 
-/// Service for managing telemetry data from MAVLink API
 class TelemetryService {
   static final TelemetryService _instance = TelemetryService._internal();
   factory TelemetryService() => _instance;
@@ -31,21 +31,21 @@ class TelemetryService {
   String _currentMode = 'Unknown';
   bool _armed = false;
   String _lastGpsFixType = 'No GPS';
-  String _vehicleType = 'Unknown'; // Vehicle type from heartbeat
+  String _vehicleType = 'Unknown';
 
-  // Heading stabilization - Optimized for ATTITUDE.yaw (more stable than VFR_HUD)
+  // --- COMPASS SMOOTHING VARIABLES ---
   double _lastStableHeading = 0.0;
   DateTime _lastHeadingUpdate = DateTime.now();
-  static const double _headingStabilityThreshold =
-      3.0; // degrees - Reduced since ATTITUDE.yaw is much more stable
-  static const Duration _headingUpdateInterval = Duration(
-    milliseconds: 500,
-  ); // Reduced since we're using stable ATTITUDE.yaw instead of noisy VFR_HUD
 
-  // Moving average filter for heading (reduce magnetometer noise)
+  // Giảm threshold để compass nhạy hơn
+  static const double _headingStabilityThreshold = 0.1;
+
+  // Tăng tốc độ update (30ms ~ 33fps) để animation không bị giật
+  static const Duration _headingUpdateInterval = Duration(milliseconds: 30);
+
   final List<double> _headingBuffer = [];
-  static const int _headingBufferSize =
-      8; // increased from 5 for stronger filtering
+  // Buffer size vừa phải, quá lớn sẽ gây lag (delay), quá nhỏ sẽ bị rung
+  static const int _headingBufferSize = 5;
 
   Stream<Map<String, double>> get telemetryStream =>
       _telemetryController.stream;
@@ -67,60 +67,94 @@ class TelemetryService {
   // Expose MAVLink API for accessing other event types (like statusText)
   DroneMAVLinkAPI get mavlinkAPI => _api;
 
-  /// Apply moving average filter to reduce magnetometer noise
-  double _filterHeading(double newHeading) {
+  /// Apply Circular Mean filter - handles 360°/0° boundary correctly
+  double _filterHeading(double normalizedHeading) {
     // Add to buffer
-    _headingBuffer.add(newHeading);
-
-    // Keep buffer size limited
+    _headingBuffer.add(normalizedHeading);
     if (_headingBuffer.length > _headingBufferSize) {
       _headingBuffer.removeAt(0);
     }
 
-    // Return simple average if buffer not full
-    if (_headingBuffer.length < 3) {
-      return newHeading;
-    }
+    // If insufficient data, return input directly
+    if (_headingBuffer.length < 2) return normalizedHeading;
 
-    // Calculate weighted average (recent values have more weight)
-    double sum = 0.0;
-    double weightSum = 0.0;
+    // --- CIRCULAR MEAN CALCULATION (FIXED) ---
+    double sumSin = 0.0;
+    double sumCos = 0.0;
 
+    // Equal weight for all samples (no weighting to avoid bias)
     for (int i = 0; i < _headingBuffer.length; i++) {
-      double weight = (i + 1).toDouble(); // Recent values get higher weight
-      sum += _headingBuffer[i] * weight;
-      weightSum += weight;
+      // Convert to radians for trigonometric calculation
+      double radians = _headingBuffer[i] * (math.pi / 180.0);
+
+      // Sum unit vectors
+      sumSin += math.sin(radians);
+      sumCos += math.cos(radians);
     }
 
-    return sum / weightSum;
+    // Calculate average direction
+    double resultRadians = math.atan2(sumSin, sumCos);
+    double resultDegrees = resultRadians * (180.0 / math.pi);
+
+    // Normalize to 0-360° range (atan2 returns -180° to 180°)
+    if (resultDegrees < 0) {
+      resultDegrees += 360.0;
+    }
+
+    return resultDegrees;
   }
 
-  /// Update compass heading with stability filtering
-  void _updateCompassHeading(double newHeading) {
+  /// Update compass heading with proper validation and rate limiting
+  void _updateCompassHeading(double rawHeading) {
     final now = DateTime.now();
 
-    // Skip update if too frequent (reduce noise)
+    // Rate limiting - prevent excessive updates
     if (now.difference(_lastHeadingUpdate) < _headingUpdateInterval) {
       return;
     }
 
-    // Normalize heading to 0-360
-    newHeading = newHeading % 360;
-    if (newHeading < 0) newHeading += 360;
+    // Normalize input to valid 0-360° range
+    double normalizedHeading = rawHeading;
 
-    // Apply moving average filter to smooth out noise
-    final filteredHeading = _filterHeading(newHeading);
+    // Handle negative values
+    if (normalizedHeading < 0) {
+      normalizedHeading = (normalizedHeading % 360) + 360;
+    }
+    // Handle values > 360
+    else if (normalizedHeading > 360) {
+      normalizedHeading = normalizedHeading % 360;
+    }
 
-    // Calculate heading difference handling 360/0 wraparound
+    // STABILITY CHECK: Temporarily disabled for testing
+    // if (_lastStableHeading != 0.0) {
+    //   double suddenDiff = (normalizedHeading - _lastStableHeading).abs();
+    //   if (suddenDiff > 180) {
+    //     suddenDiff = 360 - suddenDiff;
+    //   }
+    //
+    //   if (suddenDiff > 45.0) {
+    //     return;
+    //   }
+    // }
+
+    // Apply circular mean filter
+    final filteredHeading = _filterHeading(normalizedHeading);
+
+    // Calculate difference for update threshold check
     double headingDiff = (filteredHeading - _lastStableHeading).abs();
+
+    // Handle wrap-around difference (359° vs 1° should be 2°, not 358°)
     if (headingDiff > 180) {
       headingDiff = 360 - headingDiff;
     }
 
-    // Only update if change is significant enough to be meaningful
-    // Reduced threshold for more responsive updates while filtering noise
-    if (headingDiff > _headingStabilityThreshold ||
-        now.difference(_lastHeadingUpdate) > Duration(seconds: 2)) {
+    // Update if significant change OR to prevent UI freeze
+    bool significantChange = headingDiff > _headingStabilityThreshold;
+    bool preventFreeze =
+        now.difference(_lastHeadingUpdate).inMilliseconds >
+        1000; // Increase to 1 second
+
+    if (significantChange || preventFreeze) {
       _currentTelemetry['compass_heading'] = filteredHeading;
       _lastStableHeading = filteredHeading;
       _lastHeadingUpdate = now;
@@ -135,56 +169,36 @@ class TelemetryService {
 
   /// Connect to drone via specified port
   Future<bool> connect(String port, {int baudRate = 115200}) async {
-    // print('TelemetryService: Attempting to connect to $port at $baudRate baud');
-
     try {
-      // Check if port is available
       final availablePorts = getAvailablePorts();
       if (!availablePorts.contains(port)) {
         return false;
       }
 
-      // print('TelemetryService: Calling API connect');
       await _api.connect(port, baudRate: baudRate);
 
       final success = _api.isConnected;
       if (success) {
         _hasReceivedData = false;
-
-        // Setup API listener mới
         _apiSubscription?.cancel();
         _setupApiListener();
 
-        // Thông báo trạng thái - chưa set connected
         _connectionController.add(false);
         _dataReceiveController.add(false);
 
-        // Request all data streams for real-time telemetry với delay
         Timer(const Duration(milliseconds: 1000), () {
           if (_isConnected) {
-            // if (kDebugMode) {
-            //   print('TelemetryService: Requesting data streams...');
-            // }
             _api.requestAllDataStreams();
-
-            // Send again after delay để ensure FC receives
             Timer(const Duration(milliseconds: 500), () {
               if (_isConnected) {
                 _api.requestAllDataStreams();
-                // if (kDebugMode) {
-                //   print('TelemetryService: Data streams requested (retry)');
-                // }
               }
             });
           }
         });
-      } else {
-        // print('TelemetryService: Connection failed');
       }
-
       return success;
     } catch (e) {
-      // print('TelemetryService: Connect error: $e');
       _isConnected = false;
       _connectionController.add(false);
       return false;
@@ -193,23 +207,13 @@ class TelemetryService {
 
   /// Disconnect from drone
   void disconnect() {
-    // print('TelemetryService: Disconnecting');
     try {
-      // Hủy subscription
       _apiSubscription?.cancel();
-
-      // Disconnect từ API
       _api.disconnect();
-
-      // Reset tất cả trạng thái
       _isConnected = false;
       _hasReceivedData = false;
-
-      // Thông báo cho các listener
       _connectionController.add(false);
       _dataReceiveController.add(false);
-
-      // Xóa dữ liệu telemetry
       _currentTelemetry.clear();
       _telemetryController.add(_currentTelemetry);
     } catch (e) {
@@ -222,8 +226,7 @@ class TelemetryService {
 
   /// Get available serial ports
   List<String> getAvailablePorts() {
-    final ports = SerialPort.availablePorts;
-    return ports;
+    return SerialPort.availablePorts;
   }
 
   /// Setup listener for MAVLink API events
@@ -238,9 +241,6 @@ class TelemetryService {
             final m = (event.data as Map);
             final newMode = (m['mode'] as String?) ?? _currentMode;
             if (newMode != _currentMode) {
-              print(
-                'TelemetryService: Mode changed from $_currentMode to $newMode',
-              );
               _currentMode = newMode;
             }
             _armed = (m['armed'] as bool?) ?? _armed;
@@ -252,6 +252,7 @@ class TelemetryService {
         case MAVLinkEventType.attitude:
           if (event.data is Map) {
             final m = (event.data as Map);
+
             _currentTelemetry['roll'] =
                 (m['roll'] as num?)?.toDouble() ??
                 (_currentTelemetry['roll'] ?? 0.0);
@@ -263,21 +264,51 @@ class TelemetryService {
                 (m['yaw'] as num?)?.toDouble() ??
                 (_currentTelemetry['yaw'] ?? 0.0);
 
-            // Convert yaw from radians to degrees if needed
             double yawDegrees = rawYaw;
+            double compassHeading = rawYaw;
+
+            // Check if yaw is in radians (typical range: -π to π or -3.14 to 3.14)
             if (rawYaw.abs() <= 6.28) {
-              // likely radians (-π to π)
-              yawDegrees = rawYaw * 180.0 / 3.14159;
-              if (yawDegrees < 0) yawDegrees += 360; // normalize 0-360
+              // Convert from radians to degrees
+              yawDegrees = rawYaw * 180.0 / math.pi;
+
+              // Convert yaw to compass heading (0-360°)
+              compassHeading = yawDegrees;
+
+              // Normalize to 0-360° range
+              while (compassHeading < 0) {
+                compassHeading += 360;
+              }
+              while (compassHeading > 360) {
+                compassHeading -= 360;
+              }
+            } else {
+              // Already in degrees format
+              compassHeading = rawYaw;
+              yawDegrees = rawYaw;
+
+              // Normalize to 0-360° range
+              while (compassHeading < 0) {
+                compassHeading += 360;
+              }
+              while (compassHeading > 360) {
+                compassHeading -= 360;
+              }
             }
+
             _currentTelemetry['yaw'] = yawDegrees;
-            _updateCompassHeading(yawDegrees);
+
+            // Use converted compass heading for navigation
+            if (compassHeading >= 0 && compassHeading <= 360) {
+              _updateCompassHeading(compassHeading);
+            }
           }
           _emitTelemetry();
           break;
         case MAVLinkEventType.vfrHud:
           if (event.data is Map) {
             final m = (event.data as Map);
+
             _currentTelemetry['airspeed'] =
                 (m['airspeed'] as num?)?.toDouble() ??
                 (_currentTelemetry['airspeed'] ?? 0.0);
@@ -285,7 +316,6 @@ class TelemetryService {
                 (m['groundspeed'] as num?)?.toDouble() ??
                 (_currentTelemetry['groundspeed'] ?? 0.0);
 
-            // vfrhud.alt can serve as MSL if GLOBAL_POSITION not yet arrived
             final alt = (m['alt'] as num?)?.toDouble();
             if (alt != null) {
               _currentTelemetry['altitude_msl'] = alt;
@@ -316,10 +346,6 @@ class TelemetryService {
             _currentTelemetry['satellites'] =
                 ((m['satellites'] as num?)?.toDouble() ?? 0.0);
             _currentTelemetry['gps_fix'] = _getGpsFixValue(fixType);
-            // also store the string fix type for UI when needed
-            // store separately in a special bucket using a sentinel negative value is messy; keep outside map for strings
-            // However, some UI expects 'gps_fix_type' string
-            // We can't store string in Map<String,double>, so expose via getter only
 
             final newLat =
                 (m['lat'] as num?)?.toDouble() ??
@@ -339,6 +365,17 @@ class TelemetryService {
             _currentTelemetry['gps_course'] =
                 (m['cog'] as num?)?.toDouble() ??
                 (_currentTelemetry['gps_course'] ?? 0.0);
+
+            // Use GPS course as BACKUP compass heading
+            final currentHeading = _currentTelemetry['compass_heading'] ?? 0.0;
+            if (currentHeading == 0.0) {
+              final gpsHeading = _currentTelemetry['gps_course'];
+              if (gpsHeading != null &&
+                  gpsHeading > 0.0 &&
+                  gpsHeading <= 360.0) {
+                _updateCompassHeading(gpsHeading);
+              }
+            }
             _currentTelemetry['gps_horizontal_accuracy'] =
                 (m['eph'] as num?)?.toDouble() ??
                 (_currentTelemetry['gps_horizontal_accuracy'] ?? 0.0);
@@ -365,7 +402,6 @@ class TelemetryService {
           _emitTelemetry();
           break;
         default:
-          // no-op for other events
           break;
       }
     });
@@ -385,10 +421,9 @@ class TelemetryService {
     }
   }
 
-  /// Emit current telemetry map and mark data received when first meaningful data arrives
+  /// Emit current telemetry map
   void _emitTelemetry() {
     if (!_hasReceivedData) {
-      // Relaxed meaningful data detection - accept basic telemetry
       final hasPosition =
           ((_currentTelemetry['gps_latitude'] ?? 0.0) != 0.0) ||
           ((_currentTelemetry['gps_longitude'] ?? 0.0) != 0.0);
@@ -404,7 +439,6 @@ class TelemetryService {
           (_currentTelemetry['airspeed'] != null) ||
           (_currentTelemetry['groundspeed'] != null);
 
-      // Accept data if we have any meaningful telemetry (not just GPS+battery)
       if (hasPosition || hasBattery || hasAttitude || hasBasicData) {
         _hasReceivedData = true;
         _dataReceiveController.add(true);
@@ -482,7 +516,6 @@ class TelemetryService {
 
   /// Check if GPS has a valid fix
   bool get hasValidGpsFix {
-    // Only accept valid GPS fixes that can provide accurate position
     return _lastGpsFixType == '2D Fix' ||
         _lastGpsFixType == '3D Fix' ||
         _lastGpsFixType == 'DGPS' ||
@@ -495,20 +528,15 @@ class TelemetryService {
   /// Get GPS accuracy in human readable format
   String get gpsAccuracyString {
     if (!hasValidGpsFix) {
-      return _lastGpsFixType; // Show actual fix type for debugging
+      return _lastGpsFixType;
     }
     return '±${gpsHorizontalAccuracy.toStringAsFixed(1)}m';
   }
 
   /// Dispose service and cleanup resources
   void dispose() {
-    // Hủy tất cả subscription và timer
     _apiSubscription?.cancel();
-
-    // Dispose API
     _api.dispose();
-
-    // Đóng tất cả stream controller
     _telemetryController.close();
     _connectionController.close();
     _dataReceiveController.close();

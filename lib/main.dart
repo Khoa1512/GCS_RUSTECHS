@@ -8,13 +8,13 @@ import 'package:skylink/responsive/responsive_scaffold.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-    // Configure window for desktop
+
   await windowManager.ensureInitialized();
 
   WindowOptions windowOptions = const WindowOptions(
-    size: Size(1400, 900), // Initial size
-    minimumSize: Size(1200, 800), // Minimum size
-    center: true, // Center on screen
+    size: Size(1400, 900),
+    minimumSize: Size(1200, 800),
+    center: true,
     backgroundColor: Colors.transparent,
     skipTaskbar: false,
     titleBarStyle: TitleBarStyle.normal,
@@ -50,8 +50,8 @@ class MyApp extends StatelessWidget {
       builder: (context, child) {
         return ConstrainedBox(
           constraints: BoxConstraints(
-            minWidth: 1200, // Minimum app width
-            minHeight: 800, // Minimum app height
+            minWidth: 1200,
+            minHeight: 800,
           ),
           child: SafeSizedContainer(child: child ?? const SizedBox()),
         );

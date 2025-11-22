@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -133,7 +132,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 
   void _setupSubscriptions() {
     _missionSubscription = _missionService.missionStream.listen((points) {
-      // Khi mission được clear, xóa home point
       if (points.isEmpty) {
         _clearHomePoint();
       }
@@ -170,11 +168,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 
           // Nếu đây là GPS data đầu tiên (vẫn ở default position), khởi tạo ngay
           if (_currentLatitude == 10.7302 && _currentLongitude == 106.6988) {
-            if (kDebugMode) {
-              print(
-                'Initializing position from first GPS data: ($newLat, $newLon)',
-              );
-            }
             _currentLatitude = newLat;
             _currentLongitude = newLon;
             _currentAltitude = newAlt;
@@ -885,8 +878,8 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                     // Follow Mode Toggle
                     Tooltip(
                       message: _isFollowModeEnabled
-                          ? 'Disable Follow Mode'
-                          : 'Enable Follow Mode',
+                            ? 'Tắt chế độ theo dõi'
+                          : 'Bật chế độ theo dõi',
                       child: FloatingActionButton.small(
                         onPressed: () {
                           setState(() {
@@ -911,7 +904,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                     const SizedBox(height: 8),
                     // Center on Drone
                     Tooltip(
-                      message: 'Center on Drone',
+                      message: 'Tập trung vào Drone',
                       child: FloatingActionButton.small(
                         onPressed: () {
                           LatLng dronePosition = LatLng(
@@ -939,8 +932,8 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                     // Set/Clear Home Point
                     Tooltip(
                       message: _homePoint != null
-                          ? 'Clear Home Point'
-                          : 'Set Home Point Here',
+                          ? 'Xóa điểm Home'
+                          : 'Đặt điểm Home tại đây',
                       child: FloatingActionButton.small(
                         onPressed: _toggleHomePoint,
                         backgroundColor: _homePoint != null

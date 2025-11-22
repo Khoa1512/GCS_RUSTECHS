@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:skylink/presentation/widget/drone/drone_information_section.dart';
 import 'package:skylink/presentation/widget/custom/control_panel_widget.dart';
 import 'package:skylink/presentation/widget/custom/real_time_info_widget.dart';
 import 'package:skylink/presentation/widget/flight/drone_map_widget.dart';
@@ -153,7 +152,7 @@ class _HomepageState extends State<Homepage> {
   Widget _buildRightPanel() {
     // Switch between DroneInformationSection (for Map) and ControlPanelWidget (for Camera)
     return _isMapView
-        ? const DroneInformationSection()
+        ? const SizedBox.shrink()
         : const ControlPanelWidget();
   }
 }

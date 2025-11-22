@@ -7,6 +7,8 @@ import 'package:skylink/core/constant/map_type.dart';
 import 'package:skylink/data/models/route_point_model.dart';
 import 'package:skylink/presentation/widget/mission/mission_visualization_helpers.dart';
 import 'package:skylink/presentation/widget/mission/mission_waypoint_helpers.dart';
+import 'package:skylink/presentation/widget/map/components/bounding_box_drawer.dart';
+import 'package:skylink/presentation/widget/map/components/polygon_drawer.dart';
 
 class MainMapSimple extends StatefulWidget {
   final MapController mapController;
@@ -18,11 +20,21 @@ class MainMapSimple extends StatefulWidget {
   onWaypointTap;
   final VoidCallback? onWaypointDragStart;
   final VoidCallback? onWaypointDragEnd;
+  final Function(LatLng latLng)? onPointerHover;
   final bool isConfigValid;
   final LatLng? homePoint;
   final Map<String, LayerLink>? waypointLayerLinks;
   final RoutePoint? selectedWaypoint;
   final Set<String>? selectedWaypointIds;
+
+  // Bounding box drawing state
+  final bool isDrawingBoundingBox;
+  final LatLng? boundingBoxStart;
+  final LatLng? boundingBoxEnd;
+
+  // Polygon drawing state
+  final bool isDrawingPolygon;
+  final List<LatLng> polygonPoints;
 
   const MainMapSimple({
     super.key,
@@ -34,11 +46,17 @@ class MainMapSimple extends StatefulWidget {
     this.onWaypointTap,
     this.onWaypointDragStart,
     this.onWaypointDragEnd,
+    this.onPointerHover,
     required this.isConfigValid,
     this.homePoint,
     this.waypointLayerLinks,
     this.selectedWaypoint,
     this.selectedWaypointIds,
+    this.isDrawingBoundingBox = false,
+    this.boundingBoxStart,
+    this.boundingBoxEnd,
+    this.isDrawingPolygon = false,
+    this.polygonPoints = const [],
   });
 
   @override
@@ -65,14 +83,6 @@ class MainMapSimpleState extends State<MainMapSimple> {
   DateTime? _lastUpdateTime;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeMap();
-    });
-  }
-
-  @override
   void didUpdateWidget(MainMapSimple oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.homePoint != null && widget.homePoint == null) {
@@ -90,8 +100,6 @@ class MainMapSimpleState extends State<MainMapSimple> {
   }
 
   void _initializeMap() {
-    // Since we now use initialCenter in MapOptions, we don't need to move manually
-    // unless homePoint changes after initialization
     if (widget.homePoint != null && !_hasZoomedToHome) {
       _zoomToHomePoint();
     }
@@ -260,9 +268,7 @@ class MainMapSimpleState extends State<MainMapSimple> {
             initialCenter:
                 widget.homePoint ??
                 const LatLng(10.7302, 106.6988), // Đại học Tôn Đức Thắng
-            initialZoom: widget.homePoint != null
-                ? 18.0
-                : 16.0, // Zoom closer to university when no home point
+            initialZoom: widget.homePoint != null ? 18.0 : 16.0,
             minZoom: 3.0,
             maxZoom: 20.0,
             interactionOptions: InteractionOptions(
@@ -277,6 +283,13 @@ class MainMapSimpleState extends State<MainMapSimple> {
                 widget.onTap!(latlng);
               }
             },
+            onPointerHover: (event, latlng) {
+              if (widget.isDrawingBoundingBox &&
+                  widget.boundingBoxStart != null &&
+                  widget.onPointerHover != null) {
+                widget.onPointerHover!(latlng);
+              }
+            },
           ),
           children: [
             TileLayer(
@@ -284,6 +297,18 @@ class MainMapSimpleState extends State<MainMapSimple> {
               userAgentPackageName: "com.example.vtol_rustech",
               tileProvider: NetworkTileProvider(),
             ),
+
+            // Bounding box drawer layer
+            BoundingBoxDrawer(
+              isDrawing: widget.isDrawingBoundingBox,
+              startPoint: widget.boundingBoxStart,
+              endPoint: widget.boundingBoxEnd,
+            ),
+
+            // Polygon drawer layer
+            if (widget.isDrawingPolygon)
+              PolygonDrawer(points: widget.polygonPoints),
+
             if (flightPathPoints.isNotEmpty)
               PolylineLayer(
                 polylines: [
@@ -456,9 +481,7 @@ class MainMapSimpleState extends State<MainMapSimple> {
                               Positioned.fill(
                                 child: Center(
                                   child: Padding(
-                                    padding: const EdgeInsets.only(
-                                      bottom: 4.0,
-                                    ),
+                                    padding: const EdgeInsets.only(bottom: 4.0),
                                     child: Text(
                                       '${index + 1}',
                                       style: TextStyle(
@@ -467,7 +490,9 @@ class MainMapSimpleState extends State<MainMapSimple> {
                                         color: Colors.white,
                                         shadows: [
                                           Shadow(
-                                            color: Colors.black.withOpacity(0.8),
+                                            color: Colors.black.withOpacity(
+                                              0.8,
+                                            ),
                                             offset: const Offset(1, 1),
                                             blurRadius: 2,
                                           ),

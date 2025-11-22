@@ -5,6 +5,7 @@ class FloatingMissionActions extends StatelessWidget {
   final VoidCallback? onAddWaypoint;
   final VoidCallback? onOrbitTemplate;
   final VoidCallback? onSurveyTemplate;
+  final VoidCallback? onPolygonSurvey;
   final VoidCallback? onUndo;
   final VoidCallback? onRedo;
   final VoidCallback? onClearMission;
@@ -16,6 +17,7 @@ class FloatingMissionActions extends StatelessWidget {
     this.onAddWaypoint,
     this.onOrbitTemplate,
     this.onSurveyTemplate,
+    this.onPolygonSurvey,
     this.onUndo,
     this.onRedo,
     this.onClearMission,
@@ -72,18 +74,18 @@ class FloatingMissionActions extends StatelessWidget {
                 ),
               ),
               const Divider(height: 1, color: Colors.grey),
-              MissionTooltip(
-                message: 'Survey Template',
-                description:
-                    'Tạo đường bay zigzag để chụp ảnh toàn bộ khu vực. Phù hợp cho mapping và khảo sát.',
-                icon: Icons.grid_on,
+              _buildActionButton(
+                icon: Icons.crop_square,
+                label: 'Survey Box',
+                onPressed: onSurveyTemplate,
+                color: Colors.teal,
+              ),
+              const Divider(height: 1, color: Colors.grey),
+              _buildActionButton(
+                icon: Icons.polyline,
+                label: 'Survey Polygon',
+                onPressed: onPolygonSurvey,
                 color: Colors.purple,
-                child: _buildActionButton(
-                  icon: Icons.grid_on,
-                  label: 'Survey',
-                  onPressed: onSurveyTemplate,
-                  color: Colors.purple,
-                ),
               ),
               const Divider(height: 1, color: Colors.grey),
               MissionTooltip(
@@ -94,7 +96,7 @@ class FloatingMissionActions extends StatelessWidget {
                 color: Colors.red,
                 child: _buildActionButton(
                   icon: Icons.delete_sweep,
-                  label: 'Xoá',
+                  label: 'Xoá tất cả',
                   onPressed: onClearMission,
                   color: Colors.red,
                 ),

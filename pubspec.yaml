@@ -57,6 +57,8 @@ dependencies:
   intl: ^0.19.0
   file_picker: ^8.1.4
   window_manager: ^0.5.1
+  web_socket_channel: ^3.0.1
+  mqtt_client: ^10.11.1
 
 dev_dependencies:
   flutter_test:

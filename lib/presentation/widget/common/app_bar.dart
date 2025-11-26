@@ -1174,6 +1174,35 @@ class _QGCAppBarState extends State<QGCAppBar> {
             ],
           ),
         ),
+        const PopupMenuDivider(),
+        PopupMenuItem<String>(
+          value: 'gimbal_control',
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.videocam_outlined,
+                  color: Colors.purple.shade300,
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Điều khiển Gimbal',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

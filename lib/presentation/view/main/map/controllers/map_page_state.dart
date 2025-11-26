@@ -66,6 +66,8 @@ class MapPageState {
   bool isCameraSwapped = false;
   bool isMissionPlanningMode = false;
   bool showPdfCompass = false;
+  bool showGimbalControl = false;
+  double cameraOverlayWidth = 450; // Track camera overlay width for gimbal control positioning
 
   /// Initialize state with default values
   void initialize() {

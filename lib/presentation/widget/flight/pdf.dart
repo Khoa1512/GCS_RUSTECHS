@@ -8,6 +8,7 @@ class SolidFlightDisplay extends StatelessWidget {
   final double altitude; // Mét
   final double airspeed; // m/s
   final double batteryPercent; // Battery %
+  final double voltageBattery;
   final bool hasGpsLock; // GPS lock status
   final int linkQuality; // Link quality %
   final int satellites; // Number of satellites
@@ -20,6 +21,7 @@ class SolidFlightDisplay extends StatelessWidget {
     required this.altitude,
     required this.airspeed,
     this.batteryPercent = 100.0,
+    this.voltageBattery = 0.0,
     this.hasGpsLock = true,
     this.linkQuality = 100,
     this.satellites = 0,
@@ -233,6 +235,12 @@ class SolidFlightDisplay extends StatelessWidget {
             color: batteryPercent > 20
                 ? const Color(0xFF00E5FF)
                 : const Color(0xFFFF6B35),
+          ),
+          _buildGlassStatusItem(
+            icon: Icons.battery_std,
+            label: "Pin",
+            value: "${voltageBattery}V",
+            color: const Color(0xFF00E5FF),
           ),
           _buildGlassStatusItem(
             icon: hasGpsLock ? Icons.gps_fixed : Icons.gps_not_fixed,

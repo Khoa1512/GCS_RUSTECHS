@@ -10,7 +10,7 @@ class CameraMainView extends StatefulWidget {
 
 class _CameraMainViewState extends State<CameraMainView>
     with AutomaticKeepAliveClientMixin {
-  String cameraStreamUrl = "https://szx3j7twuwon.connect.remote.it/";
+  String cameraStreamUrl = "https://mwnijb6jsdya.connect.remote.it/";
 
   // Use stable key to prevent WebView rebuild during parent widget changes
   static const Key _stableWebViewKey = ValueKey('camera_webview_stable');

@@ -15,8 +15,9 @@ import 'package:skylink/presentation/widget/map/components/batch_edit_panel.dart
 import 'package:skylink/presentation/widget/map/components/mission_sidebar.dart';
 import 'package:skylink/presentation/widget/flight/drone_map_widget.dart';
 import 'package:skylink/presentation/widget/map/components/mission_tutorial_overlay.dart';
-import 'package:skylink/presentation/widget/camera/map_camera_overlay.dart';
+import 'package:skylink/presentation/widget/camera/resizable_camera_overlay.dart';
 import 'package:skylink/presentation/widget/flight/pdf.dart';
+import 'package:skylink/presentation/widget/gimbal/gimbal_control_compact.dart';
 import 'package:skylink/services/telemetry_service.dart';
 
 class MapPage extends StatefulWidget {
@@ -96,6 +97,16 @@ class _MapPageState extends State<MapPage>
           state.showPdfCompass = !state.showPdfCompass;
         });
         break;
+      case 'gimbal_control':
+        // Toggle gimbal control
+        setState(() {
+          state.showGimbalControl = !state.showGimbalControl;
+          // Tự động bật camera nếu chưa bật
+          if (state.showGimbalControl && !state.showCameraView) {
+            state.showCameraView = true;
+          }
+        });
+        break;
     }
   }
 
@@ -173,14 +184,38 @@ class _MapPageState extends State<MapPage>
 
                 // Camera and PFD overlays (non-planning mode)
                 if (!state.isMissionPlanningMode) ...[
-                  MapCameraOverlay(
+                  ResizableCameraOverlay(
                     isVisible: state.showCameraView,
                     onClose: () => setState(() => state.showCameraView = false),
                     isSwapped: state.isCameraSwapped,
                     onSwap: _toggleCameraSwap,
                     mapWidget: _buildCurrentMap(),
+                    onSizeChanged: (width) {
+                      setState(() {
+                        state.cameraOverlayWidth = width;
+                      });
+                    },
                   ),
                   if (state.showPdfCompass) _buildPdfCompass(),
+
+                  // Gimbal Control - Động theo camera width
+                  if (state.showGimbalControl &&
+                      state.showCameraView &&
+                      !state.isCameraSwapped)
+                    Positioned(
+                      bottom: 16,
+                      left:
+                          16 +
+                          state.cameraOverlayWidth +
+                          20, // 16px (camera left) + camera width + 20px spacing
+                      child: GimbalControlCompact(
+                        onClose: () {
+                          setState(() {
+                            state.showGimbalControl = false;
+                          });
+                        },
+                      ),
+                    ),
                 ],
               ],
             ),
@@ -341,6 +376,7 @@ class _MapPageState extends State<MapPage>
               altitude: telemetry['altitude_rel'] ?? 0.0,
               airspeed: telemetry['groundspeed'] ?? 0.0,
               batteryPercent: telemetry['battery'] ?? 0.0,
+              voltageBattery: telemetry['voltageBattery'] ?? 0.0,
               hasGpsLock: hasGps,
               linkQuality: isConnected ? 100 : 0,
               satellites: (telemetry['satellites'] ?? 0.0).toInt(),

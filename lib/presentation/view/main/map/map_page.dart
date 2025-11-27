@@ -98,7 +98,6 @@ class _MapPageState extends State<MapPage>
         });
         break;
       case 'gimbal_control':
-        // Toggle gimbal control
         setState(() {
           state.showGimbalControl = !state.showGimbalControl;
           // Tự động bật camera nếu chưa bật
@@ -203,9 +202,9 @@ class _MapPageState extends State<MapPage>
                       state.showCameraView &&
                       !state.isCameraSwapped)
                     Positioned(
-                      bottom: 16,
+                      bottom: 0,
                       left:
-                          16 +
+                          4 +
                           state.cameraOverlayWidth +
                           20, // 16px (camera left) + camera width + 20px spacing
                       child: GimbalControlCompact(
@@ -377,6 +376,9 @@ class _MapPageState extends State<MapPage>
               airspeed: telemetry['groundspeed'] ?? 0.0,
               batteryPercent: telemetry['battery'] ?? 0.0,
               voltageBattery: telemetry['voltageBattery'] ?? 0.0,
+              flightMode: TelemetryService().currentMode,
+              isArmed: TelemetryService().isArmed,
+              isConnected: isConnected,
               hasGpsLock: hasGps,
               linkQuality: isConnected ? 100 : 0,
               satellites: (telemetry['satellites'] ?? 0.0).toInt(),

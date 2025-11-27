@@ -212,6 +212,8 @@ class TelemetryService {
       _api.disconnect();
       _isConnected = false;
       _hasReceivedData = false;
+      _currentMode = 'Unknown';
+      _armed = false;
       _connectionController.add(false);
       _dataReceiveController.add(false);
       _currentTelemetry.clear();
@@ -219,6 +221,8 @@ class TelemetryService {
     } catch (e) {
       _isConnected = false;
       _hasReceivedData = false;
+      _currentMode = 'Unknown';
+      _armed = false; 
       _connectionController.add(false);
       _dataReceiveController.add(false);
     }

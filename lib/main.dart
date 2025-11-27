@@ -5,9 +5,12 @@ import 'package:skylink/core/router/app_navigation.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:skylink/core/theme/app_theme.dart';
 import 'package:skylink/responsive/responsive_scaffold.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await dotenv.load(fileName: ".env");
 
   await windowManager.ensureInitialized();
 
@@ -18,7 +21,6 @@ void main() async {
     backgroundColor: Colors.transparent,
     skipTaskbar: false,
     titleBarStyle: TitleBarStyle.normal,
-    title: 'VTOL Control System',
   );
 
   windowManager.waitUntilReadyToShow(windowOptions, () async {
@@ -43,19 +45,15 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Skylink',
+      title: 'RusSar',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
       routerConfig: AppNavigation.router,
       builder: (context, child) {
         return ConstrainedBox(
-          constraints: BoxConstraints(
-            minWidth: 1200,
-            minHeight: 800,
-          ),
+          constraints: BoxConstraints(minWidth: 1200, minHeight: 800),
           child: SafeSizedContainer(child: child ?? const SizedBox()),
         );
-
       },
     );
   }

@@ -8,7 +8,7 @@ from confluent_kafka import Consumer, KafkaError, KafkaException
 
 
 KAFKA_CONFIG_FILE = "client.properties"
-KAFKA_TOPIC = 'gimbal-commands'
+KAFKA_TOPIC = 'gimbal-command'
 
 running = True
 

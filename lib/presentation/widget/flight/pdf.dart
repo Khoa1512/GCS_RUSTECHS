@@ -9,6 +9,9 @@ class SolidFlightDisplay extends StatelessWidget {
   final double airspeed; // m/s
   final double batteryPercent; // Battery %
   final double voltageBattery;
+  final String flightMode; // Flight mode from telemetry
+  final bool isArmed; // ARM status from telemetry
+  final bool isConnected; // Connection status
   final bool hasGpsLock; // GPS lock status
   final int linkQuality; // Link quality %
   final int satellites; // Number of satellites
@@ -22,6 +25,9 @@ class SolidFlightDisplay extends StatelessWidget {
     required this.airspeed,
     this.batteryPercent = 100.0,
     this.voltageBattery = 0.0,
+    this.flightMode = 'Unknown',
+    this.isArmed = false,
+    this.isConnected = false,
     this.hasGpsLock = true,
     this.linkQuality = 100,
     this.satellites = 0,
@@ -192,6 +198,10 @@ class SolidFlightDisplay extends StatelessWidget {
                         ),
                       ),
 
+                      // ARM status above bottom bar
+                      if (isConnected) _buildArmStatus(),
+                      const SizedBox(height: 14),
+
                       // Bottom status info
                       _buildBottomStatusBar(),
                     ],
@@ -229,18 +239,16 @@ class SolidFlightDisplay extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _buildGlassStatusItem(
-            icon: Icons.battery_std,
-            label: "Pin",
-            value: "${batteryPercent.toInt()}%",
-            color: batteryPercent > 20
-                ? const Color(0xFF00E5FF)
-                : const Color(0xFFFF6B35),
+            icon: Icons.flight,
+            label: "Mode",
+            value: flightMode,
+            color: const Color(0xFF00E5FF),
           ),
           _buildGlassStatusItem(
             icon: Icons.battery_std,
             label: "Pin",
             value: "${voltageBattery}V",
-            color: const Color(0xFF00E5FF),
+            color: const Color(0xFFFF6B35),
           ),
           _buildGlassStatusItem(
             icon: hasGpsLock ? Icons.gps_fixed : Icons.gps_not_fixed,
@@ -255,16 +263,6 @@ class SolidFlightDisplay extends StatelessWidget {
             label: "Vệ tinh",
             value: satellites.toString(),
             color: _getSatelliteGlassColor(satellites),
-          ),
-          _buildGlassStatusItem(
-            icon: Icons.signal_cellular_alt,
-            label: "Kết nối",
-            value: "${linkQuality}%",
-            color: linkQuality > 50
-                ? const Color(0xFF00E5FF)
-                : linkQuality > 20
-                ? const Color(0xFFFFC107)
-                : const Color(0xFFFF6B35),
           ),
         ],
       ),
@@ -344,6 +342,47 @@ class SolidFlightDisplay extends StatelessWidget {
               color: Color(0xFFFFC107),
               fontSize: 11,
               fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ARM Status widget - Right aligned above bottom bar
+  Widget _buildArmStatus() {
+    return Container(
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0A).withOpacity(0.8),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: isArmed
+                  ? const Color(0xFFFF6B35).withOpacity(0.2)
+                  : const Color(0xFF4CAF50).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: isArmed
+                    ? const Color(0xFFFF6B35)
+                    : const Color(0xFF4CAF50),
+                width: 1.5,
+              ),
+            ),
+            child: Text(
+              isArmed ? 'ARMED' : 'DISARMED',
+              style: TextStyle(
+                color: isArmed
+                    ? const Color(0xFFFF6B35)
+                    : const Color(0xFF4CAF50),
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],

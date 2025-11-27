@@ -436,7 +436,7 @@ class _QGCAppBarState extends State<QGCAppBar> {
                     Row(
                       children: [
                         Text(
-                          'RUSTECH',
+                          'RUSSAR',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 16,

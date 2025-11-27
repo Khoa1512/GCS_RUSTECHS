@@ -73,8 +73,8 @@ class _ResizableCameraOverlayState extends State<ResizableCameraOverlay>
 
     // Resizable mode - góc trái-dưới cố định
     return Positioned(
-      bottom: 16,
-      left: 16,
+      bottom: 0,
+      left: 0,
       child: Container(
         width: _width,
         height: _height,

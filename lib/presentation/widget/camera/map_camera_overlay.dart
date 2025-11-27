@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:skylink/presentation/widget/camera/camera_main_view.dart';
-import 'package:skylink/presentation/widget/gimbal/gimbal_control_compact.dart';
 
 class MapCameraOverlay extends StatefulWidget {
   final bool isVisible;

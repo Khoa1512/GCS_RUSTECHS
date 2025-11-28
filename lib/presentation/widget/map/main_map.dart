@@ -9,6 +9,9 @@ import 'package:skylink/presentation/widget/mission/mission_visualization_helper
 import 'package:skylink/presentation/widget/mission/mission_waypoint_helpers.dart';
 import 'package:skylink/presentation/widget/map/components/bounding_box_drawer.dart';
 import 'package:skylink/presentation/widget/map/components/polygon_drawer.dart';
+import 'package:flutter_map_cache/flutter_map_cache.dart';
+import 'package:dio_cache_interceptor/dio_cache_interceptor.dart';
+import 'package:skylink/services/map_cache_service.dart';
 
 class MainMapSimple extends StatefulWidget {
   final MapController mapController;
@@ -67,6 +70,20 @@ class MainMapSimpleState extends State<MainMapSimple> {
   bool _hasZoomedToHome = false;
   int? _draggedWaypointIndex;
   LatLng? _draggedPosition;
+
+  // Cache store future
+  late final Future<CacheStore> _cacheStoreFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeMap();
+    _cacheStoreFuture = _initCacheStore();
+  }
+
+  Future<CacheStore> _initCacheStore() async {
+    return MapCacheService.instance.getCacheStore();
+  }
 
   void clearDragState() {
     setState(() {
@@ -269,8 +286,12 @@ class MainMapSimpleState extends State<MainMapSimple> {
                 widget.homePoint ??
                 const LatLng(10.7302, 106.6988), // Đại học Tôn Đức Thắng
             initialZoom: widget.homePoint != null ? 18.0 : 16.0,
-            minZoom: 3.0,
+            minZoom: 4.0, // Prevent zooming out too far (multiple worlds)
             maxZoom: 20.0,
+            // Removed cameraConstraint to fix crash
+            onPositionChanged: (position, hasGesture) {
+              // _updateVisibleZones(); // Removed as per user request
+            },
             interactionOptions: InteractionOptions(
               flags: _draggedWaypointIndex != null
                   ? InteractiveFlag.doubleTapZoom |
@@ -292,10 +313,24 @@ class MainMapSimpleState extends State<MainMapSimple> {
             },
           ),
           children: [
-            TileLayer(
-              urlTemplate: widget.mapType.urlTemplate,
-              userAgentPackageName: "com.example.vtol_rustech",
-              tileProvider: NetworkTileProvider(),
+            FutureBuilder<CacheStore>(
+              future: _cacheStoreFuture,
+              builder: (context, snapshot) {
+                if (snapshot.hasData) {
+                  return TileLayer(
+                    urlTemplate: widget.mapType.urlTemplate,
+                    userAgentPackageName: "com.example.vtol_rustech",
+                    tileProvider: CachedTileProvider(
+                      store: snapshot.data!,
+                      maxStale: const Duration(days: 30),
+                    ),
+                  );
+                }
+                return TileLayer(
+                  urlTemplate: widget.mapType.urlTemplate,
+                  userAgentPackageName: "com.example.vtol_rustech",
+                );
+              },
             ),
 
             // Bounding box drawer layer

@@ -61,6 +61,10 @@ dependencies:
   mqtt_client: ^10.11.1
   shared_preferences: ^2.2.2
   flutter_dotenv: ^5.2.1
+  clipper2: ^0.0.3
+  flutter_map_cache: ^1.5.2
+  dio_cache_interceptor_file_store: ^1.2.3
+  dio_cache_interceptor: ^3.5.1
 
 dev_dependencies:
   flutter_test:
@@ -87,6 +91,7 @@ flutter:
   assets:
     - .env
     - assets/images/
+    - hcmc_nofly_zones.json
 
     # - assets/videos/
     - assets/thumbnails/

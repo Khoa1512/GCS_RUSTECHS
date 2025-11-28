@@ -11,7 +11,7 @@ class HeartbeatHandler {
   DateTime? _modeChangeTime;
   Timer? _modeDebounceTimer;
   static const Duration _modeDebounceDelay = Duration(
-    milliseconds: 1500, // Increased to 1.5 seconds to handle unstable FC
+    milliseconds: 0, // Reduced to 0 for immediate mode update
   );
   bool _isArmed = false;
   int? _primarySystemType; // Cache primary system type

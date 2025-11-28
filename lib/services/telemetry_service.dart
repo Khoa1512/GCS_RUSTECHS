@@ -167,6 +167,8 @@ class TelemetryService {
     _setupApiListener();
   }
 
+  Timer? _dataRequestRetryTimer;
+
   /// Connect to drone via specified port
   Future<bool> connect(String port, {int baudRate = 115200}) async {
     try {
@@ -186,14 +188,41 @@ class TelemetryService {
         _connectionController.add(false);
         _dataReceiveController.add(false);
 
+        // Cancel existing timer if any
+        _dataRequestRetryTimer?.cancel();
+
+        // Initial request
         Timer(const Duration(milliseconds: 1000), () {
           if (_isConnected) {
             _api.requestAllDataStreams();
-            Timer(const Duration(milliseconds: 500), () {
-              if (_isConnected) {
-                _api.requestAllDataStreams();
-              }
-            });
+          }
+        });
+
+        // Smart retry mechanism: Check every 2 seconds
+        // If connected but NO rich data (Attitude/GPS) received yet, re-send request
+        _dataRequestRetryTimer = Timer.periodic(const Duration(seconds: 2), (
+          timer,
+        ) {
+          if (!_isConnected) {
+            timer.cancel();
+            return;
+          }
+
+          // Check if we have received RICH data (Attitude or GPS)
+          // Heartbeat gives us Mode/Armed (Basic data), but we need the streams for the rest
+          final hasRichData =
+              (_currentTelemetry['roll'] != null) ||
+              ((_currentTelemetry['gps_latitude'] ?? 0.0) != 0.0);
+
+          if (!hasRichData) {
+            print(
+              'Waiting for rich data (Attitude/GPS)... Retrying stream request...',
+            );
+            _api.requestAllDataStreams();
+          } else {
+            // Once we have rich data, we can stop retrying
+            print('Rich data received! Stopping retry timer.');
+            timer.cancel();
           }
         });
       }
@@ -208,6 +237,7 @@ class TelemetryService {
   /// Disconnect from drone
   void disconnect() {
     try {
+      _dataRequestRetryTimer?.cancel(); // Cancel retry timer
       _apiSubscription?.cancel();
       _api.disconnect();
       _isConnected = false;
@@ -222,7 +252,7 @@ class TelemetryService {
       _isConnected = false;
       _hasReceivedData = false;
       _currentMode = 'Unknown';
-      _armed = false; 
+      _armed = false;
       _connectionController.add(false);
       _dataReceiveController.add(false);
     }
@@ -544,5 +574,33 @@ class TelemetryService {
     _telemetryController.close();
     _connectionController.close();
     _dataReceiveController.close();
+  }
+
+  // --- SIMULATION HELPERS (For Testing) ---
+  void simulateTelemetry(Map<String, dynamic> data) {
+    if (data.containsKey('connected')) {
+      setConnected(data['connected']);
+    }
+
+    if (data.containsKey('gps_fix_type')) {
+      _lastGpsFixType = data['gps_fix_type'];
+    }
+
+    if (data.containsKey('mode')) {
+      _currentMode = data['mode'];
+    }
+
+    if (data.containsKey('armed')) {
+      _armed = data['armed'];
+      _currentTelemetry['armed'] = _armed ? 1.0 : 0.0;
+    }
+
+    data.forEach((key, value) {
+      if (value is num) {
+        _currentTelemetry[key] = value.toDouble();
+      }
+    });
+
+    _emitTelemetry();
   }
 }

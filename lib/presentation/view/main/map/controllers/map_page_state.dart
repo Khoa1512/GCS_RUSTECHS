@@ -67,11 +67,15 @@ class MapPageState {
   bool isMissionPlanningMode = false;
   bool showPdfCompass = false;
   bool showGimbalControl = false;
-  double cameraOverlayWidth = 450; // Track camera overlay width for gimbal control positioning
+  double cameraOverlayWidth =
+      450; // Track camera overlay width for gimbal control positioning
 
   /// Initialize state with default values
   void initialize() {
-    selectedMapType = mapTypes.first;
+    selectedMapType = mapTypes.firstWhere(
+      (mapType) => mapType.name == 'Google Hybrid',
+      orElse: () => mapTypes.first,
+    );
   }
 
   /// Clean up resources

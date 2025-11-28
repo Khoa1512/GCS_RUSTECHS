@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -7,6 +8,11 @@ import 'package:skylink/core/constant/map_type.dart';
 import 'package:skylink/services/telemetry_service.dart';
 import 'package:skylink/services/mission_service.dart';
 import 'package:skylink/presentation/widget/mission/mission_waypoint_helpers.dart';
+import 'package:skylink/services/no_fly_zone_service.dart';
+import 'package:skylink/core/utils/geo_utils.dart';
+import 'package:flutter_map_cache/flutter_map_cache.dart';
+import 'package:dio_cache_interceptor/dio_cache_interceptor.dart';
+import 'package:skylink/services/map_cache_service.dart';
 
 class DroneMapWidget extends StatefulWidget {
   final double? droneLatitude;
@@ -65,35 +71,79 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   static const int _gpsBufferSize =
       2; // Keep minimal buffer cho both connections
 
-  // Interpolation variables - như Mission Planner
-  LatLng? _targetPosition;
-  LatLng? _currentInterpolatedPosition;
+  // Biến cho thuật toán nội suy vị trí (Interpolation) - Giúp icon di chuyển mượt mà
+  LatLng? _targetPosition; // Vị trí đích đến
+  LatLng? _currentInterpolatedPosition; // Vị trí hiện tại đang vẽ trên màn hình
   Timer? _interpolationTimer;
   late AnimationController _positionController;
   late Animation<double> _positionAnimation;
 
-  // UI Update optimization
+  // Flight Trail (Breadcrumbs)
+  final List<LatLng> _flightTrail = [];
+  static const int _maxTrailPoints = 100; // Limit to prevent clutter
+  static const double _trailUpdateThreshold =
+      2.0; // Only add point if moved > 2m
+
+  // Tối ưu cập nhật UI (Throttle/Debounce)
   Timer? _uiUpdateTimer;
   bool _needsUIUpdate = false;
 
-  // Debug option để tắt smoothing
-  static const bool _enableGpsSmoothing = true; // Set false để tắt smoothing
+  // Cờ debug: Tắt làm mượt GPS nếu cần test dữ liệu thô
+  static const bool _enableGpsSmoothing = true;
+
+  // No-Fly Zones
+  List<List<LatLng>> _allNoFlyZones = [];
+  List<List<LatLng>> _visibleNoFlyZones = [];
+  bool _isLoadingZones = false;
+  Timer? _cullingDebounceTimer;
+
+  // Cache store future
+  late final Future<CacheStore> _cacheStoreFuture;
 
   @override
   void initState() {
     super.initState();
     _setupControllers();
-    _setupSubscriptions();
+    _setupListeners();
+    _loadNoFlyZones();
+
+    // Initialize cache store
+    _cacheStoreFuture = _initCacheStore();
+  }
+
+  Future<CacheStore> _initCacheStore() async {
+    return MapCacheService.instance.getCacheStore();
+  }
+
+  Future<void> _loadNoFlyZones() async {
+    setState(() {
+      _isLoadingZones = true;
+    });
+
+    // Load from assets (make sure the file is declared in pubspec.yaml)
+    final zones = await NoFlyZoneService().loadNoFlyZones(
+      'hcmc_nofly_zones.json',
+    );
+
+    if (mounted) {
+      setState(() {
+        _allNoFlyZones = zones;
+        _isLoadingZones = false;
+      });
+      // Initial culling check after loading
+      _updateVisibleZones();
+    }
   }
 
   void _setupControllers() {
     _mapController = MapController();
     _selectedMapType = mapTypes.firstWhere(
-      (mapType) => mapType.name == 'Satellite Map',
+      (mapType) => mapType.name == 'Google Hybrid',
       orElse: () => mapTypes.first,
     );
 
-    // Pulse animation
+    // 1. Hiệu ứng "Thở" (Pulse) cho icon
+    // Tạo cảm giác drone đang hoạt động (alive)
     _pulseController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
@@ -103,9 +153,10 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     );
     _pulseController.repeat(reverse: true);
 
-    // Rotation animation - tối ưu
+    // 2. Animation Xoay (Rotation)
+    // Giúp mũi drone quay mượt mà thay vì giật cục khi đổi hướng
     _rotationController = AnimationController(
-      duration: const Duration(milliseconds: 200), // Giảm xuống 200ms
+      duration: const Duration(milliseconds: 200), // 200ms là đủ nhanh và mượt
       vsync: this,
     );
     _rotationAnimation =
@@ -114,23 +165,27 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
         );
     _rotationController.forward();
 
-    // Position interpolation controller - Mission Planner style
+    // 3. Animation Di chuyển (Position Interpolation)
+    // Quan trọng nhất: Biến các tọa độ GPS rời rạc thành chuyển động liên tục
     _positionController = AnimationController(
-      duration: const Duration(milliseconds: 100), // Rất nhanh để smooth
+      duration: const Duration(
+        milliseconds: 100,
+      ), // Thời gian sẽ được tính toán động (adaptive)
       vsync: this,
     );
     _positionAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _positionController, curve: Curves.easeOut),
     );
 
-    // Add listener for smooth position updates instead of Timer.periodic
+    // Lắng nghe animation để cập nhật vị trí từng frame
     _positionController.addListener(_onPositionAnimationUpdate);
 
-    // Initialize interpolated position
+    // Khởi tạo vị trí ban đầu
     _currentInterpolatedPosition = LatLng(_currentLatitude, _currentLongitude);
   }
 
-  void _setupSubscriptions() {
+  void _setupListeners() {
+    // Lắng nghe Mission (để vẽ đường bay)
     _missionSubscription = _missionService.missionStream.listen((points) {
       if (points.isEmpty) {
         _clearHomePoint();
@@ -141,32 +196,36 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       setState(() {});
     });
 
+    // Lắng nghe Telemetry (Dữ liệu bay realtime)
     _telemetrySubscription = _telemetryService.telemetryStream.listen((data) {
       if (mounted) {
         bool needsRotationUpdate = false;
 
+        // Xử lý hướng mũi (Yaw)
         if (data.containsKey('yaw')) {
           double newYaw = data['yaw'] ?? 0.0;
-          // Tăng threshold để giảm animation yaw không cần thiết
-          if ((_currentYaw - newYaw).abs() > 2.0) {
+          // Giảm threshold xuống 0.1 độ để phản hồi nhạy hơn với slider test
+          if ((_currentYaw - newYaw).abs() > 0.1) {
+            // print('Yaw update: $_currentYaw -> $newYaw');
             _currentYaw = newYaw;
             needsRotationUpdate = true;
           }
         }
 
+        // Xử lý vị trí GPS
         if (_telemetryService.hasValidGpsFix) {
           double newLat = data['gps_latitude'] ?? _currentLatitude;
           double newLon = data['gps_longitude'] ?? _currentLongitude;
           double newAlt = data['gps_altitude'] ?? _currentAltitude;
 
-          // Early return nếu không có thay đổi
+          // Bỏ qua nếu tọa độ không đổi
           if (newLat == _currentLatitude &&
               newLon == _currentLongitude &&
               newAlt == _currentAltitude) {
             return;
           }
 
-          // Nếu đây là GPS data đầu tiên (vẫn ở default position), khởi tạo ngay
+          // Khởi tạo vị trí ngay lập tức nếu là lần đầu nhận GPS
           if (_currentLatitude == 10.7302 && _currentLongitude == 106.6988) {
             _currentLatitude = newLat;
             _currentLongitude = newLon;
@@ -174,11 +233,11 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
             _currentInterpolatedPosition = LatLng(newLat, newLon);
             _gpsBuffer.clear();
             _gpsBuffer.add(LatLng(newLat, newLon));
-            _updateMapPosition();
+            _syncMapCamera();
             return;
           }
 
-          // Kiểm tra xem có thay đổi đáng kể không
+          // Tính khoảng cách di chuyển thực tế
           double distanceFromCurrent = _calculateRealDistance(
             _currentLatitude,
             _currentLongitude,
@@ -186,19 +245,23 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
             newLon,
           );
 
-          // Detect takeoff và set home point
+          // Logic tự động set Home          // Detect takeoff và set home point
           _detectTakeoffAndSetHome(newLat, newLon, newAlt);
 
-          // Mission Planner approach: Quality-based GPS processing với caching
+          // Update Flight Trail (Smart Sampling)
+          _updateFlightTrail(newLat, newLon);
+
+          // Lọc nhiễu GPS (Smoothing) dựa trên chất lượng tín hiệu
           String gpsFixType = _telemetryService.gpsFixType;
           double threshold = _getDistanceThreshold(gpsFixType);
 
-          // Tối ưu cho mission mode: Giảm threshold khi có mission để responsive hơn
+          // Khi đang bay Mission, giảm ngưỡng lọc để icon phản hồi nhạy hơn
           if (_missionService.hasMission) {
             threshold =
                 threshold * 0.6; // Giảm threshold 40% khi đang có mission
           }
 
+          // Chỉ cập nhật nếu di chuyển vượt quá ngưỡng nhiễu (Threshold)
           if (distanceFromCurrent > threshold) {
             _processMissionPlannerStyleGPS(newLat, newLon, newAlt);
           }
@@ -210,31 +273,68 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       }
     });
 
+    // Lắng nghe trạng thái kết nối
     _connectionSubscription = _telemetryService.connectionStream.listen((
       isConnected,
     ) {
       // print('Connection status changed: $isConnected');
       if (mounted && !isConnected) {
-        _resetToDefaultPosition();
+        _handleDisconnect();
       }
       setState(() {});
     });
   }
 
-  void _updateRotationAnimation() {
-    // Chỉ animate nếu controller không đang chạy để tránh xung đột
-    if (!_rotationController.isAnimating) {
-      _rotationAnimation =
-          Tween<double>(
-            begin: _rotationAnimation.value,
-            end: _currentYaw * (math.pi / 180),
-          ).animate(
-            CurvedAnimation(parent: _rotationController, curve: Curves.easeOut),
-          );
-
-      _rotationController.reset();
-      _rotationController.forward();
+  void _updateFlightTrail(double lat, double lon) {
+    // Chỉ thêm điểm mới nếu drone đã di chuyển đủ xa (> 2m)
+    // Giúp đường bay không bị rối khi drone hover một chỗ
+    if (_flightTrail.isEmpty) {
+      _flightTrail.add(LatLng(lat, lon));
+      return;
     }
+
+    double dist = _calculateRealDistance(
+      _flightTrail.last.latitude,
+      _flightTrail.last.longitude,
+      lat,
+      lon,
+    );
+
+    if (dist > _trailUpdateThreshold) {
+      _flightTrail.add(LatLng(lat, lon));
+
+      // Giới hạn số lượng điểm (FIFO) để tránh clutter và lag
+      if (_flightTrail.length > _maxTrailPoints) {
+        _flightTrail.removeAt(0);
+      }
+    }
+  }
+
+  // Cập nhật Animation Xoay (Có xử lý góc ngắn nhất)
+  void _updateRotationAnimation() {
+    // Dừng animation cũ để phản hồi ngay lập tức
+    _rotationController.stop();
+
+    double currentRad = _rotationAnimation.value;
+    double targetRad = _currentYaw * (math.pi / 180);
+
+    // Tính toán đường đi ngắn nhất (Shortest Path)
+    // Ví dụ: Từ 350 độ sang 10 độ -> Quay phải 20 độ (thay vì quay trái 340 độ)
+    double diff = targetRad - currentRad;
+    while (diff < -math.pi) {
+      diff += 2 * math.pi;
+    }
+    while (diff > math.pi) {
+      diff -= 2 * math.pi;
+    }
+
+    _rotationAnimation =
+        Tween<double>(begin: currentRad, end: currentRad + diff).animate(
+          CurvedAnimation(parent: _rotationController, curve: Curves.easeOut),
+        );
+
+    _rotationController.reset();
+    _rotationController.forward();
   }
 
   // Professional UX: Handle user interaction with map
@@ -260,7 +360,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     return false;
   }
 
-  void _updateMapPosition() {
+  void _syncMapCamera() {
     LatLng newPosition = LatLng(_currentLatitude, _currentLongitude);
 
     // Initial zoom to GPS location
@@ -270,7 +370,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       return;
     }
 
-    // Professional UX: Only follow drone if follow mode enabled and user hasn't interacted recently
+    // Professional UX: Only follow drone if enabled and no recent user interaction
     if (_isFollowModeEnabled && _shouldResumeFollowing()) {
       // Auto-resume follow mode after timeout
       if (_userInteractedWithMap && _shouldResumeFollowing()) {
@@ -290,68 +390,63 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
         _mapController.move(newPosition, _mapController.camera.zoom);
       }
     }
-    // If follow mode disabled or user interacted, drone marker moves but camera stays
   }
 
-  void _resetToDefaultPosition() {
+  // Xử lý khi mất kết nối (Ghost Mode)
+  void _handleDisconnect() {
     setState(() {
       if (!_telemetryService.isConnected) {
-        _currentLatitude = widget.droneLatitude ?? 10.7302;
-        _currentLongitude = widget.droneLongitude ?? 106.6988;
-        _hasZoomedToGPS = false; // Reset zoom flag khi disconnect
-        _gpsBuffer.clear(); // Clear GPS buffer khi disconnect
-        _targetPosition = null;
-        _currentInterpolatedPosition = LatLng(
-          _currentLatitude,
-          _currentLongitude,
-        );
+        // CHUẨN GCS: Ghost Mode
+        // Giữ nguyên vị trí cuối cùng để người dùng biết drone đang ở đâu
 
-        // Reset takeoff detection khi disconnect
+        // Chỉ reset các trạng thái bay realtime
+        _hasZoomedToGPS = false;
+        _gpsBuffer.clear();
+        _targetPosition = null;
+
+        // Reset logic cất cánh nhưng GIỮ LẠI Home Point
         _hasSetHomePointOnTakeoff = false;
         _wasPreviouslyArmed = false;
         _groundAltitude = 0.0;
-        _homePoint = null;
       }
       _currentAltitude = 0.0;
-      _currentYaw = 0.0;
     });
-    _updateMapPosition();
+    // Don't call _syncMapCamera() to avoid jumping to default
   }
 
-  // Mission Planner Style GPS Processing
+  // Xử lý GPS theo phong cách Mission Planner (Smoothing + Interpolation)
   void _processMissionPlannerStyleGPS(
     double newLat,
     double newLon,
     double newAlt,
   ) {
-    // Add to buffer với weight dựa trên GPS fix quality
+    // 1. Thêm vào bộ đệm (Buffer)
     LatLng newPosition = LatLng(newLat, newLon);
     _gpsBuffer.add(newPosition);
     if (_gpsBuffer.length > _gpsBufferSize) {
       _gpsBuffer.removeAt(0);
     }
 
-    // Adaptive smoothing
+    // 2. Làm mượt dữ liệu (Adaptive Smoothing)
     LatLng smoothedPosition = _adaptiveSmoothing();
 
-    // Set target position cho interpolation
+    // 3. Đặt mục tiêu mới cho animation
     _targetPosition = smoothedPosition;
     _currentAltitude = newAlt;
 
-    // Start smooth interpolation animation như Mission Planner
+    // 4. Bắt đầu animation di chuyển
     _startInterpolation();
   }
 
-  // Adaptive smoothing như Mission Planner - minimal cho high-quality GPS
+  // Thuật toán làm mượt thích ứng (Adaptive Smoothing)
   LatLng _adaptiveSmoothing() {
     if (_gpsBuffer.isEmpty) return LatLng(_currentLatitude, _currentLongitude);
 
-    // Option để tắt smoothing trong debug
     if (!_enableGpsSmoothing) {
-      return _gpsBuffer.last; // Return raw GPS position
+      return _gpsBuffer.last; // Trả về dữ liệu thô nếu tắt smoothing
     }
 
-    // High-quality GPS (RTK/DGPS) → Almost raw với minimal smoothing
+    // Nếu GPS tốt (RTK/DGPS) -> Dùng trực tiếp, ít can thiệp
     String gpsFixType = _telemetryService.gpsFixType;
     if (gpsFixType == 'RTK Fixed' ||
         gpsFixType == 'RTK Float' ||
@@ -359,16 +454,15 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       return _gpsBuffer.last;
     }
 
-    // Low-quality GPS → Light smoothing
     if (_gpsBuffer.length == 1) return _gpsBuffer.first;
 
-    // Simple weighted average cho standard GPS
+    // Nếu GPS thường -> Tính trung bình có trọng số (Weighted Average)
+    // Ưu tiên dữ liệu mới nhất (80%) để giảm độ trễ
     double totalWeight = 0.0;
     double weightedLat = 0.0;
     double weightedLon = 0.0;
 
     for (int i = 0; i < _gpsBuffer.length; i++) {
-      // Recent sample có weight cao hơn (Mission Planner: 80/20 split)
       double weight = i == _gpsBuffer.length - 1 ? 0.8 : 0.2;
 
       weightedLat += _gpsBuffer[i].latitude * weight;
@@ -379,7 +473,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     return LatLng(weightedLat / totalWeight, weightedLon / totalWeight);
   }
 
-  // Smooth interpolation như Mission Planner - OPTIMIZED
+  // Bắt đầu nội suy vị trí (Interpolation)
   void _startInterpolation() {
     if (_targetPosition == null || _currentInterpolatedPosition == null) return;
 
@@ -389,7 +483,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     LatLng startPos = _currentInterpolatedPosition!;
     LatLng endPos = _targetPosition!;
 
-    // Tính distance để quyết định animation duration
+    // Tính khoảng cách để quyết định tốc độ animation
     double distance = _calculateRealDistance(
       startPos.latitude,
       startPos.longitude,
@@ -397,21 +491,21 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       endPos.longitude,
     );
 
-    // Adaptive duration dựa trên distance và speed
+    // Tính thời gian animation dựa trên khoảng cách (Adaptive Duration)
     int duration = _calculateInterpolationDuration(distance);
 
     if (duration <= 0) {
-      // Không cần animate, update trực tiếp
+      // Nếu quá gần -> Cập nhật ngay lập tức (Snap)
       _currentInterpolatedPosition = endPos;
       _updateCurrentPosition();
       return;
     }
 
-    // Store interpolation data for listener
+    // Lưu điểm đầu/cuối cho listener
     _interpolationStartPos = startPos;
     _interpolationEndPos = endPos;
 
-    // Start position animation using controller listener (more efficient)
+    // Chạy animation
     _positionController.duration = Duration(milliseconds: duration);
     _positionAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _positionController, curve: Curves.easeOut),
@@ -449,31 +543,33 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 
   // Helper method để get distance threshold dựa trên GPS quality - CACHED
   static const Map<String, double> _gpsThresholds = {
-    'RTK Fixed': 0.05, // Giảm threshold cho RTK để responsive hơn
-    'RTK Float': 0.05, // Giảm threshold cho RTK Float
-    'DGPS': 0.05, // Giảm threshold cho DGPS
+    'RTK Fixed': 0.02, // Cực nhạy cho RTK
+    'RTK Float': 0.05,
+    'DGPS': 0.1,
   };
 
   double _getDistanceThreshold(String gpsFixType) {
-    return _gpsThresholds[gpsFixType] ?? 0.3; // Giảm default từ 0.5 xuống 0.3
+    // Giảm default threshold xuống thấp để update mượt hơn
+    // Thay vì 0.3m, giờ là 0.1m cho GPS thường
+    return _gpsThresholds[gpsFixType] ?? 0.1;
   }
 
   int _calculateInterpolationDuration(double distance) {
     // Nếu đang trong mission, giảm thêm duration để responsive hơn
-    double multiplier = _missionService.hasMission ? 0.7 : 1.0;
+    double multiplier = _missionService.hasMission ? 0.8 : 1.0;
 
-    if (distance < 0.1) return 0; // Không animate cho movement rất nhỏ
+    if (distance < 0.01) return 0; // Chỉ snap nếu < 1cm
+
+    // Hovering / drifting (small moves)
     if (distance < 0.5) {
-      return (25 * multiplier).round(); // Rất nhanh cho small movements
-    }
-    if (distance < 2.0) {
-      return (50 * multiplier).round(); // Medium speed cho normal movements
-    }
-    if (distance < 5.0) {
-      return (100 * multiplier).round(); // Slower cho longer movements
+      return (250 * multiplier).round(); // Tăng lên ~250ms để cover jitter
     }
 
-    return (150 * multiplier).round(); // Max duration cho very long movements
+    // Flying (normal speed)
+    // Update rate là ~3-4Hz (333ms - 250ms)
+    // Set duration ~350ms để đảm bảo animation luôn chạy cho đến khi có update mới
+    // Nếu update mới đến sớm hơn, animation sẽ tự động retarget -> luôn mượt
+    return (350 * multiplier).round();
   }
 
   void _updateCurrentPosition() {
@@ -482,7 +578,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     _currentLatitude = _currentInterpolatedPosition!.latitude;
     _currentLongitude = _currentInterpolatedPosition!.longitude;
 
-    _updateMapPositionInterpolated();
+    _syncMapCamera();
     _scheduleUIUpdate(); // Use debounced UI update
   }
 
@@ -497,29 +593,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
         _needsUIUpdate = false;
       }
     });
-  }
-
-  void _updateMapPositionInterpolated() {
-    LatLng newPosition = LatLng(_currentLatitude, _currentLongitude);
-
-    // Initial zoom to GPS location
-    if (!_hasZoomedToGPS && _telemetryService.hasValidGpsFix) {
-      _mapController.move(newPosition, 17.0);
-      _hasZoomedToGPS = true;
-      return;
-    }
-
-    // Professional UX: Only follow drone if enabled and no recent user interaction
-    if (_isFollowModeEnabled && _shouldResumeFollowing()) {
-      // Auto-resume follow mode after timeout
-      if (_userInteractedWithMap && _shouldResumeFollowing()) {
-        setState(() {
-          _userInteractedWithMap = false;
-        });
-      }
-
-      _mapController.move(newPosition, _mapController.camera.zoom);
-    }
   }
 
   // Accurate distance calculation using Haversine formula
@@ -546,44 +619,45 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   void _detectTakeoffAndSetHome(double lat, double lon, double alt) {
     bool isCurrentlyArmed = _telemetryService.isArmed;
 
-    // Set ground altitude when first armed (before takeoff)
+    // PROFESSIONAL STANDARD: Set Home Point ngay khi ARM (nếu có GPS)
+    // Điều này chính xác hơn là đợi bay lên 2m mới set (vì có thể bị drift)
     if (isCurrentlyArmed && !_wasPreviouslyArmed) {
       _groundAltitude = alt;
       _wasPreviouslyArmed = true;
+
+      // Clear flight trail on Arming for a fresh view
+      _flightTrail.clear();
+
+      // Nếu chưa có Home Point, set ngay lập tức tại vị trí Arm
+      if (!_hasSetHomePointOnTakeoff) {
+        setState(() {
+          _homePoint = LatLng(lat, lon);
+          _hasSetHomePointOnTakeoff = true;
+          print("Home Point set at Arming: $lat, $lon");
+        });
+      }
     }
 
-    // Reset when disarmed
+    // Reset state khi Disarmed (để chuẩn bị cho lần bay sau)
     if (!isCurrentlyArmed && _wasPreviouslyArmed) {
       _wasPreviouslyArmed = false;
+      // Note: Không clear Home Point ở đây, giữ lại để tham khảo sau khi đáp
+      // Chỉ clear flag takeoff để lần arm sau có thể set lại home mới
       _hasSetHomePointOnTakeoff = false;
     }
 
-    // Reset takeoff detection khi drone đáp xuống (còn armed nhưng altitude thấp)
-    if (isCurrentlyArmed &&
-        _hasSetHomePointOnTakeoff &&
-        (alt - _groundAltitude) < (_takeoffAltitudeThreshold - 0.5)) {
-      _hasSetHomePointOnTakeoff = false;
-      _groundAltitude = alt; // Cập nhật ground altitude mới
-    }
-
+    // Backup: Nếu lúc Arm chưa có GPS, nhưng khi bay lên mới có GPS
     // Detect takeoff: armed + altitude > threshold + chưa set home point
     if (isCurrentlyArmed &&
         !_hasSetHomePointOnTakeoff &&
         (alt - _groundAltitude) >= _takeoffAltitudeThreshold) {
-      // Set home point tại vị trí cất cánh
+      // Set home point tại vị trí cất cánh (Backup)
       setState(() {
         _homePoint = LatLng(lat, lon);
         _hasSetHomePointOnTakeoff = true;
+        print("Home Point set at Takeoff (Backup): $lat, $lon");
       });
     }
-  }
-
-  // Method để get raw GPS coordinates trực tiếp từ TelemetryService
-  LatLng _getRawGpsPosition() {
-    return LatLng(
-      _telemetryService.gpsLatitude,
-      _telemetryService.gpsLongitude,
-    );
   }
 
   // Method để set home point từ GPS hiện tại
@@ -653,100 +727,68 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
               options: MapOptions(
                 initialCenter: LatLng(_currentLatitude, _currentLongitude),
                 initialZoom: 18,
-                minZoom: 1,
+                minZoom: 4, // Prevent zooming out too far
                 maxZoom: 22,
+                // Removed cameraConstraint to fix crash
                 onPositionChanged: (position, hasGesture) {
                   if (hasGesture) {
                     _onUserInteraction();
                   }
+                  // Debounce culling update
+                  _cullingDebounceTimer?.cancel();
+                  _cullingDebounceTimer = Timer(
+                    const Duration(milliseconds: 300),
+                    () {
+                      _updateVisibleZones();
+                    },
+                  );
                 },
                 onTap: (tapPosition, point) {
                   _onUserInteraction();
                 },
               ),
               children: [
-                TileLayer(
-                  urlTemplate: _selectedMapType.urlTemplate,
-                  userAgentPackageName: "com.example.vtol_rustech",
-                  maxZoom: 22,
+                // Map Layer with Caching
+                FutureBuilder<CacheStore>(
+                  future: _cacheStoreFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      return TileLayer(
+                        urlTemplate: _selectedMapType.urlTemplate,
+                        userAgentPackageName: "com.example.vtol_rustech",
+                        tileProvider: CachedTileProvider(
+                          store: snapshot.data!,
+                          maxStale: const Duration(
+                            days: 30,
+                          ), // Cache for 30 days
+                        ),
+                      );
+                    }
+                    // Fallback while initializing cache (or error)
+                    return TileLayer(
+                      urlTemplate: _selectedMapType.urlTemplate,
+                      userAgentPackageName: "com.example.vtol_rustech",
+                    );
+                  },
                 ),
 
-                // No-flight zone polygon layer
-                PolygonLayer(
-                  polygons: [
-                    Polygon(
-                      points: [
-                        LatLng(10.728148045555299, 106.71709406641989),
-                        LatLng(10.728859156795775, 106.7166138440078),
-                        LatLng(10.729655645530926, 106.71588665679651),
-                        LatLng(10.730222052725678, 106.7152278520206),
-                        LatLng(10.730764529890028, 106.71474312061488),
-                        LatLng(10.731617736914643, 106.71414399838412),
-                        LatLng(10.732148471801816, 106.71370565377873),
-                        LatLng(10.732610295649026, 106.71326691876303),
-                        LatLng(10.733072760174922, 106.71271204507593),
-                        LatLng(10.733395295381314, 106.71253964948382),
-                        LatLng(10.733993466749581, 106.71236880553334),
-                        LatLng(10.734338011951841, 106.71237074558533),
-                        LatLng(10.734509964713736, 106.71242978444708),
-                        LatLng(10.73469231532883, 106.7126863238187),
-                        LatLng(10.734874473740296, 106.71297770609173),
-                        LatLng(10.735446027227287, 106.71346872413186),
-                        LatLng(10.736257865905458, 106.71412369714865),
-                        LatLng(10.736692752532765, 106.71440489295958),
-                        LatLng(10.737133179615848, 106.71460862202042),
-                        LatLng(10.737277087401615, 106.71466056973465),
-                        LatLng(10.73790377899627, 106.71479648109796),
-                        LatLng(10.738428919943328, 106.71486127905375),
-                        LatLng(10.7384500285881, 106.71458194196131),
-                        LatLng(10.7385417663737, 106.71274524364627),
-                        LatLng(10.738564744652669, 106.71252873838894),
-                        LatLng(10.738564758726966, 106.71011931012477),
-                        LatLng(10.728148086259148, 106.71011924792673),
-                        LatLng(10.728148045555299, 106.71709406641989),
-                      ],
-                      color: const Color(0xFFB71C1C).withOpacity(0.5),
-                      borderColor: const Color(0xFFB71C1C),
-                      borderStrokeWidth: 2.0,
-                    ),
-                    // Tân Phong area polygon (district_id: 1511)
-                    Polygon(
-                      points: [
-                        LatLng(10.728148045555299, 106.71709406641989),
-                        LatLng(10.728859156795775, 106.7166138440078),
-                        LatLng(10.729655645530926, 106.71588665679651),
-                        LatLng(10.730222052725678, 106.7152278520206),
-                        LatLng(10.730764529890028, 106.71474312061488),
-                        LatLng(10.731617736914643, 106.71414399838412),
-                        LatLng(10.732148471801816, 106.71370565377873),
-                        LatLng(10.732610295649026, 106.71326691876303),
-                        LatLng(10.733072760174922, 106.71271204507593),
-                        LatLng(10.733395295381314, 106.71253964948382),
-                        LatLng(10.733993466749581, 106.71236880553334),
-                        LatLng(10.734338011951841, 106.71237074558533),
-                        LatLng(10.734509964713736, 106.71242978444708),
-                        LatLng(10.73469231532883, 106.7126863238187),
-                        LatLng(10.734874473740296, 106.71297770609173),
-                        LatLng(10.735446027227287, 106.71346872413186),
-                        LatLng(10.736257865905458, 106.71412369714865),
-                        LatLng(10.736692752532765, 106.71440489295958),
-                        LatLng(10.737133179615848, 106.71460862202042),
-                        LatLng(10.737277087401615, 106.71466056973465),
-                        LatLng(10.73790377899627, 106.71479648109796),
-                        LatLng(10.738428919943328, 106.71486127905375),
-                        LatLng(10.7384500285881, 106.71458194196131),
-                        LatLng(10.7385417663737, 106.71274524364627),
-                        LatLng(10.738564744652669, 106.71252873838894),
-                        LatLng(10.738564758726966, 106.71011931012477),
-                        LatLng(10.728148086259148, 106.71011924792673),
-                        LatLng(10.728148045555299, 106.71709406641989),
-                      ],
-                      color: const Color(0xFFB71C1C).withOpacity(0.5),
-                      borderColor: const Color(0xFFB71C1C),
-                      borderStrokeWidth: 2.0,
-                    ),
-                  ],
-                ),
+                // No-flight zone polygon layer (Optimized)
+                // PolygonLayer(
+                //   polygons: [
+                //     ..._visibleNoFlyZones.map(
+                //       (points) => Polygon(
+                //         points: points,
+                //         color: const Color(0xFFB71C1C).withOpacity(0.4),
+                //         borderColor: const Color(0xFFB71C1C),
+                //         borderStrokeWidth: 1.5,
+                //       ),
+                //     ),
+                //   ],
+                // ),
+
+                // Flight Trail (Breadcrumbs) with Fading Effect
+                if (_flightTrail.isNotEmpty)
+                  PolylineLayer(polylines: _buildFadingTrail()),
 
                 if (_missionService.hasMission) ...[
                   // Mission route line
@@ -795,7 +837,25 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                         color: Colors.cyanAccent.withOpacity(0.8),
                       ),
                     ],
-                  ), // Waypoint markers
+                  ),
+
+                  // RTH Line (Distance to Home) - Chỉ hiện khi có Home Point và Drone đang bay
+                  if (_homePoint != null && _currentAltitude > 1.0)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: [
+                            _homePoint!,
+                            LatLng(_currentLatitude, _currentLongitude),
+                          ],
+                          strokeWidth: 2.0,
+                          color: Colors.orange.withOpacity(0.6),
+                          pattern: StrokePattern.dashed(
+                            segments: [10, 5],
+                          ), // Nét đứt
+                        ),
+                      ],
+                    ), // Waypoint markers
                   MarkerLayer(
                     markers: [
                       // Regular waypoint markers
@@ -900,40 +960,54 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                       // Main drone marker (smoothed position) - render sau để nằm trên
                       Marker(
                         point: LatLng(_currentLatitude, _currentLongitude),
-                        width: 40,
-                        height: 40,
+                        width: 120, // Tăng size để vẽ FOV cone và ripple
+                        height: 120,
                         alignment: Alignment.center,
                         child: AnimatedBuilder(
                           animation: Listenable.merge([
                             _pulseAnimation,
-                            _rotationAnimation,
+                            _rotationController,
                           ]),
                           builder: (context, child) {
-                            return Transform.scale(
-                              scale: _pulseAnimation.value,
-                              child: Transform.rotate(
-                                angle: _rotationAnimation.value,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: _getGpsStatusColor().withOpacity(
-                                      0.8,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: _getGpsStatusColor().withOpacity(
-                                          0.6,
+                            return Transform.rotate(
+                              angle: _rotationAnimation.value,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  // 1. Radar Ripple Effect (Pulsing)
+                                  Transform.scale(
+                                    scale:
+                                        1.0 +
+                                        (_pulseAnimation.value - 0.8) * 1.5,
+                                    child: Container(
+                                      width: 60,
+                                      height: 60,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: _getGpsStatusColor()
+                                              .withOpacity(
+                                                0.5 *
+                                                    (1.2 -
+                                                        _pulseAnimation.value),
+                                              ),
+                                          width: 2,
                                         ),
-                                        blurRadius: 15,
+                                        color: _getGpsStatusColor().withOpacity(
+                                          0.1 * (1.2 - _pulseAnimation.value),
+                                        ),
                                       ),
-                                    ],
+                                    ),
                                   ),
-                                  child: const Icon(
-                                    Icons.flight,
-                                    color: Colors.white,
-                                    size: 24,
+                                  // 2. Drone Icon & FOV Cone (Custom Painted)
+                                  CustomPaint(
+                                    size: const Size(60, 60),
+                                    painter: DroneMarkerPainter(
+                                      color: _getGpsStatusColor(),
+                                      isArmed: _telemetryService.isArmed,
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             );
                           },
@@ -944,7 +1018,20 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
               ],
             ),
 
-            // Map Controls - Top Left Column (chỉ hiện khi connected và có GPS)
+            Positioned(
+              top: 16,
+              right: 16,
+              child: _isLoadingZones
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
             if (_telemetryService.isConnected &&
                 _telemetryService.hasValidGpsFix)
               Positioned(
@@ -1035,6 +1122,12 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
   }
 
   Color _getGpsStatusColor() {
+    // Visual Feedback cho Ghost Mode:
+    // Nếu mất kết nối, icon chuyển sang màu Xám để báo hiệu dữ liệu cũ
+    if (!_telemetryService.isConnected) {
+      return Colors.grey;
+    }
+
     switch (_telemetryService.gpsFixType) {
       case 'RTK Fixed':
         return Colors.green.shade700;
@@ -1049,6 +1142,40 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       default:
         return Colors.red;
     }
+  }
+
+  // Helper to build fading flight trail
+  List<Polyline> _buildFadingTrail() {
+    if (_flightTrail.length < 2) return [];
+
+    final List<Polyline> segments = [];
+    final int totalPoints = _flightTrail.length;
+
+    // Create segments from oldest to newest
+    for (int i = 0; i < totalPoints - 1; i++) {
+      // Calculate opacity: Newer points (higher index) are more opaque
+      // i=0 (oldest) -> opacity close to 0
+      // i=total-2 (newest segment) -> opacity close to 1.0
+      double opacity = (i + 1) / totalPoints;
+
+      // Apply non-linear fade for better visual (ease-in)
+      opacity = opacity * opacity;
+
+      // Ensure minimum visibility
+      if (opacity < 0.1) opacity = 0.1;
+
+      segments.add(
+        Polyline(
+          points: [_flightTrail[i], _flightTrail[i + 1]],
+          strokeWidth: 3.0, // Slightly thicker for better visibility
+          color: Colors.white.withOpacity(opacity),
+          strokeCap: StrokeCap.round,
+          strokeJoin: StrokeJoin.round,
+        ),
+      );
+    }
+
+    return segments;
   }
 
   @override
@@ -1071,5 +1198,145 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     _missionSubscription?.cancel();
 
     super.dispose();
+  }
+
+  void _updateVisibleZones() {
+    if (!mounted || _allNoFlyZones.isEmpty) return;
+
+    final bounds = _mapController.camera.visibleBounds;
+    final double zoom = _mapController.camera.zoom;
+
+    // Calculate tolerance based on zoom level
+    // Higher zoom (closer) -> smaller tolerance (more detail)
+    // Lower zoom (farther) -> larger tolerance (less detail)
+    // Example: Zoom 10 -> tolerance 0.001, Zoom 18 -> tolerance 0.00001
+    double tolerance = 0.0;
+    if (zoom < 10) {
+      tolerance = 0.001;
+    } else if (zoom < 13) {
+      tolerance = 0.0005;
+    } else if (zoom < 15) {
+      tolerance = 0.0001;
+    } else {
+      tolerance = 0.00001; // Very detailed
+    }
+
+    // Run culling and simplification
+    // For large datasets, this should definitely be in an Isolate or compute()
+    final visible = _allNoFlyZones
+        .where((polygon) {
+          return GeoUtils.isPolygonVisible(polygon, bounds);
+        })
+        .map((polygon) {
+          // Apply simplification if zoomed out
+          if (zoom < 16) {
+            return GeoUtils.simplifyPolygon(polygon, tolerance);
+          }
+          return polygon;
+        })
+        .toList();
+
+    setState(() {
+      _visibleNoFlyZones = visible;
+    });
+
+    // print('Visible zones: ${visible.length} / ${_allNoFlyZones.length}');
+  }
+}
+
+class DroneMarkerPainter extends CustomPainter {
+  final Color color;
+  final bool isArmed;
+
+  DroneMarkerPainter({required this.color, required this.isArmed});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final double scale = size.width / 60.0; // Base size 60
+
+    // 1. Draw FOV Cone (Field of View)
+    final Paint fovPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [color.withOpacity(0.4), color.withOpacity(0.0)],
+        stops: const [0.2, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: 40 * scale))
+      ..style = PaintingStyle.fill;
+
+    // Draw arc -90 degrees (up) +/- 30 degrees
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: 40 * scale),
+      -math.pi / 2 - (math.pi / 6), // Start angle (-90 - 30)
+      math.pi / 3, // Sweep angle (60 degrees)
+      true,
+      fovPaint,
+    );
+
+    // 2. Draw Drop Shadow
+    final ui.Path shadowPath = ui.Path();
+    shadowPath.moveTo(center.dx, center.dy - 18 * scale); // Nose
+    shadowPath.lineTo(
+      center.dx + 14 * scale,
+      center.dy + 14 * scale,
+    ); // Right wing
+    shadowPath.lineTo(center.dx, center.dy + 8 * scale); // Tail notch
+    shadowPath.lineTo(
+      center.dx - 14 * scale,
+      center.dy + 14 * scale,
+    ); // Left wing
+    shadowPath.close();
+
+    canvas.drawPath(
+      shadowPath.shift(Offset(2 * scale, 2 * scale)),
+      Paint()
+        ..color = Colors.black.withOpacity(0.5)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+    );
+
+    // 3. Draw Drone Body (Delta Wing)
+    final ui.Path dronePath = ui.Path();
+    dronePath.moveTo(center.dx, center.dy - 20 * scale); // Nose (Top)
+    dronePath.lineTo(
+      center.dx + 16 * scale,
+      center.dy + 16 * scale,
+    ); // Right wing
+    dronePath.lineTo(center.dx, center.dy + 10 * scale); // Tail notch
+    dronePath.lineTo(
+      center.dx - 16 * scale,
+      center.dy + 16 * scale,
+    ); // Left wing
+    dronePath.close();
+
+    // Fill
+    canvas.drawPath(
+      dronePath,
+      Paint()
+        ..color = isArmed
+            ? const Color(0xFFFF3D00)
+            : const Color(0xFF00E676) // Red if armed, Green if disarmed
+        ..style = PaintingStyle.fill,
+    );
+
+    // Border
+    canvas.drawPath(
+      dronePath,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5 * scale
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    // 4. Center Point (Prop/Hub)
+    canvas.drawCircle(
+      Offset(center.dx, center.dy + 2 * scale),
+      3 * scale,
+      Paint()..color = Colors.white,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant DroneMarkerPainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.isArmed != isArmed;
   }
 }

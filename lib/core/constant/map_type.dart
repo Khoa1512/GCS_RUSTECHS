@@ -20,6 +20,16 @@ final List<MapType> mapTypes = [
         'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   ),
   MapType(
+    name: 'Google Satellite',
+    imagePath: AppImage.satelliteMap,
+    urlTemplate: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+  ),
+  MapType(
+    name: 'Google Hybrid',
+    imagePath: AppImage.satelliteMap, // Re-use satellite icon or add new one
+    urlTemplate: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+  ),
+  MapType(
     name: 'Gray Map',
     imagePath: AppImage.grayMap,
     urlTemplate:

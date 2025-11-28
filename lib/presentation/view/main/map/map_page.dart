@@ -348,8 +348,8 @@ class _MapPageState extends State<MapPage>
 
   Widget _buildPdfCompass() {
     return Positioned(
-      bottom: 16,
-      right: 16,
+      bottom: 0,
+      right: 0,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),

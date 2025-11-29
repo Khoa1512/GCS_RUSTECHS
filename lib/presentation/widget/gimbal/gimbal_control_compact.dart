@@ -20,7 +20,7 @@ class _GimbalControlCompactState extends State<GimbalControlCompact>
   bool _isOSDEnabled = false;
 
   double _pitchSpeed = 5.0;
-  double _yawSpeed = 5.0; 
+  double _yawSpeed = 5.0;
 
   @override
   void initState() {
@@ -212,60 +212,60 @@ class _GimbalControlCompactState extends State<GimbalControlCompact>
               ],
             ),
             const Spacer(),
-            // Connect/Disconnect button
-            InkWell(
-              onTap: () async {
-                if (_isGimbalConnected) {
-                  // Disconnect from gimbal
-                  final success = await _kafkaService.sendDisconnectCommand();
-                  if (success) {
-                    setState(() => _isGimbalConnected = false);
-                    _showSnackBar('✅ Đã ngắt kết nối gimbal');
-                  } else {
-                    _showSnackBar('❌ Ngắt kết nối thất bại');
-                  }
-                } else {
-                  final success = await _kafkaService.sendConnectCommand(
-                    ip: '192.168.144.108',
-                    port: 2332,
-                  );
-                  if (success) {
-                    setState(() => _isGimbalConnected = true);
-                    _showSnackBar('✅ Đã gửi lệnh kết nối gimbal');
-                  } else {
-                    _showSnackBar('❌ Kết nối thất bại');
-                  }
-                }
-              },
-              borderRadius: BorderRadius.circular(4),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(
-                  color: (_isGimbalConnected ? Colors.red : Colors.green)
-                      .withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(
-                    color: (_isGimbalConnected ? Colors.red : Colors.green)
-                        .withOpacity(0.5),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _isGimbalConnected ? 'Ngắt' : 'Kết nối',
-                      style: TextStyle(
-                        color: _isGimbalConnected ? Colors.red : Colors.green,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
+            // // Connect/Disconnect button
+            // InkWell(
+            //   onTap: () async {
+            //     if (_isGimbalConnected) {
+            //       // Disconnect from gimbal
+            //       final success = await _kafkaService.sendDisconnectCommand();
+            //       if (success) {
+            //         setState(() => _isGimbalConnected = false);
+            //         _showSnackBar('✅ Đã ngắt kết nối gimbal');
+            //       } else {
+            //         _showSnackBar('❌ Ngắt kết nối thất bại');
+            //       }
+            //     } else {
+            //       final success = await _kafkaService.sendConnectCommand(
+            //         ip: '192.168.144.108',
+            //         port: 2332,
+            //       );
+            //       if (success) {
+            //         setState(() => _isGimbalConnected = true);
+            //         _showSnackBar('✅ Đã gửi lệnh kết nối gimbal');
+            //       } else {
+            //         _showSnackBar('❌ Kết nối thất bại');
+            //       }
+            //     }
+            //   },
+            //   borderRadius: BorderRadius.circular(4),
+            //   child: Container(
+            //     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            //     decoration: BoxDecoration(
+            //       color: (_isGimbalConnected ? Colors.red : Colors.green)
+            //           .withOpacity(0.2),
+            //       borderRadius: BorderRadius.circular(4),
+            //       border: Border.all(
+            //         color: (_isGimbalConnected ? Colors.red : Colors.green)
+            //             .withOpacity(0.5),
+            //         width: 1,
+            //       ),
+            //     ),
+            //     child: Row(
+            //       mainAxisSize: MainAxisSize.min,
+            //       children: [
+            //         Text(
+            //           _isGimbalConnected ? 'Ngắt' : 'Kết nối',
+            //           style: TextStyle(
+            //             color: _isGimbalConnected ? Colors.red : Colors.green,
+            //             fontSize: 9,
+            //             fontWeight: FontWeight.bold,
+            //           ),
+            //         ),
+            //       ],
+            //     ),
+            //   ),
+            // ),
+            // const SizedBox(width: 6),
             InkWell(
               onTap: widget.onClose,
               borderRadius: BorderRadius.circular(4),

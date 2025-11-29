@@ -14,7 +14,25 @@ class MissionWaypointHelpers {
     if (isROIPoint(waypoint)) {
       return Icons.center_focus_strong; // Camera focus icon for ROI
     }
-    return Icons.location_on; // Default waypoint icon
+
+    switch (waypoint.command) {
+      case 22: // MAV_CMD_NAV_TAKEOFF
+        return Icons.flight_takeoff;
+      case 21: // MAV_CMD_NAV_LAND
+        return Icons.flight_land;
+      case 20: // MAV_CMD_NAV_RETURN_TO_LAUNCH
+        return Icons.home;
+      case 19: // MAV_CMD_NAV_LOITER_TIME
+      case 17: // MAV_CMD_NAV_LOITER_UNLIM
+      case 18: // MAV_CMD_NAV_LOITER_TURNS
+      case 31: // MAV_CMD_NAV_LOITER_TO_ALT
+        return Icons.cached; // Loop/Loiter icon
+      case 183: // MAV_CMD_DO_SET_SERVO
+      case 184: // MAV_CMD_DO_REPEAT_SERVO
+        return Icons.settings_input_component;
+      default:
+        return Icons.location_on; // Default waypoint icon
+    }
   }
 
   /// Get the appropriate color for a waypoint based on its command type

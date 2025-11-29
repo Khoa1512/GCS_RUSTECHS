@@ -80,12 +80,39 @@ class SolidFlightDisplay extends StatelessWidget {
                               child: Stack(
                                 children: [
                                   ClipOval(
-                                    child: CustomPaint(
-                                      size: const Size(130, 130),
-                                      painter: _SolidAttitudePainter(
-                                        roll: roll,
-                                        pitch: pitch,
+                                    child: TweenAnimationBuilder<double>(
+                                      tween: Tween<double>(
+                                        begin: roll,
+                                        end: roll,
                                       ),
+                                      duration: const Duration(
+                                        milliseconds: 120,
+                                      ),
+                                      curve: Curves
+                                          .linear, // Linear for responsiveness
+                                      builder: (context, animatedRoll, child) {
+                                        return TweenAnimationBuilder<double>(
+                                          tween: Tween<double>(
+                                            begin: pitch,
+                                            end: pitch,
+                                          ),
+                                          duration: const Duration(
+                                            milliseconds: 120,
+                                          ),
+                                          curve: Curves.linear,
+                                          builder:
+                                              (context, animatedPitch, child) {
+                                                return CustomPaint(
+                                                  size: const Size(130, 130),
+                                                  painter:
+                                                      _SolidAttitudePainter(
+                                                        roll: animatedRoll,
+                                                        pitch: animatedPitch,
+                                                      ),
+                                                );
+                                              },
+                                        );
+                                      },
                                     ),
                                   ),
                                   // Vòng tròn viền bezel bên trong
@@ -124,8 +151,9 @@ class SolidFlightDisplay extends StatelessWidget {
                                         end: heading,
                                       ),
                                       duration: const Duration(
-                                        milliseconds: 300,
+                                        milliseconds: 120, // Reduced latency
                                       ),
+                                      curve: Curves.linear,
                                       builder:
                                           (context, animatedHeading, child) {
                                             return CustomPaint(
@@ -143,8 +171,9 @@ class SolidFlightDisplay extends StatelessWidget {
                                         end: heading,
                                       ),
                                       duration: const Duration(
-                                        milliseconds: 300,
+                                        milliseconds: 120, // Reduced latency
                                       ),
+                                      curve: Curves.linear,
                                       builder:
                                           (context, animatedHeading, child) {
                                             return Transform.rotate(

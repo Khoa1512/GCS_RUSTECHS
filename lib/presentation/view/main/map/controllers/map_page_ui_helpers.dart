@@ -93,16 +93,10 @@ mixin MapPageUIHelpers {
   /// Get MAVLink error message from error code
   String getMavlinkErrorMessage(int errorCode) {
     switch (errorCode) {
-      case 1:
-        return 'Lỗi: Mục nhiệm vụ vượt quá dung lượng lưu trữ';
       case 2:
         return 'Lỗi: Nhiệm vụ chỉ được chấp nhận một phần';
       case 3:
         return 'Lỗi: Thao tác nhiệm vụ không được hỗ trợ';
-      case 4:
-        return 'Lỗi: Tọa độ nhiệm vụ nằm ngoài phạm vi';
-      case 5:
-        return 'Lỗi: Mục nhiệm vụ không hợp lệ';
       case 10:
         return 'Lỗi: Thứ tự mục nhiệm vụ không hợp lệ';
       case 11:
@@ -123,8 +117,6 @@ mixin MapPageUIHelpers {
         return 'Lỗi: Loại nhiệm vụ không được hỗ trợ';
       case 130:
         return 'Lỗi: Phương tiện chưa sẵn sàng thực hiện nhiệm vụ';
-      case 131:
-        return 'Lỗi: Điểm bay (waypoint) ngoài phạm vi';
       case 132:
         return 'Lỗi: Số lượng điểm bay (waypoint) vượt quá giới hạn';
       default:

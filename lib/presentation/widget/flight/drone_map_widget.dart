@@ -120,7 +120,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       _isLoadingZones = true;
     });
 
-    // Load from assets (make sure the file is declared in pubspec.yaml)
+
     final zones = await NoFlyZoneService().loadNoFlyZones(
       'hcmc_nofly_zones.json',
     );
@@ -543,33 +543,32 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 
   // Helper method để get distance threshold dựa trên GPS quality - CACHED
   static const Map<String, double> _gpsThresholds = {
-    'RTK Fixed': 0.02, // Cực nhạy cho RTK
-    'RTK Float': 0.05,
-    'DGPS': 0.1,
+    'RTK Fixed': 0.01, // Cực nhạy cho RTK
+    'RTK Float': 0.02,
+    'DGPS': 0.05,
+    '3D Fix': 0.01,
   };
 
   double _getDistanceThreshold(String gpsFixType) {
     // Giảm default threshold xuống thấp để update mượt hơn
-    // Thay vì 0.3m, giờ là 0.1m cho GPS thường
-    return _gpsThresholds[gpsFixType] ?? 0.1;
+    return _gpsThresholds[gpsFixType] ?? 0.05; // Default 5cm
   }
 
   int _calculateInterpolationDuration(double distance) {
     // Nếu đang trong mission, giảm thêm duration để responsive hơn
-    double multiplier = _missionService.hasMission ? 0.8 : 1.0;
+    double multiplier = _missionService.hasMission ? 0.9 : 1.0;
 
     if (distance < 0.01) return 0; // Chỉ snap nếu < 1cm
 
     // Hovering / drifting (small moves)
-    if (distance < 0.5) {
-      return (250 * multiplier).round(); // Tăng lên ~250ms để cover jitter
+    if (distance < 0.2) {
+      return (200 * multiplier).round(); // Match 5Hz rate
     }
 
     // Flying (normal speed)
-    // Update rate là ~3-4Hz (333ms - 250ms)
-    // Set duration ~350ms để đảm bảo animation luôn chạy cho đến khi có update mới
-    // Nếu update mới đến sớm hơn, animation sẽ tự động retarget -> luôn mượt
-    return (350 * multiplier).round();
+    // Update rate is now 5Hz (200ms)
+    // Set duration to exactly 200ms for 1:1 sync
+    return (200 * multiplier).round();
   }
 
   void _updateCurrentPosition() {
@@ -839,23 +838,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                     ],
                   ),
 
-                  // RTH Line (Distance to Home) - Chỉ hiện khi có Home Point và Drone đang bay
-                  if (_homePoint != null && _currentAltitude > 1.0)
-                    PolylineLayer(
-                      polylines: [
-                        Polyline(
-                          points: [
-                            _homePoint!,
-                            LatLng(_currentLatitude, _currentLongitude),
-                          ],
-                          strokeWidth: 2.0,
-                          color: Colors.orange.withOpacity(0.6),
-                          pattern: StrokePattern.dashed(
-                            segments: [10, 5],
-                          ), // Nét đứt
-                        ),
-                      ],
-                    ), // Waypoint markers
+                  // Waypoint markers
                   MarkerLayer(
                     markers: [
                       // Regular waypoint markers
@@ -1112,6 +1095,54 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                         ),
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    // Clear Mission Button (Only visible if mission exists)
+                    if (_missionService.hasMission)
+                      Tooltip(
+                        message: 'Xóa Mission trên Map',
+                        child: FloatingActionButton.small(
+                          onPressed: () {
+                            // Confirm dialog
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                backgroundColor: const Color(0xFF1E1E1E),
+                                title: const Text(
+                                  'Xóa Mission?',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                                content: const Text(
+                                  'Bạn có chắc muốn xóa mission khỏi bản đồ không? (Lưu ý: Mission trên Drone vẫn còn nếu đã upload)',
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Hủy'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      _missionService.clearMission();
+                                      Navigator.pop(context);
+                                      setState(() {});
+                                    },
+                                    child: const Text(
+                                      'Xóa',
+                                      style: TextStyle(color: Colors.redAccent),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          backgroundColor: Colors.redAccent.withOpacity(0.9),
+                          child: const Icon(
+                            Icons.delete_forever,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

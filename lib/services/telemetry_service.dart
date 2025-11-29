@@ -37,6 +37,10 @@ class TelemetryService {
   double _lastStableHeading = 0.0;
   DateTime _lastHeadingUpdate = DateTime.now();
 
+  // DEBUG: Data Rate Tracking
+  DateTime? _lastGpsUpdateTime;
+  DateTime? _lastAttitudeUpdateTime;
+
   // Giảm threshold để compass nhạy hơn
   static const double _headingStabilityThreshold = 0.1;
 
@@ -286,6 +290,24 @@ class TelemetryService {
         case MAVLinkEventType.attitude:
           if (event.data is Map) {
             final m = (event.data as Map);
+
+            // --- DEBUG: Measure Attitude Data Rate ---
+            final now = DateTime.now();
+            if (_lastAttitudeUpdateTime != null) {
+              final diff = now
+                  .difference(_lastAttitudeUpdateTime!)
+                  .inMilliseconds;
+              if (diff > 0) {
+                // Only print every 10th update to avoid spamming console too much (since it's 10Hz)
+                if (now.second != _lastAttitudeUpdateTime!.second) {
+                  print(
+                    'Attitude Update: ${diff}ms (~${(1000 / diff).toStringAsFixed(1)}Hz)',
+                  );
+                }
+              }
+            }
+            _lastAttitudeUpdateTime = now;
+            // --------------------------------
 
             _currentTelemetry['roll'] =
                 (m['roll'] as num?)?.toDouble() ??

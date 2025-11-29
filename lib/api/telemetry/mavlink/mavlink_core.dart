@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:isolate';
 import 'dart:typed_data';
 import 'package:flutter_libserialport/flutter_libserialport.dart';
 import 'package:dart_mavlink/mavlink.dart';
@@ -17,18 +18,15 @@ import 'handlers/sys_status_handler.dart';
 import 'handlers/command_ack_handler.dart';
 import 'handlers/mission_handler.dart';
 import 'mission/mission_models.dart' as mission_model;
+import 'command_manager.dart';
 
 /// Main API class for Drone MAVLink communications, split by event handlers
 class DroneMAVLinkAPI {
   SerialPort? _serialPort;
   StreamSubscription? _subscription;
-  StreamSubscription? _parserSubscription;
   bool _isConnected = false;
   String _selectedPort = '';
   int _baudRate = 115200;
-
-  late final MavlinkDialectCommon _dialect;
-  late final MavlinkParser _parser;
 
   // Event controller for subscribers
   final _eventController = StreamController<MAVLinkEvent>.broadcast();
@@ -59,11 +57,21 @@ class DroneMAVLinkAPI {
   // Parameter storage
   final Map<String, double> parameters = {};
 
+  // Isolate communication
+  Isolate? _parserIsolate;
+  SendPort? _isolateSendPort;
+  ReceivePort? _isolateReceivePort;
+
+  // Command Manager
+  late final CommandManager _commandManager;
+
   DroneMAVLinkAPI({String? port, int baudRate = 115200}) {
     _selectedPort = port ?? '';
     _baudRate = baudRate;
-    _dialect = MavlinkDialectCommon();
-    _parser = MavlinkParser(_dialect);
+
+    // NOTE: Dialect and Parser are now managed inside the Isolate
+    // _dialect = MavlinkDialectCommon();
+    // _parser = MavlinkParser(_dialect);
 
     // init handlers with emitter
     void emit(MAVLinkEvent e) => _eventController.add(e);
@@ -79,88 +87,161 @@ class DroneMAVLinkAPI {
     _commandAckHandler = CommandAckHandler(emit);
     _missionHandler = MissionHandler(emit);
 
-    _setupParserStream();
+    _spawnParserIsolate();
+
+    // Initialize Command Manager
+    _commandManager = CommandManager(sendMessage);
+  }
+
+  /// Spawn the background isolate for parsing
+  Future<void> _spawnParserIsolate() async {
+    _isolateReceivePort = ReceivePort();
+    _parserIsolate = await Isolate.spawn(
+      _mavlinkParserIsolate,
+      _isolateReceivePort!.sendPort,
+    );
+
+    // Wait for the isolate to send its SendPort
+    _isolateReceivePort!.listen((message) {
+      if (message is SendPort) {
+        _isolateSendPort = message;
+      } else if (message is MavlinkFrame) {
+        _handleParsedFrame(message);
+      }
+    });
+  }
+
+  /// The Isolate entry point
+  static void _mavlinkParserIsolate(SendPort mainSendPort) {
+    final receivePort = ReceivePort();
+    mainSendPort.send(receivePort.sendPort);
+
+    final dialect = MavlinkDialectCommon();
+    final parser = MavlinkParser(dialect);
+
+    // Listen for parsed frames from the parser and send back to main thread
+    parser.stream.listen((frame) {
+      try {
+        mainSendPort.send(frame);
+      } catch (e) {
+        print('Isolate send error: $e');
+      }
+    });
+
+    // Listen for raw data from main thread
+    receivePort.listen((message) {
+      if (message is Uint8List) {
+        parser.parse(message);
+      }
+    });
   }
 
   bool get isConnected => _isConnected;
   String get selectedPort => _selectedPort;
   int get baudRate => _baudRate;
 
-  void _setupParserStream() {
-    // Avoid duplicating the subscription across reconnects
-    if (_parserSubscription != null) return;
-    _parserSubscription = _parser.stream.listen((frame) {
-      final msg = frame.message;
-      // Route by type
-      if (msg is Heartbeat) {
-        // Update target system when receiving heartbeat from AUTOPILOT
-        if (frame.componentId == _targetComponentId) {
-          _targetSystemId = frame.systemId;
-        }
-        _heartbeatHandler.handle(msg);
-      } else if (msg is Attitude) {
-        _attitudeHandler.handle(msg);
-      } else if (msg is GlobalPositionInt) {
-        _positionHandler.handle(msg);
-      } else if (msg is Statustext) {
-        _statusTextHandler.handle(msg);
-      } else if (msg is BatteryStatus) {
-        _batteryHandler.handle(msg);
-      } else if (msg is GpsRawInt) {
-        _gpsHandler.handle(msg);
-      } else if (msg is VfrHud) {
-        _vfrHudHandler.handle(msg);
-      } else if (msg is ParamValue) {
-        _paramsHandler.handle(msg);
-      } else if (msg is SysStatus) {
-        _sysStatusHandler.handle(msg);
-      } else if (msg is CommandAck) {
-        _commandAckHandler.handle(msg);
-        // Mission protocol messages
-      } else if (msg is MissionCount) {
-        _missionHandler.handleMissionCount(msg);
-      } else if (msg is MissionItemInt) {
-        _missionHandler.handleMissionItemInt(msg);
-      } else if (msg is MissionItem) {
-        _missionHandler.handleMissionItem(msg);
-      } else if (msg is MissionCurrent) {
-        _missionHandler.handleMissionCurrent(msg);
-      } else if (msg is MissionItemReached) {
-        _missionHandler.handleMissionItemReached(msg);
-      } else if (msg is MissionAck) {
-        _missionHandler.handleMissionAck(msg);
-      } else if (msg is MissionRequestInt) {
-        respondToMissionRequestInt(msg);
-      } else if (msg is MissionRequest) {
-        respondToMissionRequest(msg);
-      } else if (msg is HomePosition) {
-        // lat/lon in 1e7, alt in mm
-        final lat = msg.latitude / 1e7;
-        final lon = msg.longitude / 1e7;
-        final alt = msg.altitude / 1000.0;
-        _eventController.add(
-          MAVLinkEvent(MAVLinkEventType.homePosition, {
-            'lat': lat,
-            'lon': lon,
-            'alt': alt,
-            'source': 'HOME_POSITION',
-          }),
-        );
-      } else if (msg is GpsGlobalOrigin) {
-        // GPS_GLOBAL_ORIGIN lat/lon in 1e7, alt in mm
-        final lat = msg.latitude / 1e7;
-        final lon = msg.longitude / 1e7;
-        final alt = msg.altitude / 1000.0;
-        _eventController.add(
-          MAVLinkEvent(MAVLinkEventType.homePosition, {
-            'lat': lat,
-            'lon': lon,
-            'alt': alt,
-            'source': 'GPS_GLOBAL_ORIGIN',
-          }),
-        );
+  // Link Statistics
+  int _totalPackets = 0;
+  int _packetLossCount = 0;
+  int _lastSequence = -1;
+
+  /// Get current link statistics
+  Map<String, dynamic> getLinkStats() {
+    return {
+      'totalPackets': _totalPackets,
+      'packetLoss': _packetLossCount,
+      'lossRate': _totalPackets > 0
+          ? (_packetLossCount / _totalPackets) * 100
+          : 0.0,
+    };
+  }
+
+  void _handleParsedFrame(MavlinkFrame frame) {
+    // Track Link Statistics
+    _totalPackets++;
+    if (_lastSequence != -1) {
+      final expected = (_lastSequence + 1) % 256; // Sequence is 0-255
+      if (frame.sequence != expected) {
+        // Calculate lost packets (handling wrap-around)
+        int lost = (frame.sequence - expected + 256) % 256;
+        _packetLossCount += lost;
       }
-    });
+    }
+    _lastSequence = frame.sequence;
+
+    final msg = frame.message;
+    // Route by type
+    if (msg is Heartbeat) {
+      // Update target system when receiving heartbeat from AUTOPILOT
+      if (frame.componentId == _targetComponentId) {
+        _targetSystemId = frame.systemId;
+      }
+      _heartbeatHandler.handle(msg);
+    } else if (msg is Attitude) {
+      _attitudeHandler.handle(msg);
+    } else if (msg is GlobalPositionInt) {
+      _positionHandler.handle(msg);
+    } else if (msg is Statustext) {
+      _statusTextHandler.handle(msg);
+    } else if (msg is BatteryStatus) {
+      _batteryHandler.handle(msg);
+    } else if (msg is GpsRawInt) {
+      _gpsHandler.handle(msg);
+    } else if (msg is VfrHud) {
+      _vfrHudHandler.handle(msg);
+    } else if (msg is ParamValue) {
+      _paramsHandler.handle(msg);
+    } else if (msg is SysStatus) {
+      _sysStatusHandler.handle(msg);
+    } else if (msg is CommandAck) {
+      _commandAckHandler.handle(msg);
+      // Pass ACK to CommandManager
+      _commandManager.handleAck(msg);
+
+      // Mission protocol messages
+    } else if (msg is MissionCount) {
+      _missionHandler.handleMissionCount(msg);
+    } else if (msg is MissionItemInt) {
+      _missionHandler.handleMissionItemInt(msg);
+    } else if (msg is MissionItem) {
+      _missionHandler.handleMissionItem(msg);
+    } else if (msg is MissionCurrent) {
+      _missionHandler.handleMissionCurrent(msg);
+    } else if (msg is MissionItemReached) {
+      _missionHandler.handleMissionItemReached(msg);
+    } else if (msg is MissionAck) {
+      _missionHandler.handleMissionAck(msg);
+    } else if (msg is MissionRequestInt) {
+      respondToMissionRequestInt(msg);
+    } else if (msg is MissionRequest) {
+      respondToMissionRequest(msg);
+    } else if (msg is HomePosition) {
+      // lat/lon in 1e7, alt in mm
+      final lat = msg.latitude / 1e7;
+      final lon = msg.longitude / 1e7;
+      final alt = msg.altitude / 1000.0;
+      _eventController.add(
+        MAVLinkEvent(MAVLinkEventType.homePosition, {
+          'lat': lat,
+          'lon': lon,
+          'alt': alt,
+          'source': 'HOME_POSITION',
+        }),
+      );
+    } else if (msg is GpsGlobalOrigin) {
+      // GPS_GLOBAL_ORIGIN lat/lon in 1e7, alt in mm
+      final lat = msg.latitude / 1e7;
+      final lon = msg.longitude / 1e7;
+      final alt = msg.altitude / 1000.0;
+      _eventController.add(
+        MAVLinkEvent(MAVLinkEventType.homePosition, {
+          'lat': lat,
+          'lon': lon,
+          'alt': alt,
+          'source': 'GPS_GLOBAL_ORIGIN',
+        }),
+      );
+    }
   }
 
   Future<void> connect(String port, {int? baudRate}) async {
@@ -188,7 +269,8 @@ class DroneMAVLinkAPI {
     final reader = SerialPortReader(sp);
     _subscription = reader.stream.listen(
       (Uint8List data) {
-        _parser.parse(data);
+        // Send raw data to Isolate for parsing
+        _isolateSendPort?.send(data);
       },
       onDone: () => disconnect(),
       onError: (_) => disconnect(),
@@ -218,6 +300,8 @@ class DroneMAVLinkAPI {
   void dispose() {
     disconnect();
     _eventController.close();
+    _isolateReceivePort?.close();
+    _parserIsolate?.kill();
   }
 
   // Sending utilities
@@ -358,37 +442,64 @@ class DroneMAVLinkAPI {
   static const int MAV_DATA_STREAM_EXTRA2 = 11; // VFR HUD data
   static const int MAV_DATA_STREAM_EXTRA3 = 12;
 
-  /// Request a standard set of data streams at typical rates
-  void requestAllDataStreams() {
-    // First stop all streams để clear Mission Planner settings
-    _stopAllDataStreams();
+  /// Request specific message interval (MAV_CMD_SET_MESSAGE_INTERVAL)
+  /// intervalUs: Interval in microseconds (e.g. 200000 for 5Hz)
+  void setMessageInterval(int msgId, int intervalUs) {
+    final msg = CommandLong(
+      command: 511, // MAV_CMD_SET_MESSAGE_INTERVAL
+      targetSystem: _targetSystemId,
+      targetComponent: _targetComponentId,
+      param1: msgId.toDouble(),
+      param2: intervalUs.toDouble(),
+      param3: 0,
+      param4: 0,
+      param5: 0,
+      param6: 0,
+      param7: 0,
+      confirmation: 0,
+    );
+    sendMessage(msg);
+  }
 
+  /// Request a standard set of data streams using PRECISE INTERVALS
+  void requestAllDataStreams() {
     // Wait then set our preferred rates
     Future.delayed(const Duration(milliseconds: 200), () {
-      // All data at 4Hz
-      _requestDataStream(MAV_DATA_STREAM_ALL, 4);
-      // Attitude 10Hz
-      _requestDataStream(MAV_DATA_STREAM_EXTRA1, 10);
-      // VFR HUD 5Hz
-      _requestDataStream(MAV_DATA_STREAM_EXTRA2, 5);
-      // Position 3Hz
-      _requestDataStream(MAV_DATA_STREAM_POSITION, 3);
-      // Extended status 2Hz
-      _requestDataStream(MAV_DATA_STREAM_EXTENDED_STATUS, 2);
+      // 1. GLOBAL_POSITION_INT (33) -> 5Hz (200,000us)
+      // Critical for smooth map movement
+      setMessageInterval(33, 200000);
+
+      // 2. ATTITUDE (30) -> 20Hz (50,000us) - Try forcing higher rate
+      // Critical for smooth horizon/heading
+      setMessageInterval(30, 50000);
+
+      // 3. GPS_RAW_INT (24) -> 1Hz (1,000,000us)
+      // Satellites, Fix Type - Low priority
+      setMessageInterval(24, 1000000);
+
+      // 4. SYS_STATUS (1) -> 1Hz
+      // Battery, Voltage - Low priority
+      setMessageInterval(1, 1000000);
+
+      // 5. HEARTBEAT (0) -> 5Hz (200,000us)
+      // Critical for fast Mode/Arm updates
+      setMessageInterval(0, 200000);
+
+      // 6. VFR_HUD (74) -> 2Hz (500,000us)
+      // Airspeed, Alt - Medium priority
+      setMessageInterval(74, 500000);
+
+      // Fallback: Also request streams for older FCs that don't support SET_MESSAGE_INTERVAL
+      _requestDataStream(MAV_DATA_STREAM_POSITION, 5);
+      // _requestDataStream(MAV_DATA_STREAM_EXTRA1, 10); // Disable legacy to avoid conflict
+      _requestDataStream(MAV_DATA_STREAM_EXTRA2, 2);
+      _requestDataStream(MAV_DATA_STREAM_EXTENDED_STATUS, 1);
     });
   }
 
   /// Stop all data streams để clear previous settings
   void _stopAllDataStreams() {
     _requestDataStream(MAV_DATA_STREAM_ALL, 0);
-    _requestDataStream(MAV_DATA_STREAM_RAW_SENSORS, 0);
-    _requestDataStream(MAV_DATA_STREAM_EXTENDED_STATUS, 0);
-    _requestDataStream(MAV_DATA_STREAM_RC_CHANNELS, 0);
-    _requestDataStream(MAV_DATA_STREAM_RAW_CONTROLLER, 0);
-    _requestDataStream(MAV_DATA_STREAM_POSITION, 0);
-    _requestDataStream(MAV_DATA_STREAM_EXTRA1, 0);
-    _requestDataStream(MAV_DATA_STREAM_EXTRA2, 0);
-    _requestDataStream(MAV_DATA_STREAM_EXTRA3, 0);
   }
 
   void _requestDataStream(int streamId, int rate) {
@@ -407,12 +518,6 @@ class DroneMAVLinkAPI {
     );
     _sequence = (_sequence + 1) % 255;
     _serialPort?.write(frame.serialize());
-    // Send again after delay to improve reliability
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (_serialPort != null) {
-        _serialPort!.write(frame.serialize());
-      }
-    });
   }
 
   /// Request all parameters from the vehicle

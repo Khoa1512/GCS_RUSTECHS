@@ -392,6 +392,15 @@ class TelemetryService {
             _currentTelemetry['groundspeed'] =
                 (m['groundSpeed'] as num?)?.toDouble() ??
                 (_currentTelemetry['groundspeed'] ?? 0.0);
+
+            // [NEW] Use Fused Global Position for main coordinates (Smoother & More Accurate)
+            final newLat = (m['lat'] as num?)?.toDouble();
+            final newLon = (m['lon'] as num?)?.toDouble();
+
+            if (newLat != null && newLon != null) {
+              _currentTelemetry['gps_latitude'] = newLat;
+              _currentTelemetry['gps_longitude'] = newLon;
+            }
           }
           _emitTelemetry();
           break;
@@ -403,6 +412,11 @@ class TelemetryService {
                 ((m['satellites'] as num?)?.toDouble() ?? 0.0);
             _currentTelemetry['gps_fix'] = _getGpsFixValue(fixType);
 
+            // [CHANGED] Raw GPS coordinates are NO LONGER used for main display
+            // to avoid jitter. We now use GLOBAL_POSITION_INT (Fused) above.
+            // Only use Raw GPS as fallback if needed, or just ignore.
+            // For now, we comment them out to ensure we only use the Fused position.
+            /*
             final newLat =
                 (m['lat'] as num?)?.toDouble() ??
                 (_currentTelemetry['gps_latitude'] ?? 0.0);
@@ -412,6 +426,7 @@ class TelemetryService {
 
             _currentTelemetry['gps_latitude'] = newLat;
             _currentTelemetry['gps_longitude'] = newLon;
+            */
             _currentTelemetry['gps_altitude'] =
                 (m['alt'] as num?)?.toDouble() ??
                 (_currentTelemetry['gps_altitude'] ?? 0.0);

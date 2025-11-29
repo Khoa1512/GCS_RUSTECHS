@@ -471,7 +471,9 @@ class DroneMAVLinkAPI {
 
       // 2. ATTITUDE (30) -> 20Hz (50,000us) - Try forcing higher rate
       // Critical for smooth horizon/heading
-      setMessageInterval(30, 50000);
+      // 2. ATTITUDE (30) -> 20Hz (50,000us) - Try forcing higher rate
+      // Critical for smooth horizon/heading
+      // setMessageInterval(30, 50000); // Disable this to rely on legacy REQUEST_DATA_STREAM below
 
       // 3. GPS_RAW_INT (24) -> 1Hz (1,000,000us)
       // Satellites, Fix Type - Low priority
@@ -491,7 +493,10 @@ class DroneMAVLinkAPI {
 
       // Fallback: Also request streams for older FCs that don't support SET_MESSAGE_INTERVAL
       _requestDataStream(MAV_DATA_STREAM_POSITION, 5);
-      // _requestDataStream(MAV_DATA_STREAM_EXTRA1, 10); // Disable legacy to avoid conflict
+      _requestDataStream(
+        MAV_DATA_STREAM_EXTRA1,
+        20,
+      ); // Enable legacy Attitude at 20Hz
       _requestDataStream(MAV_DATA_STREAM_EXTRA2, 2);
       _requestDataStream(MAV_DATA_STREAM_EXTENDED_STATUS, 1);
     });
@@ -510,7 +515,8 @@ class DroneMAVLinkAPI {
       reqMessageRate: rate,
       startStop: 1,
     );
-    final frame = MavlinkFrame.v2(
+    final frame = MavlinkFrame.v1(
+      // Changed to V1 for better compatibility with legacy commands
       _sequence,
       _sourceSystemId,
       _sourceComponentId,

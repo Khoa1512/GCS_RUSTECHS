@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math; // Import thư viện toán học
 import 'package:flutter_libserialport/flutter_libserialport.dart';
+import 'package:dart_mavlink/dialects/common.dart';
 import 'package:skylink/api/telemetry/mavlink_api.dart';
 import 'package:skylink/data/telemetry_data.dart';
 import 'package:skylink/data/constants/telemetry_constants.dart';
@@ -455,6 +456,18 @@ class TelemetryService {
                 (_currentTelemetry['gps_vertical_accuracy'] ?? 0.0);
 
             _lastGpsFixType = fixType;
+          }
+          _emitTelemetry();
+          break;
+        case MAVLinkEventType.sysStatus:
+          if (event.data is SysStatus) {
+            final msg = event.data as SysStatus;
+            // Voltage is in mV, convert to V
+            _currentTelemetry['voltageBattery'] = msg.voltageBattery / 1000.0;
+            // Current is in cA, convert to A
+            _currentTelemetry['currentBattery'] = msg.currentBattery / 100.0;
+            // Remaining is in %
+            _currentTelemetry['battery'] = msg.batteryRemaining.toDouble();
           }
           _emitTelemetry();
           break;

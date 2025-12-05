@@ -120,7 +120,6 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       _isLoadingZones = true;
     });
 
-
     final zones = await NoFlyZoneService().loadNoFlyZones(
       'hcmc_nofly_zones.json',
     );
@@ -1214,6 +1213,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     // Cancel all timers first to prevent memory leaks
     _interpolationTimer?.cancel();
     _uiUpdateTimer?.cancel();
+    _cullingDebounceTimer?.cancel();
 
     // Remove animation listeners
     _positionController.removeListener(_onPositionAnimationUpdate);
@@ -1227,6 +1227,9 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
     _telemetrySubscription?.cancel();
     _connectionSubscription?.cancel();
     _missionSubscription?.cancel();
+
+    // Dispose map controller to prevent memory leaks and errors
+    _mapController.dispose();
 
     super.dispose();
   }

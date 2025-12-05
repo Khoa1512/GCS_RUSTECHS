@@ -82,6 +82,7 @@ class MapPageState {
   void dispose() {
     mavSub?.cancel();
     telemetrySub?.cancel();
+    mapController.dispose();
   }
 
   /// Ensure layer links exist for all waypoints

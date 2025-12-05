@@ -12,7 +12,7 @@ class SolidFlightDisplay extends StatelessWidget {
   final String flightMode; // Flight mode from telemetry
   final bool isArmed; // ARM status from telemetry
   final bool isConnected; // Connection status
-  final bool hasGpsLock; // GPS lock status
+  final String hasGpsLock; // GPS lock status
   final int linkQuality; // Link quality %
   final int satellites; // Number of satellites
 
@@ -28,7 +28,7 @@ class SolidFlightDisplay extends StatelessWidget {
     this.flightMode = 'Unknown',
     this.isArmed = false,
     this.isConnected = false,
-    this.hasGpsLock = true,
+    this.hasGpsLock = 'No GPS',
     this.linkQuality = 100,
     this.satellites = 0,
   });
@@ -280,12 +280,10 @@ class SolidFlightDisplay extends StatelessWidget {
             color: const Color(0xFFFF6B35),
           ),
           _buildGlassStatusItem(
-            icon: hasGpsLock ? Icons.gps_fixed : Icons.gps_not_fixed,
+            icon: _getGpsIcon(hasGpsLock),
             label: "GPS",
-            value: hasGpsLock ? "LOCK" : "NO FIX",
-            color: hasGpsLock
-                ? const Color(0xFF00E5FF)
-                : const Color(0xFFFF6B35),
+            value: _formatGpsType(hasGpsLock),
+            color: _getGpsColor(hasGpsLock),
           ),
           _buildGlassStatusItem(
             icon: Icons.satellite_alt,
@@ -425,6 +423,48 @@ class SolidFlightDisplay extends StatelessWidget {
     if (sats >= 6) return const Color(0xFF4CAF50); // Green for good
     if (sats >= 4) return const Color(0xFFFFC107); // Amber for marginal
     return const Color(0xFFFF6B35); // Orange-red for poor
+  }
+
+  // GPS type helpers
+  IconData _getGpsIcon(String gpsType) {
+    if (gpsType == 'RTK Fixed' || gpsType == 'RTK Float') {
+      return Icons.gps_fixed;
+    } else if (gpsType == '3D Fix' || gpsType == 'DGPS') {
+      return Icons.gps_fixed;
+    } else if (gpsType == '2D Fix') {
+      return Icons.gps_not_fixed;
+    }
+    return Icons.gps_off;
+  }
+
+  String _formatGpsType(String gpsType) {
+    // Rút gọn tên để vừa với UI
+    if (gpsType == 'RTK Fixed') return 'RTK FIX';
+    if (gpsType == 'RTK Float') return 'RTK FLT';
+    if (gpsType == '3D Fix') return '3D FIX';
+    if (gpsType == '2D Fix') return '2D FIX';
+    if (gpsType == 'DGPS') return 'DGPS';
+    if (gpsType == 'No GPS') return 'NO GPS';
+    if (gpsType == 'No Fix') return 'NO FIX';
+    return gpsType;
+  }
+
+  Color _getGpsColor(String gpsType) {
+    // RTK - Màu tím (cao cấp nhất)
+    if (gpsType == 'RTK Fixed') return const Color(0xFFE040FB);
+    if (gpsType == 'RTK Float') return const Color(0xFFBA68C8);
+
+    // DGPS - Màu xanh lá (tốt)
+    if (gpsType == 'DGPS') return const Color(0xFF4CAF50);
+
+    // 3D Fix - Màu cyan (bình thường tốt)
+    if (gpsType == '3D Fix') return const Color(0xFF00E5FF);
+
+    // 2D Fix - Màu vàng (cảnh báo)
+    if (gpsType == '2D Fix') return const Color(0xFFFFC107);
+
+    // No GPS/No Fix - Màu đỏ cam (lỗi)
+    return const Color(0xFFFF6B35);
   }
 
   Widget _buildInstrumentFrame({required Widget child}) {

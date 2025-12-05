@@ -366,7 +366,6 @@ class _MapPageState extends State<MapPage>
           builder: (context, snapshot) {
             final telemetry = snapshot.data ?? {};
             final isConnected = TelemetryService().isConnected;
-            final hasGps = TelemetryService().hasValidGpsFix;
 
             return SolidFlightDisplay(
               roll: telemetry['roll'] ?? 0.0,
@@ -379,7 +378,7 @@ class _MapPageState extends State<MapPage>
               flightMode: TelemetryService().currentMode,
               isArmed: TelemetryService().isArmed,
               isConnected: isConnected,
-              hasGpsLock: hasGps,
+              hasGpsLock: TelemetryService().gpsFixType,
               linkQuality: isConnected ? 100 : 0,
               satellites: (telemetry['satellites'] ?? 0.0).toInt(),
             );

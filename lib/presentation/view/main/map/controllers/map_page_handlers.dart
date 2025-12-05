@@ -156,6 +156,24 @@ mixin MapPageHandlers<T extends StatefulWidget> on State<T> {
     });
   }
 
+  /// Handle home point drag
+  void onHomePointDrag(LatLng newPosition) {
+    updateState(() {
+      state.homePoint = newPosition;
+      state.isHomePointManuallySet = true; // Mark as manually set
+    });
+  }
+
+  /// Reset home point to auto mode (GPS-based)
+  void resetHomePointToAuto() {
+    updateState(() {
+      state.isHomePointManuallySet = false;
+      state.hasSetHomePoint = false;
+      state.homePoint = null;
+    });
+    showInfo('Home Point đã được reset về chế độ tự động');
+  }
+
   // ============================================================================
   // WAYPOINT OPERATIONS
   // ============================================================================

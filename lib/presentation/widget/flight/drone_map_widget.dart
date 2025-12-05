@@ -631,7 +631,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
         setState(() {
           _homePoint = LatLng(lat, lon);
           _hasSetHomePointOnTakeoff = true;
-          print("Home Point set at Arming: $lat, $lon");
+          // print("Home Point set at Arming: $lat, $lon");
         });
       }
     }
@@ -653,7 +653,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
       setState(() {
         _homePoint = LatLng(lat, lon);
         _hasSetHomePointOnTakeoff = true;
-        print("Home Point set at Takeoff (Backup): $lat, $lon");
+        // print("Home Point set at Takeoff (Backup): $lat, $lon");
       });
     }
   }
@@ -939,7 +939,7 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                             ),
                           ),
                         ),
-                      // Main drone marker (smoothed position) - render sau để nằm trên
+                      // Main drone marker with heading line (smoothed position)
                       Marker(
                         point: LatLng(_currentLatitude, _currentLongitude),
                         width: 120, // Tăng size để vẽ FOV cone và ripple
@@ -981,12 +981,29 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
                                       ),
                                     ),
                                   ),
-                                  // 2. Drone Icon & FOV Cone (Custom Painted)
-                                  CustomPaint(
-                                    size: const Size(60, 60),
-                                    painter: DroneMarkerPainter(
-                                      color: _getGpsStatusColor(),
-                                      isArmed: _telemetryService.isArmed,
+                                  // 2. Heading Line + Drone Icon (xoay cùng nhau)
+                                  Transform.rotate(
+                                    angle: _currentYaw * (math.pi / 180),
+                                    child: Stack(
+                                      alignment: Alignment.center,
+                                      children: [
+                                        // Heading line (vẽ trước)
+                                        CustomPaint(
+                                          size: const Size(120, 120),
+                                          painter: HeadingLinePainter(
+                                            color: _getGpsStatusColor(),
+                                          ),
+                                        ),
+                                        // Drone icon (vẽ sau, nằm trên)
+                                        CustomPaint(
+                                          size: const Size(60, 60),
+                                          painter: DroneMarkerPainter(
+                                            color: _getGpsStatusColor(),
+                                            isArmed: _telemetryService.isArmed,
+                                            heading: _currentYaw,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
@@ -1281,27 +1298,32 @@ class _DroneMapWidgetState extends State<DroneMapWidget>
 class DroneMarkerPainter extends CustomPainter {
   final Color color;
   final bool isArmed;
+  final double heading;
 
-  DroneMarkerPainter({required this.color, required this.isArmed});
+  DroneMarkerPainter({
+    required this.color,
+    required this.isArmed,
+    required this.heading,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final double scale = size.width / 60.0; // Base size 60
 
-    // 1. Draw FOV Cone (Field of View)
+    // 1. Draw FOV Cone (Field of View) - Wider and more visible
     final Paint fovPaint = Paint()
       ..shader = RadialGradient(
-        colors: [color.withOpacity(0.4), color.withOpacity(0.0)],
-        stops: const [0.2, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: 40 * scale))
+        colors: [color.withOpacity(0.3), color.withOpacity(0.0)],
+        stops: const [0.1, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: 50 * scale))
       ..style = PaintingStyle.fill;
 
-    // Draw arc -90 degrees (up) +/- 30 degrees
+    // Draw arc pointing forward (up) +/- 45 degrees for better visibility
     canvas.drawArc(
-      Rect.fromCircle(center: center, radius: 40 * scale),
-      -math.pi / 2 - (math.pi / 6), // Start angle (-90 - 30)
-      math.pi / 3, // Sweep angle (60 degrees)
+      Rect.fromCircle(center: center, radius: 50 * scale),
+      -math.pi / 2 - (math.pi / 4), // Start angle (-90 - 45)
+      math.pi / 2, // Sweep angle (90 degrees)
       true,
       fovPaint,
     );
@@ -1327,50 +1349,203 @@ class DroneMarkerPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
     );
 
-    // 3. Draw Drone Body (Delta Wing)
+    // 3. Draw Drone Body (Delta Wing - More pronounced nose)
     final ui.Path dronePath = ui.Path();
-    dronePath.moveTo(center.dx, center.dy - 20 * scale); // Nose (Top)
+    dronePath.moveTo(
+      center.dx,
+      center.dy - 22 * scale,
+    ); // Nose (Top) - Extended
     dronePath.lineTo(
       center.dx + 16 * scale,
-      center.dy + 16 * scale,
+      center.dy + 14 * scale,
     ); // Right wing
-    dronePath.lineTo(center.dx, center.dy + 10 * scale); // Tail notch
+    dronePath.lineTo(center.dx, center.dy + 8 * scale); // Tail notch
     dronePath.lineTo(
       center.dx - 16 * scale,
-      center.dy + 16 * scale,
+      center.dy + 14 * scale,
     ); // Left wing
     dronePath.close();
 
-    // Fill
-    canvas.drawPath(
-      dronePath,
-      Paint()
-        ..color = isArmed
-            ? const Color(0xFFFF3D00)
-            : const Color(0xFF00E676) // Red if armed, Green if disarmed
-        ..style = PaintingStyle.fill,
-    );
+    // Fill with gradient for depth
+    final Paint bodyPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: isArmed
+            ? [
+                const Color(0xFFFF5722), // Lighter red at nose
+                const Color(0xFFD32F2F), // Darker red at tail
+              ]
+            : [
+                const Color(0xFF00E676), // Lighter green at nose
+                const Color(0xFF00C853), // Darker green at tail
+              ],
+      ).createShader(Rect.fromCircle(center: center, radius: 25 * scale))
+      ..style = PaintingStyle.fill;
 
-    // Border
+    canvas.drawPath(dronePath, bodyPaint);
+
+    // Border - Thicker and white for high contrast
     canvas.drawPath(
       dronePath,
       Paint()
         ..color = Colors.white
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5 * scale
+        ..strokeWidth = 3 * scale
         ..strokeJoin = StrokeJoin.round,
     );
 
-    // 4. Center Point (Prop/Hub)
+    // 4. Draw Directional Indicator (Nose marker) - Critical for orientation
+    final Paint noseMarkerPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    // Small triangle at the nose to emphasize direction
+    final ui.Path noseMarker = ui.Path();
+    noseMarker.moveTo(center.dx, center.dy - 22 * scale); // Tip
+    noseMarker.lineTo(center.dx - 4 * scale, center.dy - 14 * scale); // Left
+    noseMarker.lineTo(center.dx + 4 * scale, center.dy - 14 * scale); // Right
+    noseMarker.close();
+    canvas.drawPath(noseMarker, noseMarkerPaint);
+
+    // 5. Center Point (Prop/Hub) - Larger for visibility
+    canvas.drawCircle(center, 4 * scale, Paint()..color = Colors.white);
+
+    // Inner hub
     canvas.drawCircle(
-      Offset(center.dx, center.dy + 2 * scale),
-      3 * scale,
-      Paint()..color = Colors.white,
+      center,
+      2 * scale,
+      Paint()..color = isArmed ? Colors.red : Colors.green,
     );
+
+    // 6. Add heading text for precision (optional - can be toggled)
+    // Uncomment if you want to show heading number on the icon
+    /*
+    final textSpan = TextSpan(
+      text: '${heading.toStringAsFixed(0)}°',
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: 8 * scale,
+        fontWeight: FontWeight.bold,
+        shadows: [
+          Shadow(
+            color: Colors.black,
+            offset: Offset(1, 1),
+            blurRadius: 2,
+          ),
+        ],
+      ),
+    );
+    final textPainter = TextPainter(
+      text: textSpan,
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(
+        center.dx - textPainter.width / 2,
+        center.dy + 20 * scale,
+      ),
+    );
+    */
   }
 
   @override
   bool shouldRepaint(covariant DroneMarkerPainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.isArmed != isArmed;
+    return oldDelegate.color != color ||
+        oldDelegate.isArmed != isArmed ||
+        oldDelegate.heading != heading;
+  }
+}
+
+/// Heading Line Painter - Clean single line style
+/// One bright line showing drone heading direction
+class HeadingLinePainter extends CustomPainter {
+  final Color color;
+
+  HeadingLinePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+
+    // Calculate drone nose position (where line starts)
+    final double noseOffset = 22.0; // Drone nose position
+    final Offset lineStart = Offset(center.dx, center.dy - noseOffset);
+
+    // Line extends very far forward - much longer for visibility
+    final double lineLength = size.height * 0.6; // 60% - very long!
+    final Offset lineEnd = Offset(
+      center.dx,
+      center.dy - noseOffset - lineLength,
+    );
+
+    // Bright cyan for maximum visibility
+    const Color primaryColor = Color(0xFF00E5FF); // Bright cyan
+    const Color secondaryColor = Colors.white;
+
+    // Draw strong glow for visibility on any background
+    final Paint glowPaint = Paint()
+      ..color = secondaryColor.withOpacity(0.4)
+      ..strokeWidth = 12
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5)
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawLine(lineStart, lineEnd, glowPaint);
+
+    // Main line - bright and thick
+    final Paint linePaint = Paint()
+      ..color = primaryColor
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawLine(lineStart, lineEnd, linePaint);
+
+    // Draw arrowhead at the end
+    final Paint arrowPaint = Paint()
+      ..color = primaryColor
+      ..style = PaintingStyle.fill;
+
+    final ui.Path arrowPath = ui.Path();
+    final double arrowSize = 12; // Bigger arrow
+
+    // Solid triangle
+    arrowPath.moveTo(lineEnd.dx, lineEnd.dy); // Tip
+    arrowPath.lineTo(lineEnd.dx - arrowSize / 2, lineEnd.dy + arrowSize);
+    arrowPath.lineTo(lineEnd.dx + arrowSize / 2, lineEnd.dy + arrowSize);
+    arrowPath.close();
+
+    // Draw arrow with glow
+    canvas.drawPath(
+      arrowPath,
+      Paint()
+        ..color = secondaryColor.withOpacity(0.6)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+    );
+    canvas.drawPath(arrowPath, arrowPaint);
+
+    // Connection point at drone nose - bright and visible
+    canvas.drawCircle(
+      lineStart,
+      3.5,
+      Paint()
+        ..color = secondaryColor
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawCircle(
+      lineStart,
+      2.5,
+      Paint()
+        ..color = primaryColor
+        ..style = PaintingStyle.fill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant HeadingLinePainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }

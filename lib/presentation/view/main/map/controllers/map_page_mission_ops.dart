@@ -64,7 +64,8 @@ mixin MapPageMissionOps<T extends StatefulWidget> on State<T> {
     final isConnected = TelemetryService().isConnected;
 
     if (!hasValidGps || !isConnected) {
-      if (state.homePoint != null) {
+      if (state.homePoint != null && !state.isHomePointManuallySet) {
+        // Only clear home point if it wasn't manually set by user
         updateState(() {
           state.homePoint = null;
           state.hasSetHomePoint = false;
@@ -73,7 +74,8 @@ mixin MapPageMissionOps<T extends StatefulWidget> on State<T> {
       return;
     }
 
-    if (!state.hasSetHomePoint && hasValidGps) {
+    // Only auto-set home point if user hasn't manually set it
+    if (!state.hasSetHomePoint && !state.isHomePointManuallySet && hasValidGps) {
       final lat = TelemetryService().gpsLatitude;
       final lng = TelemetryService().gpsLongitude;
       if (lat != 0.0 && lng != 0.0) {

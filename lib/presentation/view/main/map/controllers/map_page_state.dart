@@ -23,6 +23,7 @@ class MapPageState {
   // GPS/Home point
   LatLng? homePoint;
   bool hasSetHomePoint = false;
+  bool isHomePointManuallySet = false; // Track if user manually dragged home point
 
   // Stream subscriptions
   StreamSubscription? mavSub;

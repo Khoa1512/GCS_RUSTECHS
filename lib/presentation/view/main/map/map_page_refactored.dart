@@ -135,6 +135,7 @@ class _MapPageState extends State<MapPage>
         onWaypointDragStart: onWaypointDragStart,
         onWaypointDragEnd: onWaypointDragEnd,
         onPointerHover: onPointerHover,
+        onHomePointDrag: onHomePointDrag,
         isConfigValid: true,
         homePoint: state.homePoint,
         waypointLayerLinks: state.waypointLayerLinks,
@@ -355,10 +356,17 @@ class _MapPageState extends State<MapPage>
             final telemetry = snapshot.data ?? {};
             final isConnected = TelemetryService().isConnected;
 
+            // Use yaw directly instead of compass_heading for more stable display
+            final yaw = telemetry['yaw'] ?? 0.0;
+            // Convert yaw to 0-360 range if needed
+            double heading = yaw;
+            while (heading < 0) heading += 360;
+            while (heading > 360) heading -= 360;
+
             return SolidFlightDisplay(
               roll: telemetry['roll'] ?? 0.0,
               pitch: telemetry['pitch'] ?? 0.0,
-              heading: telemetry['compass_heading'] ?? 0.0,
+              heading: heading,
               altitude: telemetry['altitude_rel'] ?? 0.0,
               airspeed: telemetry['groundspeed'] ?? 0.0,
               batteryPercent: telemetry['battery'] ?? 0.0,

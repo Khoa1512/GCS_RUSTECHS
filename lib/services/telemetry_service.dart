@@ -42,15 +42,15 @@ class TelemetryService {
   DateTime? _lastGpsUpdateTime;
   DateTime? _lastAttitudeUpdateTime;
 
-  // Giảm threshold để compass nhạy hơn
-  static const double _headingStabilityThreshold = 0.1;
+  // Tăng threshold để lọc nhiễu sensor (gyro noise thường ±0.2°)
+  static const double _headingStabilityThreshold = 2.0; // 2 độ để lọc nhiễu
 
-  // Tăng tốc độ update (30ms ~ 33fps) để animation không bị giật
-  static const Duration _headingUpdateInterval = Duration(milliseconds: 30);
+  // Giảm tần suất update để tránh spam
+  static const Duration _headingUpdateInterval = Duration(milliseconds: 100);
 
   final List<double> _headingBuffer = [];
-  // Buffer size vừa phải, quá lớn sẽ gây lag (delay), quá nhỏ sẽ bị rung
-  static const int _headingBufferSize = 5;
+  // Tăng buffer size để lọc nhiễu tốt hơn
+  static const int _headingBufferSize = 10;
 
   Stream<Map<String, double>> get telemetryStream =>
       _telemetryController.stream;
@@ -153,13 +153,11 @@ class TelemetryService {
       headingDiff = 360 - headingDiff;
     }
 
-    // Update if significant change OR to prevent UI freeze
+    // Update ONLY if significant change (remove preventFreeze to avoid unnecessary updates)
     bool significantChange = headingDiff > _headingStabilityThreshold;
-    bool preventFreeze =
-        now.difference(_lastHeadingUpdate).inMilliseconds >
-        1000; // Increase to 1 second
 
-    if (significantChange || preventFreeze) {
+    if (significantChange) {
+      print('📍 COMPASS UPDATE: ${_lastStableHeading.toStringAsFixed(2)}° → ${filteredHeading.toStringAsFixed(2)}° (diff: ${headingDiff.toStringAsFixed(2)}°)');
       _currentTelemetry['compass_heading'] = filteredHeading;
       _lastStableHeading = filteredHeading;
       _lastHeadingUpdate = now;
@@ -354,6 +352,9 @@ class TelemetryService {
             }
 
             _currentTelemetry['yaw'] = yawDegrees;
+
+            // DEBUG: Print yaw values to check if FC is actually rotating
+            print('🧭 RAW YAW: ${rawYaw.toStringAsFixed(4)} | YAW DEG: ${yawDegrees.toStringAsFixed(2)}° | COMPASS: ${compassHeading.toStringAsFixed(2)}°');
 
             // Use converted compass heading for navigation
             if (compassHeading >= 0 && compassHeading <= 360) {

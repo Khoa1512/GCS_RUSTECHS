@@ -145,51 +145,22 @@ class SolidFlightDisplay extends StatelessWidget {
                                           .black, // Nền đen tuyệt đối cho la bàn
                                       shape: BoxShape.circle,
                                     ),
-                                    child: TweenAnimationBuilder<double>(
-                                      tween: HeadingTween(
-                                        begin: heading,
-                                        end: heading,
+                                    child: CustomPaint(
+                                      painter: _SolidCompassPainter(
+                                        heading: heading,
                                       ),
-                                      duration: const Duration(
-                                        milliseconds: 120, // Reduced latency
-                                      ),
-                                      curve: Curves.linear,
-                                      builder:
-                                          (context, animatedHeading, child) {
-                                            return CustomPaint(
-                                              painter: _SolidCompassPainter(
-                                                heading: animatedHeading,
-                                              ),
-                                            );
-                                          },
                                     ),
                                   ),
                                   Positioned.fill(
-                                    child: TweenAnimationBuilder<double>(
-                                      tween: HeadingTween(
-                                        begin: heading,
-                                        end: heading,
+                                    child: Transform.rotate(
+                                      angle: heading * math.pi / 180,
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.navigation,
+                                          color: Color(0xFF00E5FF),
+                                          size: 24,
+                                        ),
                                       ),
-                                      duration: const Duration(
-                                        milliseconds: 120, // Reduced latency
-                                      ),
-                                      curve: Curves.linear,
-                                      builder:
-                                          (context, animatedHeading, child) {
-                                            return Transform.rotate(
-                                              angle:
-                                                  animatedHeading *
-                                                  math.pi /
-                                                  180,
-                                              child: Center(
-                                                child: Icon(
-                                                  Icons.navigation,
-                                                  color: Color(0xFF00E5FF),
-                                                  size: 24,
-                                                ),
-                                              ),
-                                            );
-                                          },
                                     ),
                                   ),
                                   // Heading text

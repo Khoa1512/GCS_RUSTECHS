@@ -24,6 +24,7 @@ class MainMapSimple extends StatefulWidget {
   final VoidCallback? onWaypointDragStart;
   final VoidCallback? onWaypointDragEnd;
   final Function(LatLng latLng)? onPointerHover;
+  final Function(LatLng newPosition)? onHomePointDrag;
   final bool isConfigValid;
   final LatLng? homePoint;
   final Map<String, LayerLink>? waypointLayerLinks;
@@ -50,6 +51,7 @@ class MainMapSimple extends StatefulWidget {
     this.onWaypointDragStart,
     this.onWaypointDragEnd,
     this.onPointerHover,
+    this.onHomePointDrag,
     required this.isConfigValid,
     this.homePoint,
     this.waypointLayerLinks,
@@ -70,6 +72,8 @@ class MainMapSimpleState extends State<MainMapSimple> {
   bool _hasZoomedToHome = false;
   int? _draggedWaypointIndex;
   LatLng? _draggedPosition;
+  bool _isDraggingHomePoint = false;
+  LatLng? _draggedHomePosition;
 
   // Cache store future
   late final Future<CacheStore> _cacheStoreFuture;
@@ -254,6 +258,47 @@ class MainMapSimpleState extends State<MainMapSimple> {
     }
   }
 
+  // Home point drag handlers
+  void _onHomePointPanUpdate(DragUpdateDetails details) {
+    final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    final localPosition = renderBox.globalToLocal(details.globalPosition);
+    final camera = widget.mapController.camera;
+    final bounds = camera.visibleBounds;
+    final size = renderBox.size;
+
+    final relativeX = localPosition.dx / size.width;
+    final relativeY = localPosition.dy / size.height;
+
+    final newLat = bounds.north - (bounds.north - bounds.south) * relativeY;
+    final newLng = bounds.west + (bounds.east - bounds.west) * relativeX;
+
+    final point = LatLng(newLat, newLng);
+
+    setState(() {
+      _isDraggingHomePoint = true;
+      _draggedHomePosition = point;
+    });
+
+    // Haptic feedback when dragging
+    if (_draggedHomePosition != null) {
+      HapticFeedback.selectionClick();
+    }
+
+    if (widget.onHomePointDrag != null) {
+      widget.onHomePointDrag!(point);
+    }
+  }
+
+  void _onHomePointPanEnd(DragEndDetails details) {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _isDraggingHomePoint = false;
+      _draggedHomePosition = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     // All waypoints for rendering markers
@@ -374,22 +419,70 @@ class MainMapSimpleState extends State<MainMapSimple> {
               markers: [
                 if (widget.homePoint != null)
                   Marker(
-                    point: widget.homePoint!,
-                    width: 40,
-                    height: 40,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'H',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                    point: _draggedHomePosition ?? widget.homePoint!,
+                    width: _isDraggingHomePoint ? 50 : 40,
+                    height: _isDraggingHomePoint ? 50 : 40,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      dragStartBehavior: DragStartBehavior.down,
+                      onTapDown: widget.onHomePointDrag != null
+                          ? (details) {
+                              HapticFeedback.lightImpact();
+                              setState(() {
+                                _isDraggingHomePoint = true;
+                                _draggedHomePosition = widget.homePoint;
+                              });
+                            }
+                          : null,
+                      onPanStart: widget.onHomePointDrag != null
+                          ? (details) {
+                              setState(() {
+                                _isDraggingHomePoint = true;
+                                _draggedHomePosition = widget.homePoint;
+                              });
+                              widget.onWaypointDragStart?.call();
+                            }
+                          : null,
+                      onPanUpdate: widget.onHomePointDrag != null
+                          ? (details) => _onHomePointPanUpdate(details)
+                          : null,
+                      onPanEnd: widget.onHomePointDrag != null
+                          ? (details) {
+                              _onHomePointPanEnd(details);
+                              widget.onWaypointDragEnd?.call();
+                            }
+                          : null,
+                      child: Tooltip(
+                        message: 'Kéo để di chuyển Home Point',
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _isDraggingHomePoint
+                                ? Colors.green.withOpacity(0.8)
+                                : Colors.green,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: _isDraggingHomePoint ? Colors.yellow : Colors.white,
+                              width: _isDraggingHomePoint ? 4 : 3,
+                            ),
+                            boxShadow: _isDraggingHomePoint
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.yellow.withOpacity(0.5),
+                                      blurRadius: 10,
+                                      spreadRadius: 2,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'H',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -605,6 +698,57 @@ class MainMapSimpleState extends State<MainMapSimple> {
                     'Kinh Độ: ${_draggedPosition!.longitude.toStringAsFixed(7)}',
                     style: const TextStyle(
                       color: Colors.cyan,
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (_isDraggingHomePoint && _draggedHomePosition != null)
+          Positioned(
+            left: 20,
+            top: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green, width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.home, color: Colors.green, size: 16),
+                      SizedBox(width: 4),
+                      Text(
+                        'Home Point',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Vĩ Độ: ${_draggedHomePosition!.latitude.toStringAsFixed(7)}",
+                    style: const TextStyle(
+                      color: Colors.greenAccent,
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                  Text(
+                    'Kinh Độ: ${_draggedHomePosition!.longitude.toStringAsFixed(7)}',
+                    style: const TextStyle(
+                      color: Colors.greenAccent,
                       fontSize: 11,
                       fontFamily: 'monospace',
                     ),
